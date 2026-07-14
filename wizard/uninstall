@@ -1,0 +1,19 @@
+[{
+  "stepTitle": "卸载 Hermes Agent",
+  "items": [
+    {
+      "type": "tips",
+      "helpText": "请选择数据清理方式。"
+    },
+    {
+      "type": "radio",
+      "field": "wizard_delete_data",
+      "label": "保留用户数据（推荐 — 下次安装时可继续使用）",
+      "initValue": "false",
+      "options": [
+        { "label": "保留数据", "value": "false" },
+        { "label": "完全删除（包括会话记忆、技能和配置）", "value": "true" }
+      ]
+    }
+  ]
+}]

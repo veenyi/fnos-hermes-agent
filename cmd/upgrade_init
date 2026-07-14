@@ -1,0 +1,56 @@
+#!/bin/bash
+
+### 升级前回调 — 停止应用并清理残留 socket，避免解压新文件时冲突
+
+TRIM_APPDEST="${TRIM_APPDEST:-/var/apps/hermes-agent}"
+TRIM_PKGVAR="${TRIM_PKGVAR:-/vol1/@appdata/hermes-agent}"
+LOG_FILE="${TRIM_PKGVAR}/info.log"
+
+log_msg() {
+    local msg="$(date '+%Y-%m-%d %H:%M:%S') - [upgrade_init] $1"
+    echo "$msg" >> "${LOG_FILE}" 2>/dev/null || true
+}
+
+log_msg "=== upgrade_init start ==="
+log_msg "TRIM_APPDEST=${TRIM_APPDEST}"
+log_msg "TRIM_PKGVAR=${TRIM_PKGVAR}"
+log_msg "TRIM_USERNAME=${TRIM_USERNAME:-<empty>}"
+
+# 记录升级前目录状态
+log_msg "--- 目录状态 (升级前) ---"
+ls -la "${TRIM_APPDEST}" 2>&1 | while IFS= read -r line; do log_msg "  $line"; done
+
+# 强制 kill 残留进程（fnOS 在 upgrade_init 前会发 SIGTERM，但子进程可能未完全退出）
+pkill -9 -f "bun.*monitor\.js" 2>/dev/null || true
+pkill -9 -f "hermes.*gateway" 2>/dev/null || true
+pkill -9 -f "hermes.*dashboard" 2>/dev/null || true
+
+# 等待进程完全退出（最多 10 秒），避免文件句柄残留导致 fnOS 解压/权限设置失败
+_wait=0
+while [ ${_wait} -lt 10 ]; do
+    if ! pgrep -f "bun.*monitor\.js" >/dev/null 2>&1 \
+       && ! pgrep -f "hermes.*gateway" >/dev/null 2>&1 \
+       && ! pgrep -f "hermes.*dashboard" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+    _wait=$((_wait + 1))
+done
+log_msg "进程清理完成 (等待 ${_wait}s)"
+
+# 兜底删除残留 socket
+rm -f "${TRIM_APPDEST}/hermes-agent.sock" 2>/dev/null || true
+rm -f "/var/apps/hermes-agent/target/hermes-agent.sock" 2>/dev/null || true
+log_msg "socket 清理完成"
+
+# 额外等待 2 秒，确保文件系统释放所有句柄
+sleep 2
+
+# 记录清理后目录状态
+log_msg "--- 目录状态 (清理后) ---"
+ls -la "${TRIM_APPDEST}" 2>&1 | while IFS= read -r line; do log_msg "  $line"; done
+
+log_msg "=== upgrade_init end ==="
+exit 0
+
+

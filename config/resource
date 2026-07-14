@@ -1,0 +1,14 @@
+{
+    "data-share": {
+        "shares": [
+            {
+                "name": "hermes-agent"
+            }
+        ]
+    },
+    "usr-local-linker": {
+        "bin": [
+            "bin/hermes"
+        ]
+    }
+}

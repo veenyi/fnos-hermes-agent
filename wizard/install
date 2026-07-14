@@ -1,0 +1,15 @@
+[
+    {
+        "stepTitle": "安装说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "<b>Herme Agent</b><br>开源AI Agent，支持多平台消息网关、内置学习循环、技能系统和MCP扩展。"
+            },
+            {
+                "type": "tips",
+                "helpText": "<br >安装完成后，打开Herme Agent控制面板，完成模型添加即可进行对话。"
+            }
+        ]
+    }
+]

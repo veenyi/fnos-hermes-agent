@@ -1,0 +1,278 @@
+#!/bin/bash
+
+set -e
+
+LOG_FILE="${TRIM_PKGVAR}/info.log"
+
+log_msg() {
+    local msg="$(date '+%Y-%m-%d %H:%M:%S') - [upgrade] $1"
+    echo "$msg"
+    echo "$msg" >> "${LOG_FILE}" 2>/dev/null || true
+}
+
+toast_err() {
+    echo "$*" > "$TRIM_TEMP_LOGFILE"
+}
+
+# 全局错误捕获
+trap 'toast_err "脚本出错(L${LINENO}): $(tail -3 "${LOG_FILE}" 2>/dev/null)"' ERR
+
+DATA_DIR="${TRIM_PKGHOME}/data"
+VAR_DIR="${TRIM_PKGVAR}"
+VENV_DIR="${DATA_DIR}/venv"
+HERMES="${VENV_DIR}/bin/hermes"
+APP_DIR="${TRIM_APPDEST}"
+UV_BIN="${DATA_DIR}/bin"
+
+export HOME="${DATA_DIR}"
+
+# uv 缓存目录放到 DATA_DIR 下，确保和 venv 同一文件系统，hardlink 可用
+export UV_CACHE_DIR="${DATA_DIR}/.uv-cache"
+
+export PIP_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
+export UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
+
+# ---------------------------------------------------------------------------
+# curl 从阿里云 PyPI 镜像直接下载 uv wheel，unzip 提取二进制
+# ---------------------------------------------------------------------------
+ensure_uv() {
+    if [ -x "${UV_BIN}/uv" ]; then
+        UV="${UV_BIN}/uv"
+        log_msg "uv found (persistent): ${UV}"
+    else
+        log_msg "uv not found, installing via curl ..."
+        mkdir -p "${UV_BIN}"
+        mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
+        local TMP_DIR
+        TMP_DIR="$(mktemp -d)"
+
+        # 检测架构
+        local ARCH
+        case "$(uname -m)" in
+            x86_64)  ARCH="x86_64" ;;
+            aarch64) ARCH="aarch64" ;;
+            *)       ARCH="$(uname -m)" ;;
+        esac
+
+        log_msg ">>> 正在从 PyPI 镜像下载 uv (${ARCH}) ..."
+
+        # 从 simple index 获取最新版 wheel 下载链接
+        # 返回的是相对路径 ../../packages/...，需转为绝对 URL 并去掉 #sha256
+        local WHEEL_URL
+        WHEEL_URL=$(curl -LsSf "https://mirrors.aliyun.com/pypi/simple/uv/" 2>>"${LOG_FILE}" \
+            | grep -o 'href="[^"]*py3-none-manylinux[^"]*' \
+            | grep "${ARCH}" \
+            | sed 's|^href="../../|https://mirrors.aliyun.com/pypi/|; s|#sha256=.*||' \
+            | sort -t'-' -k2,2V \
+            | tail -1)
+
+        local UV_WHL="${TMP_DIR}/uv.whl"
+        if [ -n "${WHEEL_URL}" ]; then
+            log_msg "wheel URL: ${WHEEL_URL}"
+            if curl -L --retry 3 --retry-delay 3 --progress-bar -o "${UV_WHL}" "${WHEEL_URL}" 2>&1 \
+               && unzip -o -j "${UV_WHL}" "uv-*.data/scripts/uv" -d "${UV_BIN}" >>"${LOG_FILE}" 2>&1; then
+                log_msg "uv extracted from wheel"
+            fi
+        else
+            log_msg "simple index query failed, trying GitHub fallback ..."
+        fi
+
+        # wheel 下载失败 → GitHub tar.gz 兜底
+        if [ ! -x "${UV_BIN}/uv" ]; then
+            log_msg ">>> wheel 方式失败，尝试 GitHub 下载 ..."
+            local UV_TAR="uv-${ARCH}-unknown-linux-gnu"
+            local UV_GZ="${TMP_DIR}/uv.tar.gz"
+            if curl -L --retry 3 --retry-delay 5 --progress-bar \
+                 -o "${UV_GZ}" "https://github.com/astral-sh/uv/releases/latest/download/${UV_TAR}.tar.gz" 2>&1 \
+               && tar tzf "${UV_GZ}" >/dev/null 2>&1 \
+               && tar xzf "${UV_GZ}" -C "${UV_BIN}" --strip-components=1 "${UV_TAR}/uv" 2>&1; then
+                log_msg "uv extracted from GitHub tarball"
+            fi
+        fi
+
+        rm -rf "${TMP_DIR}"
+
+        if [ -x "${UV_BIN}/uv" ]; then
+            UV="${UV_BIN}/uv"
+            log_msg "uv installed: ${UV}"
+        else
+            toast_err "uv 安装失败: $(tail -3 "${LOG_FILE}" 2>/dev/null)"
+            exit 1
+        fi
+    fi
+
+    log_msg "uv version: $("${UV}" --version 2>&1 || echo 'FAILED')"
+}
+
+# ---------------------------------------------------------------------------
+# 1. 读取目标版本号（从 hermes-version.env，manifest 不部署到设备）
+# ---------------------------------------------------------------------------
+if [ ! -f "${APP_DIR}/config/bootstrap/hermes-version.env" ]; then
+    toast_err "hermes-version.env 不存在，请检查打包是否包含 config/bootstrap/"
+    exit 1
+fi
+# shellcheck disable=SC1090
+. "${APP_DIR}/config/bootstrap/hermes-version.env"
+if [ -z "${HERMES_VERSION}" ]; then
+    toast_err "hermes-version.env 中未定义 HERMES_VERSION"
+    exit 1
+fi
+log_msg "hermes-agent target version: ${HERMES_VERSION}"
+
+# ---------------------------------------------------------------------------
+# 2. 用 uv pip show 快速检测当前版本
+# ---------------------------------------------------------------------------
+ensure_uv
+
+# 把 uv 软链接进 venv/bin，让 hermes 运行时（PATH 仅含 venv/bin）能找到 uv
+# 放在版本检测之前，确保即使版本匹配提前退出也会执行
+if [ -x "${UV_BIN}/uv" ] && [ -d "${VENV_DIR}/bin" ]; then
+    ln -sf "${UV_BIN}/uv" "${VENV_DIR}/bin/uv"
+    if [ -x "${VENV_DIR}/bin/uv" ]; then
+        log_msg "uv symlinked into venv/bin"
+    else
+        log_msg "WARNING: uv symlink into venv/bin failed"
+    fi
+fi
+
+INSTALLED_VER=$("$UV" pip show --python "${VENV_DIR}/bin/python3" hermes-agent 2>/dev/null | grep -i '^version' | awk '{print $2}' || true)
+
+if [ -n "${INSTALLED_VER}" ] && [ "${INSTALLED_VER}" = "${HERMES_VERSION}" ]; then
+    # 版本匹配，再验证二进制能跑
+    if [ -x "${HERMES}" ] && timeout 10 "${HERMES}" --version >/dev/null 2>&1; then
+        log_msg "hermes OK: ${INSTALLED_VER} (matches target)"
+        trap - ERR
+        log_msg "upgrade_callback finished (no action needed)."
+        exit 0
+    fi
+    log_msg "version matches but binary broken, will reinstall"
+elif [ -n "${INSTALLED_VER}" ] && [ "$(printf '%s\n%s' "${INSTALLED_VER}" "${HERMES_VERSION}" | sort -V | tail -1)" = "${INSTALLED_VER}" ]; then
+    # 本地版本 > 目标版本，不降级
+    log_msg "installed ${INSTALLED_VER} > target ${HERMES_VERSION}, skipping (no downgrade)"
+    trap - ERR
+    log_msg "upgrade_callback finished (no action needed)."
+    exit 0
+elif [ -n "${INSTALLED_VER}" ]; then
+    log_msg "version mismatch: installed=${INSTALLED_VER}, target=${HERMES_VERSION}"
+else
+    log_msg "hermes-agent not found in venv"
+fi
+
+# ---------------------------------------------------------------------------
+# 3. 安装/升级 hermes-agent（uv pip install 覆盖装，不删 venv）
+# ---------------------------------------------------------------------------
+
+# 如果 venv 不存在或损坏，先重建
+if [ ! -d "${VENV_DIR}/bin" ] || [ ! -x "${VENV_DIR}/bin/python3" ]; then
+    if [ -d "${VENV_DIR}" ]; then
+        log_msg ">>> 旧 venv 不可用，正在重建 ..."
+        rm -rf "${VENV_DIR}" 2>/dev/null || true
+    else
+        log_msg ">>> 正在创建 Python 虚拟环境 ..."
+    fi
+    "$UV" venv --python /usr/bin/python3 "${VENV_DIR}" 2>>"${LOG_FILE}"
+    if [ ! -d "${VENV_DIR}/bin" ]; then
+        toast_err "venv 创建失败: $(tail -5 "${LOG_FILE}" 2>/dev/null)"
+        exit 1
+    fi
+    log_msg "venv created"
+fi
+
+log_msg ">>> 正在安装 hermes-agent[all]==${HERMES_VERSION}，依赖较多请耐心等待 ..."
+UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+    "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
+    2>>"${LOG_FILE}" || true
+
+# 覆盖安装可能失败 → 清 hermes 相关的 site-packages 再试
+if [ ! -f "${HERMES}" ]; then
+    log_msg ">>> 首次安装失败，清理后重试 ..."
+    rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
+    UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+        "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
+        2>>"${LOG_FILE}" || true
+
+    if [ ! -f "${HERMES}" ]; then
+        toast_err "hermes-agent 安装失败: $(tail -5 "${LOG_FILE}" 2>/dev/null)"
+        exit 1
+    fi
+fi
+
+log_msg "hermes binary verified"
+
+ACTUAL_VER=$("$UV" pip show --python "${VENV_DIR}/bin/python3" hermes-agent 2>/dev/null | grep -i '^version' | awk '{print $2}' || echo "unknown")
+log_msg "hermes upgraded: ${ACTUAL_VER}"
+
+# 清除版本缓存，让 monitor.js 下次启动时重新检测真实版本
+rm -f "${VAR_DIR}/hermes_version.txt" 2>/dev/null || true
+log_msg "version cache cleared"
+
+# ---------------------------------------------------------------------------
+# 4. 部署 prompts
+# ---------------------------------------------------------------------------
+PROMPTS_SRC="${APP_DIR}/config/prompts"
+if [ -d "${PROMPTS_SRC}" ]; then
+    # skills/ — 始终覆盖（跟随版本）
+    if [ -d "${PROMPTS_SRC}/skills" ]; then
+        mkdir -p "${DATA_DIR}/skills"
+        cp -a "${PROMPTS_SRC}/skills/." "${DATA_DIR}/skills/"
+        log_msg "skills redeployed"
+    fi
+
+    # SOUL.md — 不存在才复制
+    if [ -f "${PROMPTS_SRC}/SOUL.md" ] && [ ! -f "${DATA_DIR}/SOUL.md" ]; then
+        cp "${PROMPTS_SRC}/SOUL.md" "${DATA_DIR}/SOUL.md"
+        log_msg "SOUL.md deployed (missing)"
+    fi
+
+    # AGENTS.md — 不存在才复制
+    if [ -f "${PROMPTS_SRC}/AGENTS.md" ] && [ ! -f "${DATA_DIR}/AGENTS.md" ]; then
+        cp "${PROMPTS_SRC}/AGENTS.md" "${DATA_DIR}/AGENTS.md"
+        log_msg "AGENTS.md deployed (missing)"
+    fi
+
+    # config.yaml — 不存在才复制
+    if [ -f "${PROMPTS_SRC}/config.yaml" ] && [ ! -f "${DATA_DIR}/config.yaml" ]; then
+        cp "${PROMPTS_SRC}/config.yaml" "${DATA_DIR}/config.yaml"
+        log_msg "config.yaml deployed (missing)"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 5. 修复权限
+# ---------------------------------------------------------------------------
+if [ -n "${TRIM_USERNAME}" ]; then
+    log_msg "=== 修复权限 ==="
+    log_msg "TRIM_USERNAME=${TRIM_USERNAME}"
+    log_msg "APP_DIR=${APP_DIR} owner=$(stat -c '%U:%G' "${APP_DIR}" 2>/dev/null || echo 'N/A') perms=$(stat -c '%a' "${APP_DIR}" 2>/dev/null || echo 'N/A')"
+    log_msg "DATA_DIR=${DATA_DIR} owner=$(stat -c '%U:%G' "${DATA_DIR}" 2>/dev/null || echo 'N/A') perms=$(stat -c '%a' "${DATA_DIR}" 2>/dev/null || echo 'N/A')"
+
+    if chown -R "${TRIM_USERNAME}:${TRIM_USERNAME}" "${APP_DIR}" 2>>"${LOG_FILE}"; then
+        log_msg "chown -R ${TRIM_USERNAME}:${TRIM_USERNAME} ${APP_DIR} → OK"
+    else
+        log_msg "chown -R ${TRIM_USERNAME}:${TRIM_USERNAME} ${APP_DIR} → FAILED (exit=$?)"
+    fi
+    if chmod 775 "${APP_DIR}" 2>>"${LOG_FILE}"; then
+        log_msg "chmod 775 ${APP_DIR} → OK"
+    else
+        log_msg "chmod 775 ${APP_DIR} → FAILED (exit=$?)"
+    fi
+    if chown -R "${TRIM_USERNAME}:${TRIM_USERNAME}" "${DATA_DIR}" 2>>"${LOG_FILE}"; then
+        log_msg "chown -R ${TRIM_USERNAME}:${TRIM_USERNAME} ${DATA_DIR} → OK"
+    else
+        log_msg "chown -R ${TRIM_USERNAME}:${TRIM_USERNAME} ${DATA_DIR} → FAILED (exit=$?)"
+    fi
+    if chmod -R 750 "${DATA_DIR}" 2>>"${LOG_FILE}"; then
+        log_msg "chmod -R 750 ${DATA_DIR} → OK"
+    else
+        log_msg "chmod -R 750 ${DATA_DIR} → FAILED (exit=$?)"
+    fi
+
+    log_msg "--- 权限修复后目录状态 ---"
+    ls -la "${APP_DIR}" 2>&1 | while IFS= read -r line; do log_msg "  $line"; done
+else
+    log_msg "TRIM_USERNAME 为空，跳过权限修复"
+fi
+
+trap - ERR
+log_msg "upgrade_callback finished successfully."
+exit 0

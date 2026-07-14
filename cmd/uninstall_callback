@@ -1,0 +1,15 @@
+#!/bin/bash
+
+### 卸载后回调
+### wizard_delete_data="true"  → 删除全部数据
+### wizard_delete_data="false" → 保留全部（venv + 数据 + uv），升级时不破坏环境
+
+[ -z "${TRIM_PKGHOME}" ] && exit 0
+
+if [ "${wizard_delete_data}" = "true" ]; then
+    rm -rf "${TRIM_PKGHOME}/data"
+    [ -n "${TRIM_PKGVAR}" ] && rm -rf "${TRIM_PKGVAR}" 2>/dev/null || true
+fi
+
+
+exit 0
