@@ -116,10 +116,7 @@ jobs:
           VERSION="${{ steps.target_version.outputs.target_version }}"
           FPK_NAME="fnos-${{ env.APP_NAME }}_v${VERSION}.fpk"
           
-          cat > release_body.md << 'EOF'
-
-*Commit: ${{ github.sha }}*
-EOF
+          printf '\n*Commit: %s*\n' "${{ github.sha }}" > release_body.md
 
           echo "Release notes 已生成"
 
