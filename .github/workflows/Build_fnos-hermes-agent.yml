@@ -1,9 +1,6 @@
 name: Build fnOS Hermes Agent FPK
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -70,7 +67,8 @@ jobs:
       # 6. 更新 manifest 版本号
       - name: Update manifest version
         run: |
-          sed -i "s/^version.*=.*/version               = ${{ steps.target_version.outputs.target_version }}/" ${{ env.MANIFEST_FILE }}
+          VERSION="${{ steps.target_version.outputs.target_version }}"
+          sed -i "s/^version.*=/version       = $VERSION/" ${{ env.MANIFEST_FILE }} || exit 1
           echo "Updated manifest:"
           grep "^version" ${{ env.MANIFEST_FILE }}
 
@@ -91,11 +89,10 @@ jobs:
           
           cd "$APP_DIR"
           
-          # 执行打包
-          "$FNPACK" build --directory "$APP_DIR" || {
+          if ! "$FNPACK" build --directory "$APP_DIR"; then
             echo "::error:: fnpack 打包失败"
             exit 1
-          }
+          fi
           
           SOURCE_FPK="${{ env.APP_NAME }}.fpk"
           DIST_DIR="dist"
@@ -120,37 +117,6 @@ jobs:
           FPK_NAME="fnos-${{ env.APP_NAME }}_v${VERSION}.fpk"
           
           cat > release_body.md << 'EOF'
-# fnOS Hermes Agent
-
-AI 助手应用，专为飞牛 NAS 打造。
-
-## 功能特性
-
-- **多模型支持**: OpenRouter、OpenAI、Anthropic、Kimi、MiniMax 等
-- **消息平台接入**: 微信、Telegram、Discord、Slack、QQ、钉钉、飞书等
-- **对话管理**: 多轮对话、会话记忆、技能系统
-- **文件操作**: 图片识别、文档分析、报告生成
-- **自动更新**: 内置版本检查与在线升级
-
-## 安装方法
-
-在飞牛应用中心上传此 FPK 安装包即可。
-
-## 技术细节
-
-- **运行环境**: fnOS 4.0+
-- **依赖项**: bunjs
-- **数据路径**: `/vol1/@apphome/hermes-agent/data/`
-- **日志路径**: `/var/apps/hermes-agent/var/hermes.log`
-
-## 已知问题
-
-- 首次安装需要下载 Python 依赖包，请耐心等待
-- 微信绑定二维码有效期约 2 分钟
-
----
-
-基于 [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 
 *Commit: ${{ github.sha }}*
 EOF
@@ -174,11 +140,7 @@ EOF
             "$DIST_DIR/$FPK_NAME" \
             --draft \
             --title "$RELEASE_TAG" \
-            --notes-file release_body.md \
-            --verify-tag || {
-              echo "::error:: 创建 Release 失败"
-              exit 1
-          }
+            --notes-file release_body.md || exit 1
           
           echo "Draft Release 已创建"
           echo "release_url=https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG" >> $GITHUB_OUTPUT
@@ -190,6 +152,6 @@ EOF
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| 项目 | 版本 | FPK 文件名 | 大小 |" >> $GITHUB_STEP_SUMMARY
           echo "|------|------|-----------|------|" >> $GITHUB_STEP_SUMMARY
-          echo "| fnOS Hermes Agent | v${{ steps.target_version.outputs.target_version }} | fnos-hermes-agent_v${{ steps.target_version.outputs.version }}.fpk | ${{ steps.build.outputs.size }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| fnOS Hermes Agent | v${{ steps.target_version.outputs.target_version }} | fnos-hermes-agent_v${{ steps.target_version.outputs.target_version }}.fpk | ${{ steps.build.outputs.size }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**[Draft Release](https://github.com/${{ github.repository }}/releases)** — 请确认后发布" >> $GITHUB_STEP_SUMMARY
