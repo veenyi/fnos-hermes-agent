@@ -1,0 +1,5 @@
+#!/bin/bash
+
+### 配置变更后回调 — hermes-agent 通过控制面板自行管理配置
+
+exit 0

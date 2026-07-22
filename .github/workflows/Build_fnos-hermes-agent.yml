@@ -1,0 +1,154 @@
+name: Build fnOS Hermes Agent FPK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（格式：0.18.0，留空则使用 manifest 中的版本）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: "hermes-agent"
+  MANIFEST_FILE: "manifest"
+
+jobs:
+  build-fpk:
+    runs-on: ubuntu-latest
+    outputs:
+      fpk_name: ${{ steps.build.outputs.fpks }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 设置时区
+      - name: Set timezone
+        run: sudo timedatectl set-timezone "Asia/Shanghai"
+
+      # 3. 读取 manifest 版本信息
+      - name: Get version from manifest
+        id: version
+        run: |
+          VERSION=$(grep "^version" ${{ env.MANIFEST_FILE }} | awk -F'=' '{print $2}' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "从 manifest 读取的版本号：v$VERSION"
+
+      # 4. 确定最终版本号
+      - name: Determine target version
+        id: target_version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            TARGET_VERSION="${{ github.event.inputs.version }}"
+            echo "使用输入的版本号：v$TARGET_VERSION"
+          else
+            TARGET_VERSION="${{ steps.version.outputs.version }}"
+            echo "使用 manifest 版本号：v$TARGET_VERSION"
+          fi
+          echo "target_version=$TARGET_VERSION" >> $GITHUB_OUTPUT
+
+      # 5. 安装 fnpack 工具
+      - name: Install fnpack
+        run: |
+          FNPACK_URL="https://static2.fnnas.com/fnpack/fnpack-1.0.4-linux-amd64"
+          curl -fsSL "$FNPACK_URL" -o fnpack
+          chmod +x fnpack
+          mv fnpack /usr/local/bin/
+          fnpack --version
+          echo "fnpack 已安装并可用"
+
+      # 6. 更新 manifest 版本号
+      - name: Update manifest version
+        run: |
+          VERSION="${{ steps.target_version.outputs.target_version }}"
+          sed -i "s/^version.*=/version       = $VERSION/" ${{ env.MANIFEST_FILE }} || exit 1
+          echo "Updated manifest:"
+          grep "^version" ${{ env.MANIFEST_FILE }}
+
+      # 7. 创建输出目录
+      - name: Create dist directory
+        run: mkdir -p dist
+
+      # 8. 打包应用
+      - name: Build FPK
+        id: build
+        run: |
+          FNPACK="fnpack"
+          APP_DIR="$GITHUB_WORKSPACE"
+          
+          echo "开始打包：${{ env.APP_NAME }}"
+          echo "目标版本：${{ steps.target_version.outputs.target_version }}"
+          echo "包目录：$APP_DIR"
+          
+          cd "$APP_DIR"
+          
+          if ! "$FNPACK" build --directory "$APP_DIR"; then
+            echo "::error:: fnpack 打包失败"
+            exit 1
+          fi
+          
+          SOURCE_FPK="${{ env.APP_NAME }}.fpk"
+          DIST_DIR="dist"
+          TARGET_NAME="fnos-${{ env.APP_NAME }}_v${{ steps.target_version.outputs.target_version }}.fpk"
+          
+          if [ -f "$SOURCE_FPK" ]; then
+            mv "$SOURCE_FPK" "$DIST_DIR/$TARGET_NAME"
+            SIZE=$(du -h "$DIST_DIR/$TARGET_NAME" | cut -f1)
+            echo "打包成功：$TARGET_NAME ($SIZE)"
+            echo "fpks=$TARGET_NAME" >> $GITHUB_OUTPUT
+            echo "size=$SIZE" >> $GITHUB_OUTPUT
+          else
+            echo "::error:: fnpack 未生成 FPK 文件"
+            exit 1
+          fi
+
+      # 9. 准备 Release 说明
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.target_version.outputs.target_version }}"
+          FPK_NAME="fnos-${{ env.APP_NAME }}_v${VERSION}.fpk"
+          
+          printf '\n*Commit: %s*\n' "${{ github.sha }}" > release_body.md
+
+          echo "Release notes 已生成"
+
+      # 10. 创建 Draft Release
+      - name: Create Draft Release
+        id: create_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.target_version.outputs.target_version }}"
+          FPK_NAME="fnos-${{ env.APP_NAME }}_v${VERSION}.fpk"
+          RELEASE_TAG="fnos-hermes-agent_v${VERSION}"
+          DIST_DIR="dist"
+          
+          echo "创建 Draft Release: $RELEASE_TAG"
+          
+          gh release create "$RELEASE_TAG" \
+            "$DIST_DIR/$FPK_NAME" \
+            --draft \
+            --title "$RELEASE_TAG" \
+            --notes-file release_body.md || exit 1
+          
+          echo "Draft Release 已创建"
+          echo "release_url=https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG" >> $GITHUB_OUTPUT
+
+      # 11. 构建摘要
+      - name: Build Summary
+        run: |
+          echo "### ✅ 构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 项目 | 版本 | FPK 文件名 | 大小 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|-----------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| fnOS Hermes Agent | v${{ steps.target_version.outputs.target_version }} | fnos-hermes-agent_v${{ steps.target_version.outputs.target_version }}.fpk | ${{ steps.build.outputs.size }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**[Draft Release](https://github.com/${{ github.repository }}/releases)** — 请确认后发布" >> $GITHUB_STEP_SUMMARY

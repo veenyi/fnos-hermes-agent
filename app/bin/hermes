@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+
+HERMES_VENV_BIN="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}/data/venv/bin/hermes"
+
+if [ ! -x "$HERMES_VENV_BIN" ]; then
+    echo "hermes-agent not installed in venv. Please reinstall the app." >&2
+    exit 1
+fi
+
+export PATH="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}/data/venv/bin:$PATH"
+export HOME="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}/data"
+export HERMES_HOME="${HOME}"
+
+exec "$HERMES_VENV_BIN" "$@"

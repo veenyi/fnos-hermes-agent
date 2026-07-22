@@ -1,0 +1,36 @@
+{
+  "name": "trim-cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for TRIM NAS",
+  "entry": "SKILL.md",
+  "bin": {
+    "darwin-arm64": "bin/trim-cli-darwin-arm64",
+    "darwin-x64": "bin/trim-cli-darwin-x64",
+    "linux-arm64": "bin/trim-cli-linux-arm64",
+    "linux-x64": "bin/trim-cli-linux-x64",
+    "windows-x64": "bin/trim-cli-windows-x64.exe"
+  },
+  "reference": "reference/",
+  "entriesDir": "entries/",
+  "entries": [
+    "entries/trim-app.md",
+    "entries/trim-docker.md",
+    "entries/trim-download.md",
+    "entries/trim-file.md",
+    "entries/trim-log.md",
+    "entries/trim-monitor.md",
+    "entries/trim-shared.md",
+    "entries/trim-storage.md",
+    "entries/trim-system.md",
+    "entries/trim-user.md"
+  ],
+  "capabilities": [
+    "authentication",
+    "file-management",
+    "storage-management",
+    "docker-management",
+    "download-tasks",
+    "system-monitoring",
+    "user-management"
+  ]
+}

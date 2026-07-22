@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# monitor-api — 通过 unix socket 调用 Monitor HTTP API
+#
+# 用法: monitor-api <action> [POST]
+#   action:  health | status | stop | restart | dashboard/start | dashboard/stop
+#   第二个参数为 POST 时发送 POST 请求，否则 GET
+#
+# 示例:
+#   monitor-api restart          → 重启 Gateway + Dashboard
+#   monitor-api stop             → 停止全部
+#   monitor-api status           → 查询状态
+#   monitor-api dashboard/start  → 启动 Dashboard
+#
+
+set -e
+
+SOCKET="${TRIM_APPDEST:-/var/apps/hermes-agent}/hermes-agent.sock"
+TOKEN_FILE="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}/data/.monitor_token"
+
+if [ ! -S "$SOCKET" ]; then
+    echo "Error: Monitor socket not found at $SOCKET" >&2
+    exit 1
+fi
+
+TOKEN="$(cat "$TOKEN_FILE" 2>/dev/null || echo "")"
+ACTION="${1:?Usage: monitor-api <action> [POST]}"
+METHOD="${2:-POST}"
+
+curl -sf --unix-socket "$SOCKET" \
+    -X "$METHOD" \
+    -H "x-monitor-token: $TOKEN" \
+    "http://localhost/api/$ACTION"
