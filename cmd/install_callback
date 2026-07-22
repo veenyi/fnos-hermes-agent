@@ -360,7 +360,15 @@ if [ "${SKIP_INSTALL}" = "false" ]; then
     log_msg ">>> 正在安装 hermes-agent[all]==${HERMES_VERSION}，依赖较多请耐心等待 ..."
     UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
         "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
-        2>>"${LOG_FILE}"
+        2>>"${LOG_FILE}" || true
+
+    # 若指定版本在 PyPI 不存在，自动回退到最新版（应用版本可领先于 PyPI 包版本）
+    if [ ! -f "${HERMES}" ]; then
+        log_msg ">>> 指定版本 ${HERMES_VERSION} 不可用，尝试安装最新版 hermes-agent[all] ..."
+        UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+            "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]" \
+            2>>"${LOG_FILE}"
+    fi
 
     if [ ! -f "${HERMES}" ]; then
         toast_err "hermes-agent 安装失败: $(tail -5 "${LOG_FILE}" 2>/dev/null)"

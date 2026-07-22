@@ -184,10 +184,10 @@ UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
 
 # 覆盖安装可能失败 → 清 hermes 相关的 site-packages 再试
 if [ ! -f "${HERMES}" ]; then
-    log_msg ">>> 首次安装失败，清理后重试 ..."
+    log_msg ">>> 指定版本安装失败，尝试安装最新版 hermes-agent[all] ..."
     rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
     UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
-        "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
+        "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]" \
         2>>"${LOG_FILE}" || true
 
     if [ ! -f "${HERMES}" ]; then
