@@ -1676,7 +1676,7 @@
 
   var chatState = {
     sessions: [],
-    currentId: sessionStorage.getItem('hermes_chat_session'),
+    currentId: (function(){ try { return localStorage.getItem('hermes_chat_session'); } catch(e){ return null; } })(),
     isStreaming: false,
     abortCtrl: null,
     inited: false,
@@ -1920,7 +1920,7 @@
     var _sb = document.getElementById('chatStatusBar');
     if(_tb) _tb.style.display = 'none';
     if(_sb) _sb.textContent = '';
-    try { var sid = sessionStorage.getItem('hermes_chat_session'); if(sid) chatState.currentId = sid; } catch(e){}
+    try { var sid = localStorage.getItem('hermes_chat_session'); if(sid) chatState.currentId = sid; } catch(e){}
     // 直接加载 sessions，不禁用输入。Gateway 状态由聊天请求自然反馈
     chatLoadSessions().catch(function(){
       var box = document.getElementById('chatMessages');
@@ -2050,7 +2050,7 @@
 
   function chatSwitchSession(id, closeDrawer){
     chatState.currentId = id;
-    try { sessionStorage.setItem('hermes_chat_session', id); } catch(e){}
+    try { localStorage.setItem('hermes_chat_session', id); } catch(e){}
     if(closeDrawer !== false) toggleChatSessions();
     var box = document.getElementById('chatMessages');
     if(box) box.innerHTML = '';
@@ -2130,7 +2130,26 @@
       box.innerHTML = msgs.map(function(m){ return chatMsgHTML(m); }).join('');
       scrollChatToBottom(true);
       box.querySelectorAll('.message.assistant .msg-content').forEach(function(el){ enhanceLinksWithQR(el); addCopyButtonsToPre(el); });
+      chatDetectIncompleteStream(s);
     }).catch(function(){ chatRenderEmpty(); });
+  }
+
+  // 检测是否有未完成的流式回复（服务端 checkpoint），自动恢复并提示用户
+  function chatDetectIncompleteStream(session){
+    var msgs = session && session.messages || [];
+    var last = msgs[msgs.length - 1];
+    if(!last || last.role !== 'assistant' || !last._streaming) return;
+    var statusBar = document.getElementById('chatStatusBar');
+    if(statusBar) statusBar.textContent = '检测到未完成的回复，正在恢复…';
+    fetch(apiUrl('/api/sessions/'+session.id), {method:'POST'}).then(function(r){ return r.json(); }).then(function(res){
+      if(res && res.ok){
+        chatRenderMessages();
+        if(statusBar) statusBar.textContent = '已恢复上次未完成的回复';
+        setTimeout(function(){ if(statusBar) statusBar.textContent = ''; }, 3000);
+      }
+    }).catch(function(){
+      if(statusBar) statusBar.textContent = '恢复未完成回复失败';
+    });
   }
 
   function chatMsgHTML(m){
@@ -2153,7 +2172,7 @@
   function chatNewSession(){
     fetch(apiUrl('/api/sessions'), {method:'POST'}).then(function(r){ return r.json(); }).then(function(s){
       chatState.currentId = s.id;
-      try { sessionStorage.setItem('hermes_chat_session', s.id); } catch(e){}
+      try { localStorage.setItem('hermes_chat_session', s.id); } catch(e){}
       toggleChatSessions();
       var box = document.getElementById('chatMessages');
       if(box) box.innerHTML =
@@ -4085,7 +4104,7 @@
     var urlSession = params.get('session_id');
     var urlView = params.get('view');
     if (urlSession) {
-      try { sessionStorage.setItem('hermes_chat_session', urlSession); } catch(e){}
+      try { localStorage.setItem('hermes_chat_session', urlSession); } catch(e){}
       window.savedView = 'chat';
       window.__deepLinked = true;
     } else if (urlView) {
@@ -4132,7 +4151,36 @@
   window.chatNewSession = chatNewSession;
   window.chatSend = chatSend;
   window.chatStop = chatStop;
-  window.toggleDashboard = window.toggleDashboard;
+  window.chatSwitchSession = chatSwitchSession;
+  window.chatRenameSession = chatRenameSession;
+  window.chatOpenNewWindow = chatOpenNewWindow;
+  window.chatPickFile = chatPickFile;
+  window.chatFilesSelected = chatFilesSelected;
+  window.chatRemoveAttachment = chatRemoveAttachment;
+  window.toggleDashboard = toggleDashboard;
+
+  // 扩展能力页函数暴露到全局，供内联 onclick 调用
+  //（settings* 等函数已在各自定义处挂到 window）
+  window.extSwitchTab = extSwitchTab;
+  window.extSwitchSkillTab = extSwitchSkillTab;
+  window.extSwitchHubTab = extSwitchHubTab;
+  window.extToggleToolset = extToggleToolset;
+  window.extToggleWorkflow = extToggleWorkflow;
+  window.extToggleMemory = extToggleMemory;
+  window.extMemLimitInput = extMemLimitInput;
+  window.extSelectPersona = extSelectPersona;
+  window.extLoadLocalSkills = extLoadLocalSkills;
+  window.extLoadStore = extLoadStore;
+  window.extLoadHub = extLoadHub;
+  window.extAddMcp = extAddMcp;
+  window.extEditMcp = extEditMcp;
+  window.extDelMcp = extDelMcp;
+  window.extAddSkillDir = extAddSkillDir;
+  window.extRemoveSkill = extRemoveSkill;
+  window.extInstallSkill = extInstallSkill;
+  window.extQuickPersona = extQuickPersona;
+  window.extShowHubEmbed = extShowHubEmbed;
+  window.extDelSkillDir = extDelSkillDir;
 })();
 </script>
 </body>

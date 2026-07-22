@@ -729,7 +729,7 @@ async function* streamDeltas(upstream, decoder, reqSignal) {
 }
 
 
-const PROVIDER_TIMEOUT_MS = 120000;
+const PROVIDER_TIMEOUT_MS = 300000; // 长任务/多工具链需要更长时间，5 分钟
 const activeChatStreams = new Map();
 const wsMessageQueue = new Map(); // session_id → message，WS 连接前暂存
 
@@ -756,7 +756,64 @@ const UI_CAPABILITIES_PROMPT = `你正在通过网页聊天窗口对话，前端
 7. 代码块只用一层三反引号包裹，内部如需展示代码块用四空格缩进代替，避免反引号提前闭合导致内容泄漏。
 8. 需要重启自己时，执行封装脚本：\`$TRIM_APPDEST/bin/monitor-api restart\`，认证 token 从文件 ${HERMES_TOKEN_MIRROR} 读取。不要用 shell kill 命令或子进程方式，会导致服务状态异常。
 9. 网页聊天环境下所有工具调用已预授权（等效于 /yolo 模式）。执行 terminal、execute_code、read_file、search_files 等工具时直接调用，不要询问用户是否批准，不要说"需要授权"或"需要批准"，直接执行即可。
-10. 写文件后必须用 stat（不是 ls）验证文件真实落盘。ls 可能被 sandbox overlay 欺骗显示不存在的文件。stat 报 No such file = 写入失败，不能报告成功。`;
+10. 写文件后必须用 stat（不是 ls）验证文件真实落盘。ls 可能被 sandbox overlay 欺骗显示不存在的文件。stat 报 No such file = 写入失败，不能报告成功。
+11. 如果任务涉及多步骤或长时间运行，请在回复中定期（例如每完成一个重要步骤后）用一句话总结当前已完成的内容和下一步计划，这有助于在会话恢复时保持上下文连贯。`;
+
+// ─── 聊天上下文构建：保留首条用户消息 + 最近 N 条，避免长任务丢失任务定义 ───
+const MAX_HISTORY_MESSAGES = 200;
+function buildChatHistory(session, systemPrompt) {
+  const msgs = session.messages || [];
+  // 保留系统能力提示
+  const history = [{ role: "system", content: systemPrompt }];
+  if (msgs.length === 0) return history;
+  // 始终保留首条用户消息（通常是任务目标）
+  const firstUserIdx = msgs.findIndex(m => m.role === "user");
+  const keepFirst = firstUserIdx >= 0 && firstUserIdx < msgs.length - MAX_HISTORY_MESSAGES;
+  const startIdx = keepFirst ? firstUserIdx + 1 : Math.max(0, msgs.length - MAX_HISTORY_MESSAGES);
+  for (let i = startIdx; i < msgs.length; i++) {
+    const m = msgs[i];
+    history.push({ role: m.role, content: m.content });
+  }
+  return history;
+}
+
+// 流式回复增量 checkpoint：把当前部分回复暂存为最后一条 assistant 消息，便于异常恢复
+function checkpointAssistantMessage(sessionId, content) {
+  try {
+    const session = getSession(sessionId);
+    if (!session) return;
+    const last = session.messages[session.messages.length - 1];
+    if (last && last.role === "assistant" && last._streaming) {
+      last.content = content;
+      last.ts = Date.now();
+    } else {
+      session.messages.push({ role: "assistant", content, ts: Date.now(), _streaming: true });
+    }
+    saveSession(session);
+  } catch (e) {
+    log(`[checkpoint] failed: ${e.message}`);
+  }
+}
+function finalizeAssistantMessage(sessionId, content, options = {}) {
+  try {
+    const session = getSession(sessionId);
+    if (!session) return;
+    const last = session.messages[session.messages.length - 1];
+    if (last && last.role === "assistant" && last._streaming) {
+      last.content = content;
+      last.ts = Date.now();
+      delete last._streaming;
+    } else {
+      session.messages.push({ role: "assistant", content, ts: Date.now() });
+    }
+    if (options.title && session.title === "New Chat") {
+      session.title = options.title;
+    }
+    saveSession(session);
+  } catch (e) {
+    log(`[finalize] failed: ${e.message}`);
+  }
+}
 
 
 function createChatStream(sessionId, message, reqSignal) {
@@ -794,11 +851,11 @@ function createChatStream(sessionId, message, reqSignal) {
           JSON.stringify(_lastMsg.content) === JSON.stringify(message);
         if (!_isSameUserMsg) {
           session.messages.push({ role: "user", content: message, ts: Date.now() });
+          saveSession(session);
         }
 
-        const MAX_HISTORY = 50;
-        const rawHistory = session.messages.slice(-MAX_HISTORY).map(m => ({ role: m.role, content: m.content }));
-        const history = [{ role: "system", content: UI_CAPABILITIES_PROMPT }, ...rawHistory];
+        // 智能上下文：保留首条用户消息 + 最近 MAX_HISTORY_MESSAGES 条
+        const history = buildChatHistory(session, UI_CAPABILITIES_PROMPT);
 
         const cfg = getChatConfig();
         const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
@@ -812,6 +869,18 @@ function createChatStream(sessionId, message, reqSignal) {
 
         let fullReply = "";
         let requestError = null;
+        let hadToolCalls = false;
+
+        // 每 5 秒 / 每 1000 字符做一次增量 checkpoint，异常时也能保留进度
+        let lastCheckpointLen = 0;
+        let lastCheckpointTs = Date.now();
+        const checkpointInterval = setInterval(() => {
+          if (fullReply.length > 0 && (fullReply.length - lastCheckpointLen >= 1000 || Date.now() - lastCheckpointTs >= 5000)) {
+            checkpointAssistantMessage(sessionId, fullReply);
+            lastCheckpointLen = fullReply.length;
+            lastCheckpointTs = Date.now();
+          }
+        }, 1000);
 
         for (let i = 0; i < allProviders.length; i++) {
           const provider = allProviders[i];
@@ -829,7 +898,7 @@ function createChatStream(sessionId, message, reqSignal) {
             const upstream = await chatRequest(provider, message, history, signal);
             clearTimeout(timeoutTimer);
 
-            let hadToolCalls = false;
+            hadToolCalls = false;
             const localParser = createSSEParser(
               (delta) => { fullReply += delta; sendJSON({ delta }); },
               () => {},
@@ -862,7 +931,12 @@ function createChatStream(sessionId, message, reqSignal) {
             if (isFallback) sendJSON({ info: `备选 "${provider.name}" 失败: ${errMsg}` });
           }
         }
+        clearInterval(checkpointInterval);
+
         if (requestError !== null) {
+          // 即使失败，也要把已生成的部分回复保存下来，避免用户消息白发
+          const partialContent = fullReply || `(请求失败: ${requestError})`;
+          finalizeAssistantMessage(sessionId, partialContent);
           sendJSON({ error: `所有模型均失败: ${requestError}` });
           send("[DONE]", "end");
           cleanup();
@@ -873,14 +947,7 @@ function createChatStream(sessionId, message, reqSignal) {
         // 替换最近的 WS 助手消息（来自 WS→XHR 回退），使会话反映用户实际看到的内容
         //（即 XHR 响应），而非不完整的 WS 响应。
         const _assistantContent = fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）");
-        const _lastForReplace = session.messages[session.messages.length - 1];
-        if (_lastForReplace && _lastForReplace.role === "assistant" && (Date.now() - _lastForReplace.ts) < 60000) {
-          _lastForReplace.content = _assistantContent;
-          _lastForReplace.ts = Date.now();
-        } else {
-          session.messages.push({ role: "assistant", content: _assistantContent, ts: Date.now() });
-        }
-        saveSession(session);
+        finalizeAssistantMessage(sessionId, _assistantContent);
 
         if (session.title === "New Chat" && session.messages.length >= 2) {
           autoTitle(message, primary).then(title => {
@@ -894,6 +961,8 @@ function createChatStream(sessionId, message, reqSignal) {
 
         send("[DONE]", "end");
       } catch (e) {
+        clearInterval(checkpointInterval);
+        if (fullReply) finalizeAssistantMessage(sessionId, fullReply + "\n\n(流式处理异常中断: " + e.message + ")");
         sendJSON({ error: e.message });
         send("[DONE]", "end");
       }
@@ -937,11 +1006,11 @@ async function runChatWS(ws, sessionId, message) {
       JSON.stringify(_wsLastMsg.content) === JSON.stringify(message);
     if (!_wsIsSameMsg) {
       session.messages.push({ role: "user", content: message, ts: Date.now() });
+      saveSession(session);
     }
 
-    const MAX_HISTORY = 50;
-    const rawHistory = session.messages.slice(-MAX_HISTORY).map(m => ({ role: m.role, content: m.content }));
-    const history = [{ role: "system", content: UI_CAPABILITIES_PROMPT }, ...rawHistory];
+    // 智能上下文：保留首条用户消息 + 最近 MAX_HISTORY_MESSAGES 条
+    const history = buildChatHistory(session, UI_CAPABILITIES_PROMPT);
 
     const cfg = getChatConfig();
     const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
@@ -956,6 +1025,17 @@ async function runChatWS(ws, sessionId, message) {
     let fullReply = "";
     let requestError = null;
     let hadToolCalls = false;
+
+    // 每 5 秒 / 每 1000 字符做一次增量 checkpoint
+    let lastCheckpointLen = 0;
+    let lastCheckpointTs = Date.now();
+    const checkpointInterval = setInterval(() => {
+      if (fullReply.length > 0 && (fullReply.length - lastCheckpointLen >= 1000 || Date.now() - lastCheckpointTs >= 5000)) {
+        checkpointAssistantMessage(sessionId, fullReply);
+        lastCheckpointLen = fullReply.length;
+        lastCheckpointTs = Date.now();
+      }
+    }, 1000);
 
     for (let i = 0; i < allProviders.length; i++) {
       const provider = allProviders[i];
@@ -1003,15 +1083,14 @@ async function runChatWS(ws, sessionId, message) {
       }
     }
 
+    clearInterval(checkpointInterval);
     if (requestError !== null) {
+      const partialContent = fullReply || `(请求失败: ${requestError})`;
+      finalizeAssistantMessage(sessionId, partialContent);
       sendJSON({ error: `所有模型均失败: ${requestError}` });
-      if (fullReply) {
-        session.messages.push({ role: "assistant", content: fullReply, ts: Date.now() });
-      }
     } else {
-      session.messages.push({ role: "assistant", content: fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）"), ts: Date.now() });
+      finalizeAssistantMessage(sessionId, fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）"));
     }
-    saveSession(session);
 
     if (!requestError && session.title === "New Chat" && session.messages.length >= 2) {
       autoTitle(message, primary).then(title => {
@@ -1021,6 +1100,8 @@ async function runChatWS(ws, sessionId, message) {
     }
     sendJSON({ done: true });
   } catch (e) {
+    clearInterval(checkpointInterval);
+    if (fullReply) finalizeAssistantMessage(sessionId, fullReply + "\n\n(流式处理异常中断: " + e.message + ")");
     sendJSON({ error: e.message || String(e) });
     sendJSON({ done: true });
     // 异常时也要保存，防止用户消息和已收到的部分内容丢失
@@ -3286,6 +3367,20 @@ async function handleFetch(req) {
       const s = getSession(sid);
       if (!s) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: jsonHeaders() });
       return new Response(JSON.stringify(s), { headers: jsonHeaders() });
+    }
+    if (req.method === "POST") {
+      // resume：把未完成的 streaming checkpoint 消息标记为完成，便于用户继续对话
+      const s = getSession(sid);
+      if (!s) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: jsonHeaders() });
+      const last = s.messages[s.messages.length - 1];
+      let resumed = false;
+      if (last && last.role === "assistant" && last._streaming) {
+        delete last._streaming;
+        last.ts = Date.now();
+        saveSession(s);
+        resumed = true;
+      }
+      return new Response(JSON.stringify({ ok: true, resumed, session: s }), { headers: jsonHeaders() });
     }
     if (req.method === "DELETE") {
       deleteSession(sid);
