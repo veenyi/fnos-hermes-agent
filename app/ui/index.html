@@ -449,9 +449,23 @@
     .tool-approve-btn.approve:hover{opacity:.85}
     .tool-approve-btn.deny{background:transparent;color:var(--text3);border-color:var(--border)}
     .tool-approve-btn.deny:hover{background:var(--bg3)}
-    .chat-status-bar{padding:2px 0 4px;font-size:11px;color:var(--text3);min-height:16px;text-align:center;display:block}
+    .chat-status-bar{padding:2px 16px 4px;font-size:11px;color:var(--text3);min-height:16px;text-align:center;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .chat-status-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
     .chat-timeout-bar{height:2px;background:var(--border);margin:0 24px 4px;border-radius:1px;overflow:hidden;display:none}
     .chat-timeout-bar-fill{height:100%;background:var(--accent);width:0%;transition:width .5s linear}
+    /* Token 上下文用量条 */
+    .token-usage-bar{display:flex;align-items:center;gap:8px;justify-content:center;padding:0 16px;cursor:pointer;user-select:none;position:relative}
+    .token-usage-bar:hover{opacity:.9}
+    .token-usage-label{white-space:nowrap;font-size:11px;color:var(--text3)}
+    .token-usage-track{flex:1;max-width:260px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;position:relative}
+    .token-usage-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green,#22c55e),var(--green,#22c55e));transition:width .3s ease}
+    .token-usage-fill.warn{background:linear-gradient(90deg,#f59e0b,#f59e0b)}
+    .token-usage-fill.danger{background:linear-gradient(90deg,var(--red,#ef4444),var(--red,#ef4444))}
+    .token-usage-detail{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:0 4px 16px rgba(0,0,0,.15);min-width:220px;text-align:left;display:none;z-index:20}
+    .token-usage-detail.show{display:block}
+    .token-usage-detail .tu-row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;margin:3px 0}
+    .token-usage-detail .tu-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+    .token-usage-detail .tu-total{font-weight:600;border-top:1px solid var(--border);margin-top:6px;padding-top:6px}
     /* 流式输出时末尾闪烁光标 */
     .cursor-blink::after{content:'|';animation:cursorBlink .8s infinite;color:var(--accent);font-weight:700;margin-left:1px}
     /* 回到底部浮标 */
@@ -927,12 +941,12 @@
               </div>
 
               <div class="ext-subpane" id="extSkill-store">
-                <div class="ext-hint">Hermes 官方技能文档（已适配内嵌浏览）。</div>
+                <div class="ext-hint">Hermes 官方技能文档（客户端渲染，需在原站浏览）。</div>
                 <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
                   <button class="btn btn-sm" onclick="extLoadStore()">加载 / 刷新</button>
                   <a class="btn btn-sm" href="https://hermes-agent.nousresearch.com/docs/zh-Hans/skills" target="_blank" rel="noopener">打开原站 ↗</a>
                 </div>
-                <div class="ext-embed" id="extStoreEmbed"><div class="ext-empty" style="padding:14px">点击「加载 / 刷新」获取在线技能商店内容。</div></div>
+                <div class="ext-embed" id="extStoreEmbed"><div class="ext-empty" style="padding:14px">点击「加载 / 刷新」尝试获取；若页面为动态加载，请使用「打开原站」。</div></div>
               </div>
 
               <div class="ext-subpane" id="extSkill-hub">
@@ -947,7 +961,6 @@
                 </div>
                 <div class="ext-hint" id="extHubHint"></div>
                 <div class="ext-grid" id="extHubList"></div>
-                <div class="ext-embed" id="extHubEmbed" style="display:none"></div>
               </div>
             </div>
 
@@ -1077,7 +1090,14 @@
             </div>
           </div>
           <div class="chat-timeout-bar" id="chatTimeoutBar"><div class="chat-timeout-bar-fill" id="chatTimeoutFill"></div></div>
-          <div class="chat-status-bar" id="chatStatusBar"></div>
+          <div class="chat-status-bar" id="chatStatusBar">
+            <span class="chat-status-text" id="chatStatusText"></span>
+            <div class="token-usage-bar" id="tokenUsageBar" style="display:none" onclick="chatToggleUsageDetail()">
+              <span class="token-usage-label" id="tokenUsageLabel">-- / --</span>
+              <div class="token-usage-track"><div class="token-usage-fill" id="tokenUsageFill"></div></div>
+              <div class="token-usage-detail" id="tokenUsageDetail"></div>
+            </div>
+          </div>
           <div class="chat-composer">
             <div class="chat-composer-inner">
               <div class="persona-bar-wrap" id="personaBar"></div>
@@ -1680,11 +1700,99 @@
     isStreaming: false,
     abortCtrl: null,
     inited: false,
+    tokenUsage: null,
+    tokenUsageDetail: false,
   };
   
 
   function escapeHtml(s){
     return s.replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
+
+  // ── Token 上下文用量条（替代时间进度）───────────────────────────────────────
+  function formatTokens(n){
+    if (n == null || isNaN(n)) return '--';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return String(Math.round(n));
+  }
+  function chatUpdateTokenUsage(usage, isProviderReport){
+    // usage: { total, window, pct, system, tools, skills, subagents, memory, conversation }
+    // 或 provider 实际返回: { prompt_tokens, completion_tokens, total_tokens }
+    if (!usage) return;
+    if (isProviderReport && usage.total_tokens != null) {
+      // 优先使用 provider 上报的 prompt + completion
+      chatState.tokenUsage = {
+        total: usage.total_tokens,
+        prompt: usage.prompt_tokens,
+        completion: usage.completion_tokens,
+        window: (chatState.tokenUsage && chatState.tokenUsage.window) || 128000,
+        breakdown: chatState.tokenUsage && chatState.tokenUsage.breakdown,
+      };
+    } else if (usage.total != null) {
+      chatState.tokenUsage = {
+        total: usage.total,
+        window: usage.window || 128000,
+        pct: usage.pct || Math.min(100, Math.round((usage.total / (usage.window || 128000)) * 100)),
+        breakdown: {
+          system: usage.system || 0,
+          tools: usage.tools || 0,
+          skills: usage.skills || 0,
+          subagents: usage.subagents || 0,
+          memory: usage.memory || 0,
+          conversation: usage.conversation || 0,
+        },
+      };
+    }
+    chatRenderTokenUsage();
+  }
+  function chatRenderTokenUsage(){
+    var bar = document.getElementById('tokenUsageBar');
+    var label = document.getElementById('tokenUsageLabel');
+    var fill = document.getElementById('tokenUsageFill');
+    var detail = document.getElementById('tokenUsageDetail');
+    var u = chatState.tokenUsage;
+    if (!bar || !u) return;
+    bar.style.display = 'flex';
+    var total = u.total || 0;
+    var window = u.window || 128000;
+    var pct = u.pct != null ? u.pct : Math.min(100, Math.round((total / window) * 100));
+    label.textContent = formatTokens(total) + ' / ' + formatTokens(window) + ' Tokens (' + pct + '%)';
+    fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    fill.className = 'token-usage-fill' + (pct >= 90 ? ' danger' : (pct >= 70 ? ' warn' : ''));
+
+    // 详情浮层
+    var rows = [];
+    if (u.breakdown) {
+      var colors = { system: '#64748b', tools: '#8b5cf6', skills: '#f59e0b', subagents: '#ec4899', memory: '#06b6d4', conversation: '#3b82f6' };
+      var names = { system: '系统提示词', tools: '工具定义', skills: '技能', subagents: '子代理定义', memory: '记忆', conversation: '对话' };
+      Object.keys(names).forEach(function(k){
+        var v = u.breakdown[k] || 0;
+        rows.push('<div class="tu-row"><span><span class="tu-dot" style="background:'+colors[k]+'"></span>'+names[k]+'</span><span>'+formatTokens(v)+'</span></div>');
+      });
+    }
+    if (u.prompt != null) {
+      rows.push('<div class="tu-row"><span><span class="tu-dot" style="background:#10b981"></span>本次 Prompt</span><span>'+formatTokens(u.prompt)+'</span></div>');
+    }
+    if (u.completion != null) {
+      rows.push('<div class="tu-row"><span><span class="tu-dot" style="background:#3b82f6"></span>本次 Completion</span><span>'+formatTokens(u.completion)+'</span></div>');
+    }
+    detail.innerHTML = '<div class="tu-total">上下文用量：'+formatTokens(total)+' / '+formatTokens(window)+' Tokens ('+pct+'%)</div>' + rows.join('');
+  }
+  function chatToggleUsageDetail(){
+    chatState.tokenUsageDetail = !chatState.tokenUsageDetail;
+    var d = document.getElementById('tokenUsageDetail');
+    if (d) d.classList.toggle('show', chatState.tokenUsageDetail);
+  }
+  function chatFetchTokenUsage(sessionId){
+    if (!sessionId) return;
+    fetch(apiUrl('/api/sessions/' + encodeURIComponent(sessionId) + '/usage')).then(function(r){ return r.json(); }).then(function(res){
+      if (res && res.ok && res.usage) chatUpdateTokenUsage(res.usage);
+    }).catch(function(){});
+  }
+  function chatHideTokenUsage(){
+    var bar = document.getElementById('tokenUsageBar');
+    if (bar) bar.style.display = 'none';
+    chatState.tokenUsage = null;
   }
 
 
@@ -2054,9 +2162,11 @@
     if(closeDrawer !== false) toggleChatSessions();
     var box = document.getElementById('chatMessages');
     if(box) box.innerHTML = '';
+    chatState.tokenUsage = null;
     chatRenderSessions();
     chatRenderMessages();
     chatUpdateHeaderTitle();
+    chatFetchTokenUsage(id);
   }
 
   function chatUpdateHeaderTitle(){
@@ -2131,6 +2241,7 @@
       scrollChatToBottom(true);
       box.querySelectorAll('.message.assistant .msg-content').forEach(function(el){ enhanceLinksWithQR(el); addCopyButtonsToPre(el); });
       chatDetectIncompleteStream(s);
+      chatFetchTokenUsage(chatState.currentId);
     }).catch(function(){ chatRenderEmpty(); });
   }
 
@@ -2139,16 +2250,16 @@
     var msgs = session && session.messages || [];
     var last = msgs[msgs.length - 1];
     if(!last || last.role !== 'assistant' || !last._streaming) return;
-    var statusBar = document.getElementById('chatStatusBar');
-    if(statusBar) statusBar.textContent = '检测到未完成的回复，正在恢复…';
+    var statusText = document.getElementById('chatStatusText');
+    if(statusText) statusText.textContent = '检测到未完成的回复，正在恢复…';
     fetch(apiUrl('/api/sessions/'+session.id), {method:'POST'}).then(function(r){ return r.json(); }).then(function(res){
       if(res && res.ok){
         chatRenderMessages();
-        if(statusBar) statusBar.textContent = '已恢复上次未完成的回复';
-        setTimeout(function(){ if(statusBar) statusBar.textContent = ''; }, 3000);
+        if(statusText) statusText.textContent = '已恢复上次未完成的回复';
+        setTimeout(function(){ if(statusText) statusText.textContent = ''; }, 3000);
       }
     }).catch(function(){
-      if(statusBar) statusBar.textContent = '恢复未完成回复失败';
+      if(statusText) statusText.textContent = '恢复未完成回复失败';
     });
   }
 
@@ -2180,6 +2291,7 @@
         '<p style="font-size:12px;color:var(--text3)">Enter 发送 · Shift+Enter 换行 · Esc 停止</p></div>';
       chatRenderSessions();
       chatUpdateHeaderTitle();
+      chatHideTokenUsage();
       var inp = document.getElementById('chatInput');
       if(inp) inp.focus();
       chatLoadSessions();
@@ -2489,18 +2601,18 @@
       // 显示进度/超时进度条
       var timeoutBar = document.getElementById('chatTimeoutBar');
       var timeoutFill = document.getElementById('chatTimeoutFill');
-      var statusBar = document.getElementById('chatStatusBar');
+      var statusText = document.getElementById('chatStatusText');
       var _startTime = Date.now();
       var _MAX_MS = 300000;
       if(timeoutBar){ timeoutBar.style.display = 'block'; timeoutFill.style.width = '0%'; }
-      if(statusBar) statusBar.textContent = '正在连接 Hermes…';
+      if(statusText) statusText.textContent = '正在连接 Hermes…';
       var _progressTimer = setInterval(function(){
         var elapsed = Date.now() - _startTime;
         var pct = Math.min(95, elapsed / _MAX_MS * 100);
         if(timeoutFill) timeoutFill.style.width = pct + '%';
         var secs = Math.floor(elapsed / 1000);
         var _msg = elapsed < 3000 ? '正在思考' : (elapsed < 10000 ? ('思考中 '+secs+'s') : ('处理中 '+secs+'s'));
-        if(statusBar) statusBar.textContent = _msg;
+        if(statusText) statusText.textContent = _msg;
       }, 500);
 
       // UI state (isStreaming + 按钮已在 chatSend 顶部设置)
@@ -2559,7 +2671,7 @@
             contentEl.innerHTML = renderMarkdown(fullText, true);
             addCopyButtonsToPre(contentEl); contentEl.classList.add('cursor-blink');
           }
-          if (statusBar) statusBar.textContent = tp.status === 'running'
+          if (statusText) statusText.textContent = tp.status === 'running'
             ? (tp.emoji || '🔧') + ' ' + (tp.toolZh || tp.tool) + '…'
             : 'Hermes 正在回复…';
           (window.requestAnimationFrame || setTimeout)(function(){ scrollChatToBottom(); }, 0);
@@ -2569,13 +2681,15 @@
           contentEl.innerHTML = renderMarkdown(fullText, true);
           addCopyButtonsToPre(contentEl);
           if (wasEmpty) contentEl.classList.add('cursor-blink');
-          if (statusBar) statusBar.textContent = 'Hermes 正在回复…';
+          if (statusText) statusText.textContent = 'Hermes 正在回复…';
           (window.requestAnimationFrame || setTimeout)(function(){ scrollChatToBottom(); }, 0);
         } else if (parsed.error) {
           streamErrorMsg = parsed.error;
           contentEl.innerHTML = '<span style="color:var(--red);white-space:pre-wrap">⚠ 错误：'+escapeHtml(parsed.error)+'</span>';
         } else if (parsed.info) {
-          if (statusBar) statusBar.textContent = parsed.info;
+          if (statusText) statusText.textContent = parsed.info;
+        } else if (parsed.usage) {
+          chatUpdateTokenUsage(parsed.usage, true);
         }
         if (parsed.done || parsed.error) finish(!!parsed.error);
       }
@@ -2637,7 +2751,7 @@
         }
         if (typeof _progressTimer !== 'undefined') clearInterval(_progressTimer);
         if (timeoutBar) { timeoutBar.style.display = 'none'; if (timeoutFill) timeoutFill.style.width = '0%'; }
-        if (statusBar) statusBar.textContent = '';
+        if (statusText) statusText.textContent = '';
         chatState.isStreaming = false;
         chatState.abortCtrl = null;
         sendBtn.className = 'chat-send-btn send';
@@ -3110,7 +3224,7 @@
     extLoadLocalSkills();
   }
 
-  // ── 在线技能商店（nousresearch 文档，后端代理适配）──
+  // ── 在线技能商店（nousresearch 文档，SPA 仅可打开原站）──
   function extLoadStore(){
     var box = document.getElementById('extStoreEmbed');
     if(box) box.innerHTML = '<div class="ext-empty" style="padding:14px">加载中…</div>';
@@ -3121,6 +3235,10 @@
         if(box) box.innerHTML = '<div class="ext-empty" style="padding:14px">加载失败：' + escapeHtml((res && res.error) || '未知错误') + '<br>可点击「打开原站」直接访问。</div>';
         return;
       }
+      if(res.spa){
+        if(box) box.innerHTML = '<div class="ext-empty" style="padding:14px">' + escapeHtml(res.note || '该页面为客户端渲染，无法内嵌浏览。') + '<br><a class="btn btn-sm" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">打开原站 ↗</a></div>';
+        return;
+      }
       if(box) box.innerHTML = '<div class="ext-embed-doc">' + res.html + '</div>';
     }).catch(function(err){ if(box) box.innerHTML = '<div class="ext-empty" style="padding:14px">加载失败：' + escapeHtml(err) + '</div>'; });
   }
@@ -3129,45 +3247,37 @@
   function extLoadHub(type){
     var list = document.getElementById('extHubList');
     var hint = document.getElementById('extHubHint');
-    var embed = document.getElementById('extHubEmbed');
     if(list) list.innerHTML = '<div class="ext-empty">拉取中…</div>';
     if(hint) hint.textContent = '';
-    if(embed) embed.style.display = 'none';
     var url = (type === 'packages')
       ? 'https://www.skillhub.cn/skillspackage'
       : 'https://www.skillhub.cn/skills?sortBy=score';
     _extFetch('/api/extensions/skills/remote?url=' + encodeURIComponent(url) + '&mode=list&type=' + type).then(function(res){
       window._extHubListLoaded = true;
       if(!res || !res.ok){
-        if(hint) hint.textContent = '拉取失败：' + ((res && res.error) || '未知错误') + '（可在「打开 SkillHub ↗」查看）';
+        if(hint) hint.textContent = '拉取失败：' + ((res && res.error) || '未知错误') + '（可点击上方「打开 SkillHub ↗」在原站浏览）';
         if(list) list.innerHTML = '';
         return;
       }
       var items = res.items || [];
       if(!items.length){
-        if(hint) hint.textContent = (res.note || '未获取到技能列表') + ' 已为你打开内嵌浏览。';
+        if(hint) hint.textContent = (res.note || '未获取到技能列表') + ' 请直接点击「打开 SkillHub ↗」在原站浏览。';
         if(list) list.innerHTML = '';
-        extShowHubEmbed(url);
         return;
       }
-      if(hint) hint.textContent = '共获取到 ' + items.length + ' 个' + (type === 'packages' ? '专家包' : '技能') + '，点击「安装」尝试导入。';
+      if(hint) hint.textContent = '共获取到 ' + items.length + ' 个' + (type === 'packages' ? '专家包' : '技能') + '，点击「安装」尝试导入（需要页面包含 SKILL.md）。';
       if(list) list.innerHTML = items.map(function(it){
         return '<div class="ext-card">'+
           '<div class="ext-card-head"><span class="ext-card-icon">🧩</span>'+
           '<span class="ext-card-title">'+escapeHtml(it.title || '未命名')+'</span>'+
           '<span class="ext-badge">'+(it.type === 'packages' ? '专家包' : '技能')+'</span></div>'+
+          (it.description ? '<div class="ext-card-desc">'+escapeHtml(it.description)+'</div>' : '')+
           '<div class="ext-card-actions">'+
           '<button class="btn btn-sm" onclick="extInstallSkill(\''+encodeURIComponent(it.url)+'\',\''+it.type+'\',\''+encodeURIComponent(it.title || '')+'\')">安装</button>'+
           '<a class="btn btn-sm" href="'+escapeHtml(it.url)+'" target="_blank" rel="noopener">详情 ↗</a>'+
           '</div></div>';
       }).join('');
     }).catch(function(err){ if(hint) hint.textContent = '拉取失败：' + err; if(list) list.innerHTML = ''; });
-  }
-  function extShowHubEmbed(url){
-    var embed = document.getElementById('extHubEmbed');
-    if(!embed) return;
-    embed.style.display = 'block';
-    embed.innerHTML = '<iframe src="'+escapeHtml(url)+'" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>';
   }
   function extInstallSkill(encUrl, type, encName){
     var url = decodeURIComponent(encUrl);
@@ -4157,6 +4267,7 @@
   window.chatPickFile = chatPickFile;
   window.chatFilesSelected = chatFilesSelected;
   window.chatRemoveAttachment = chatRemoveAttachment;
+  window.chatToggleUsageDetail = chatToggleUsageDetail;
   window.toggleDashboard = toggleDashboard;
 
   // 扩展能力页函数暴露到全局，供内联 onclick 调用
@@ -4179,7 +4290,6 @@
   window.extRemoveSkill = extRemoveSkill;
   window.extInstallSkill = extInstallSkill;
   window.extQuickPersona = extQuickPersona;
-  window.extShowHubEmbed = extShowHubEmbed;
   window.extDelSkillDir = extDelSkillDir;
 })();
 </script>

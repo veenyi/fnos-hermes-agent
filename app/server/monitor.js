@@ -27,6 +27,88 @@ const VERSION_FILE   = `${VAR_DIR}/hermes_version.txt`;
 const START_TIME     = Date.now();
 const CONFIG_VERSION = "1.0";
 
+// 默认上下文窗口（tokens）。无法精确获知模型 tokenizer，这里取常见默认值用于进度条展示。
+const DEFAULT_CONTEXT_WINDOW = 128000;
+
+// 与 app/ui/index.html 保持一致的人格定义
+const EXT_PERSONAS = {
+  default:    { emoji: "🤖", label: "默认助手",   prompt: "" },
+  coder:      { emoji: "💻", label: "程序员",     prompt: "你是一位资深全栈工程师。优先给出可直接运行的代码与命令，注重安全性、可维护性与生产实践；遇到模糊需求先给出最小可行方案再迭代。" },
+  researcher: { emoji: "🔬", label: "研究员",     prompt: "你是一位严谨的研究员。回答须基于证据、引用来源，并明确区分事实、推测与不确定信息；避免臆断。" },
+  writer:     { emoji: "✍️", label: "写作助手",   prompt: "你是一位专业的写作助手。擅长结构化、清晰、有感染力的中文表达，依据场景调整语气与篇幅。" },
+  analyst:    { emoji: "📊", label: "数据分析师", prompt: "你是一位数据分析师。善于从数据 / 文件中提取洞察，优先给出量化结论与可执行建议。" },
+};
+
+// 轻量 token 估算：中文/全角字符 1:1，其他按 4 字符≈1 token。
+// 仅用于 UI 上下文用量条，不用于计费或精确截断。
+function estimateTokens(text) {
+  if (text == null) return 0;
+  const s = typeof text === "string" ? text : JSON.stringify(text);
+  let tokens = 0;
+  for (const ch of s) {
+    const code = ch.codePointAt(0);
+    // CJK 统一表意文字、韩文、日文、全角符号
+    if ((code >= 0x4E00 && code <= 0x9FFF) ||
+        (code >= 0x3400 && code <= 0x4DBF) ||
+        (code >= 0x3040 && code <= 0x309F) ||
+        (code >= 0x30A0 && code <= 0x30FF) ||
+        (code >= 0xAC00 && code <= 0xD7AF) ||
+        (code >= 0xFF00 && code <= 0xFFEF) ||
+        (code >= 0x20000 && code <= 0x2EBEF)) {
+      tokens += 1;
+    } else {
+      tokens += 0.25;
+    }
+  }
+  return Math.ceil(tokens);
+}
+
+// 汇总一次请求的上下文用量各组成部分
+function computeSessionUsage(session, options = {}) {
+  const msgs = (session && session.messages) || [];
+  const ext = options.extensions || {};
+  const persona = options.persona || {};
+
+  // 系统提示词 = UI 能力提示 + 人格提示
+  const systemText = (options.systemPrompt || UI_CAPABILITIES_PROMPT || "") + (persona.prompt || "");
+  const systemTokens = estimateTokens(systemText);
+
+  // 对话历史（按 buildChatHistory 规则近似）
+  const keptMessages = buildChatHistory({ messages: msgs }, "").slice(1); // 去掉系统占位
+  let conversationTokens = 0;
+  for (const m of keptMessages) conversationTokens += estimateTokens(m.content) + 4; // +4 角色/格式开销
+
+  // 记忆（按字符估算）
+  const memoryEnabled = ext.memory && ext.memory.enabled;
+  const memoryTokens = memoryEnabled ? estimateTokens(options.memoryText || "") : 0;
+
+  // 工具定义占位：每个启用的 toolset 约 800 tokens（实际由 Gateway 生成，这里仅做视觉估算）
+  const toolsets = ext.toolsets || {};
+  const enabledToolsets = Object.keys(toolsets).filter(k => toolsets[k]);
+  const toolTokens = enabledToolsets.length * 800;
+
+  // 已安装技能占位：每个技能约 1000 tokens
+  const skillDirs = ext.skills_dirs || [];
+  const skillCount = Math.max(0, (options.localSkillCount || 0));
+  const skillTokens = skillCount * 1000;
+
+  // 子代理 / 工作流占位
+  const subagentTokens = toolsets.delegation ? 1200 : 0;
+
+  const total = systemTokens + toolTokens + skillTokens + subagentTokens + memoryTokens + conversationTokens;
+  return {
+    system: systemTokens,
+    tools: toolTokens,
+    skills: skillTokens,
+    subagents: subagentTokens,
+    memory: memoryTokens,
+    conversation: conversationTokens,
+    total,
+    window: options.contextWindow || DEFAULT_CONTEXT_WINDOW,
+    pct: Math.min(100, Math.round((total / (options.contextWindow || DEFAULT_CONTEXT_WINDOW)) * 100)),
+  };
+}
+
 // ── Hermes 自更新状态 ──
 let updateState = "idle";       // idle | checking | updating | done | error
 let updateOutput = [];           // 最近的 stdout/stderr 输出行
@@ -405,7 +487,7 @@ function deleteSession(id) {
   if (existsSync(f)) unlinkSync(f);
 }
 
-function createSSEParser(onDelta, onDone, onError, onToolEvent) {
+function createSSEParser(onDelta, onDone, onError, onToolEvent, onUsage) {
   let buffer = "";
   let currentEvent = "";
   let toolData = {};
@@ -479,6 +561,7 @@ function createSSEParser(onDelta, onDone, onError, onToolEvent) {
           if (json.error) { onError(typeof json.error === 'string' ? json.error : (json.error.message || JSON.stringify(json.error))); return; }
           const delta = json.choices?.[0]?.delta?.content || "";
           if (delta) onDelta(delta);
+          if (json.usage && onUsage) onUsage(json.usage);
         } catch {
           // 忽略非 JSON 行
         }
@@ -513,6 +596,7 @@ function createSSEParser(onDelta, onDone, onError, onToolEvent) {
               if (json.error) { onError(typeof json.error === 'string' ? json.error : (json.error.message || JSON.stringify(json.error))); return; }
               const delta = json.choices?.[0]?.delta?.content || "";
               if (delta) onDelta(delta);
+              if (json.usage && onUsage) onUsage(json.usage);
             } catch {}
           }
         }
@@ -899,11 +983,28 @@ function createChatStream(sessionId, message, reqSignal) {
             clearTimeout(timeoutTimer);
 
             hadToolCalls = false;
+            let usageReported = false;
             const localParser = createSSEParser(
               (delta) => { fullReply += delta; sendJSON({ delta }); },
               () => {},
               (err) => { requestError = err; sendJSON({ error: err }); },
               (toolEvent) => { hadToolCalls = true; sendJSON({ tool_progress: toolEvent }); },
+              (usage) => {
+                usageReported = true;
+                try {
+                  const s = getSession(sessionId);
+                  if (s) {
+                    s.lastUsage = {
+                      prompt_tokens: usage.prompt_tokens,
+                      completion_tokens: usage.completion_tokens,
+                      total_tokens: usage.total_tokens,
+                      reported_at: Date.now(),
+                    };
+                    saveSession(s);
+                  }
+                } catch {}
+                sendJSON({ usage });
+              },
             );
 
             const reader = upstream.body.getReader();
@@ -1044,6 +1145,7 @@ async function runChatWS(ws, sessionId, message) {
 
       try {
         hadToolCalls = false;
+        let usageReported = false;
         const timeoutController = new AbortController();
         const timeoutTimer = setTimeout(() => timeoutController.abort(), PROVIDER_TIMEOUT_MS);
         const signal = combineSignals([timeoutController.signal, stopCtrl.signal]);
@@ -1056,6 +1158,22 @@ async function runChatWS(ws, sessionId, message) {
           () => {},
           (err) => { requestError = err; sendJSON({ error: err }); },
           (toolEvent) => { hadToolCalls = true; sendJSON({ tool_progress: toolEvent }); },
+          (usage) => {
+            usageReported = true;
+            try {
+              const s = getSession(sessionId);
+              if (s) {
+                s.lastUsage = {
+                  prompt_tokens: usage.prompt_tokens,
+                  completion_tokens: usage.completion_tokens,
+                  total_tokens: usage.total_tokens,
+                  reported_at: Date.now(),
+                };
+                saveSession(s);
+              }
+            } catch {}
+            sendJSON({ usage });
+          },
         );
 
         const reader = upstream.body.getReader();
@@ -2554,21 +2672,45 @@ async function handleFetch(req) {
     return out;
   }
 
-  // 从远程 HTML 中提取技能 / 专家包链接
+  // 从远程 HTML 中提取技能 / 专家包链接（SkillHub / agentskills.io 风格卡片）
   function _extractSkillLinks(html, base, type){
     const items = []; const seen = {};
-    const re = /<a\b[^>]*\bhref\s*=\s*("|')([^"']+)\1[^>]*>([\s\S]*?)<\/a>/gi;
+    // 先尝试解析 SkillHub 卡片结构：<a href="...">...<div class="...">标题</div>...描述...</a>
+    const cardRe = /<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
     let m;
-    while ((m = re.exec(html)) !== null){
-      const href = m[2];
-      const text = m[3].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    while ((m = cardRe.exec(html)) !== null){
+      const href = m[1];
+      const raw = m[2];
       if (!/(\/skills?\/|\/skillspackage|\/skill-package|\/skill\/)/i.test(href)) continue;
       const abs = _absUrl(href, base);
       if (seen[abs]) continue;
       seen[abs] = true;
-      let title = text || _baseName(abs.split("?")[0]);
-      title = title.replace(/\.html?$/i, "");
-      items.push({ title: title.slice(0, 80), url: abs, type: type || "skill" });
+
+      // 清理标签但保留换行
+      let text = raw.replace(/<script[\s\S]*?<\/script>/gi, "")
+                    .replace(/<style[\s\S]*?<\/style>/gi, "")
+                    .replace(/<[^>]+>/g, "\n")
+                    .replace(/\n+/g, "\n")
+                    .trim();
+      const lines = text.split("\n").map(l => l.replace(/\s+/g, " ").trim()).filter(l => l.length > 0 && l !== "SkillHub");
+
+      // 标题：第一行非 SkillHub / 认证标记 / 分类标记的文本
+      let title = "";
+      let description = "";
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        if (!title && !/^([0-9.]+\s*万|需配置|办公效率|内容创作|知识管理|AI Agent|开发编程|IT 运维|设计|多媒体|行业专业|商业运营|{\[).*/i.test(l)) {
+          title = l; continue;
+        }
+        if (title && !description && l !== title && l.length > 5) {
+          description = l; break;
+        }
+      }
+      if (!title) title = _baseName(abs.split("?")[0]).replace(/[-_]/g, " ");
+      title = title.replace(/\.html?$/i, "").slice(0, 80);
+      description = description.slice(0, 160);
+
+      items.push({ title, description, url: abs, type: type || "skill" });
     }
     return items;
   }
@@ -2818,6 +2960,14 @@ async function handleFetch(req) {
         return new Response(JSON.stringify({
           ok: true, url: target, items,
           note: items.length ? "" : "该页面为客户端渲染(SPA)，服务端未返回技能列表；请使用「打开原站」查看完整内容，或稍后在原站复制 SKILL.md 后通过「本地已安装」目录加载。",
+        }), { headers: jsonHeaders() });
+      }
+      // embed 模式：如果页面是客户端渲染 SPA（仅有 loading 骨架），内嵌无法执行其 JS，改为返回提示
+      const isClientRenderedSPA = /Loading\s+(the\s+)?catalog|Fetching\s+[0-9]+k?\+?\s+skills|__NEXT_DATA__|data-reactroot/i.test(html);
+      if (isClientRenderedSPA) {
+        return new Response(JSON.stringify({
+          ok: true, url: target, spa: true,
+          note: "该页面为客户端渲染(SPA)，内嵌浏览器无法执行其动态加载脚本。请点击「打开原站」在新窗口浏览，或在原站找到 SKILL.md 后通过「本地已安装」目录加载。"
         }), { headers: jsonHeaders() });
       }
       return new Response(JSON.stringify({ ok: true, url: target, html: _sanitizeHtmlForEmbed(html, target) }), { headers: jsonHeaders() });
@@ -3357,6 +3507,46 @@ async function handleFetch(req) {
     };
     saveSession(s);
     return new Response(JSON.stringify(s), { headers: jsonHeaders() });
+  }
+
+  // 匹配 /api/sessions/:id/usage
+  const usageMatch = path.match(/^\/api\/sessions\/([^/]+)\/usage$/);
+  if (usageMatch && req.method === "GET") {
+    const sid = decodeURIComponent(usageMatch[1]);
+    const s = getSession(sid);
+    if (!s) return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: jsonHeaders() });
+    const ext = _readExtensionsFile() || { toolsets: {}, skills_dirs: [], persona: "default", memory: { enabled: true, char_limit: 2200 } };
+    // 统计本地已安装技能数量
+    let localSkillCount = 0;
+    try {
+      const dirs = ext.skills_dirs || [];
+      for (const d of dirs) {
+        if (existsSync(d)) {
+          const files = readdirSync(d);
+          localSkillCount += files.filter(f => f.toLowerCase() === "skill.md").length;
+        }
+      }
+    } catch {}
+    // 读取长期记忆文本（如果 memory 启用）
+    let memoryText = "";
+    if (ext.memory && ext.memory.enabled) {
+      try {
+        const memPath = `${DATA_DIR}/memories/MEMORY.md`;
+        const userPath = `${DATA_DIR}/memories/USER.md`;
+        if (existsSync(memPath)) memoryText += readFileSync(memPath, "utf8");
+        if (existsSync(userPath)) memoryText += readFileSync(userPath, "utf8");
+      } catch {}
+    }
+    const persona = EXT_PERSONAS[ext.persona] || {};
+    const usage = computeSessionUsage(s, {
+      extensions: ext,
+      persona,
+      systemPrompt: UI_CAPABILITIES_PROMPT,
+      memoryText,
+      localSkillCount,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+    });
+    return new Response(JSON.stringify({ ok: true, usage }), { headers: jsonHeaders() });
   }
 
   // 匹配 /api/sessions/:id
