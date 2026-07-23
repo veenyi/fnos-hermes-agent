@@ -252,13 +252,26 @@ const CHANNEL_DEFS = {
 
 // ─── Node.js 运行时探测（hermes TUI 需要 node；版本在安装期由 install_callback 固定） ───
 
+// 解析 Node 二进制：① 打包内置路径 → ② 系统 nodejs 运行时（fnOS 应用中心） → ③ PATH 探测
+function _findNodeInPath() {
+  try {
+    const r = spawnSync("sh", ["-c", "command -v node"], { stdout: "pipe", stderr: "pipe" });
+    const out = (r.stdout || "").toString().trim();
+    if (out && existsSync(out) && (statSync(out).mode & 0o111) !== 0) return out;
+  } catch {}
+  return null;
+}
 const NODE_CANDIDATES = [
   `${APP_DIR}/runtime/node/bin/node`,            // ① 打包内置（最高优先）
   `${DATA_DIR}/node/bin/node`,                   // ② 安装期 ensure_node 下载并固定的路径
+  "/var/apps/nodejs_v24/target/bin/node",        // ③ fnOS 应用中心 Node.js v24
+  "/var/apps/nodejs_v22/target/bin/node",        // ④ fnOS 应用中心 Node.js v22
+  "/var/apps/nodejs_v20/target/bin/node",        // ⑤ fnOS 应用中心 Node.js v20
+  "/var/apps/nodejs/target/bin/node",            // ⑥ 通用 nodejs 路径
 ];
 const resolvedNodeBin = NODE_CANDIDATES.find(p => {
   try { return existsSync(p) && (statSync(p).mode & 0o111) !== 0; } catch { return false; }
-}) || null;
+}) || _findNodeInPath();
 const resolvedNodeDir = resolvedNodeBin ? resolvedNodeBin.replace(/\/[^/]+$/, "") : null;
 
 // ─── 通讯平台 QR 扫码登录相关常量 ────────────────────────────────────────
