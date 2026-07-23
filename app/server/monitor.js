@@ -2976,6 +2976,61 @@ async function handleFetch(req) {
     }
   }
 
+  // ── SkillHub 技能 / 专家包搜索（官方 API：GET /api/skills?keyword=&type=package）──
+  if (path === "/api/extensions/skills/search" && req.method === "GET") {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      const keyword = (u.searchParams.get("keyword") || "").trim();
+      const type = u.searchParams.get("type") || "skills"; // skills | packages
+      const pageSize = Math.min(Math.max(parseInt(u.searchParams.get("pageSize") || "24", 10) || 24, 1), 50);
+      if (!keyword) return new Response(JSON.stringify({ ok: false, error: "empty" }), { status: 200, headers: jsonHeaders() });
+      const apiUrl = "https://api.skillhub.cn/api/skills?keyword=" + encodeURIComponent(keyword) +
+        "&sortBy=score&pageSize=" + pageSize + (type === "packages" ? "&type=package" : "");
+      const r = await fetch(apiUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; HermesDashboard/1.0)",
+          "Accept": "application/json",
+          "Origin": "https://www.skillhub.cn",
+          "Referer": "https://www.skillhub.cn/",
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) {
+        const note = (r.status === 429) ? "（SkillHub 请求过于频繁，请稍后再试）" : "";
+        return new Response(JSON.stringify({ ok: false, error: "SkillHub API 返回 " + r.status + note }), { status: 502, headers: jsonHeaders() });
+      }
+      const j = await r.json();
+      const arr = (j && j.data && Array.isArray(j.data.skills)) ? j.data.skills : [];
+      const items = arr.map(function(it){
+        const nsObj = (typeof it.namespace === "object" && it.namespace) ? it.namespace : null;
+        const canonical = (nsObj && nsObj.canonicalName) ? nsObj.canonicalName : ("@" + (it.ownerName || "user") + "/" + (it.slug || ""));
+        const desc = it.description_zh || it.description || "";
+        const subcats = Array.isArray(it.subCategories) ? it.subCategories.map(function(s){ return (s && s.name) ? s.name : ""; }).filter(Boolean) : [];
+        const webUrl = (it.homepage || "").replace("api.skillhub.cn", "www.skillhub.cn") || ("https://www.skillhub.cn/skills/" + (it.slug || ""));
+        return {
+          name: it.name || it.slug || "未命名",
+          slug: it.slug || "",
+          namespace: canonical,
+          description: desc,
+          category: it.category || "",
+          iconUrl: it.iconUrl || "",
+          downloads: it.downloads || 0,
+          installs: it.installs || 0,
+          stars: it.stars || 0,
+          version: it.version || "",
+          source: it.source || "",
+          tags: subcats,
+          webUrl: webUrl,
+          installCmd: "npx -y agentskills install " + canonical,
+        };
+      });
+      return new Response(JSON.stringify({ ok: true, type: type, keyword: keyword, total: (j.data && j.data.total) || items.length, items }), { headers: jsonHeaders() });
+    } catch (e) {
+      const msg = /timeout/i.test(String(e && e.message || e)) ? "SkillHub API 请求超时" : ("搜索失败：" + (e && e.message || e));
+      return new Response(JSON.stringify({ ok: false, error: msg }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+
   // ── 安装远程技能（best-effort：尝试从页面提取 SKILL.md）──
   if (path === "/api/extensions/skills/install" && req.method === "POST") {
     try {

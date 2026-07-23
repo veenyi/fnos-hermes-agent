@@ -721,6 +721,12 @@
     .ext-card-title{font-size:13px;font-weight:600;color:var(--text,#e8eaed);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .ext-card-desc{font-size:12px;color:var(--text3,#8a909c);line-height:1.45;min-height:32px}
     .ext-card-actions{display:flex;gap:6px;margin-top:2px}
+    .ext-input{flex:1;min-width:200px;padding:7px 11px;border-radius:8px;border:1px solid var(--border,#2a2f3a);background:var(--bg,#12151c);color:var(--text,#e8eaed);font-size:13px;outline:none;transition:border-color .15s}
+    .ext-input:focus{border-color:var(--accent,#4f8cff)}
+    .ext-input::placeholder{color:var(--text3,#8a909c)}
+    .ext-tags{display:flex;gap:5px;flex-wrap:wrap}
+    .ext-tag{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--border,#2a2f3a);color:var(--text3,#8a909c)}
+    .ext-card-meta{font-size:11px;color:var(--text3,#8a909c)}
     .ext-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--accent,#4f8cff) 18%,transparent);color:var(--accent,#4f8cff)}
     .ext-badge.muted{background:var(--border,#2a2f3a);color:var(--text3,#8a909c)}
     .ext-embed{max-height:420px;overflow:auto;border:1px solid var(--border,#2a2f3a);border-radius:10px;background:#fff;margin-top:4px}
@@ -954,12 +960,13 @@
                   <span class="ext-subtab active" data-ht="skills" onclick="extSwitchHubTab('skills')">技能</span>
                   <span class="ext-subtab" data-ht="packages" onclick="extSwitchHubTab('packages')">专家包</span>
                 </div>
-                <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-                  <button class="btn btn-sm" onclick="extLoadHub('skills')">拉取全部技能</button>
-                  <button class="btn btn-sm" onclick="extLoadHub('packages')">拉取专家包</button>
+                <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+                  <input id="extHubSearch" class="ext-input" type="text" placeholder="搜索技能 / 专家包，如 pdf、OCR、翻译、写作…" onkeydown="if(event.key==='Enter')extSearchHub()" />
+                  <button class="btn btn-sm" onclick="extSearchHub()">搜索</button>
+                  <button class="btn btn-sm" onclick="extClearHubSearch()">清空</button>
                   <a class="btn btn-sm" href="https://www.skillhub.cn/skills?sortBy=score" target="_blank" rel="noopener">打开 SkillHub ↗</a>
                 </div>
-                <div class="ext-hint" id="extHubHint"></div>
+                <div class="ext-hint" id="extHubHint">输入关键词搜索 SkillHub 上的技能与专家包（数据来自 SkillHub 官方 API）。</div>
                 <div class="ext-grid" id="extHubList"></div>
               </div>
             </div>
@@ -3149,10 +3156,15 @@
     document.querySelectorAll('#extSkillTabs .ext-subtab').forEach(function(el){ el.classList.toggle('active', el.dataset.st === st); });
     ['local','store','hub'].forEach(function(s){ var p = document.getElementById('extSkill-'+s); if(p) p.classList.toggle('active', s === st); });
     if(st === 'store' && !window._extStoreLoaded) extLoadStore();
-    if(st === 'hub' && !window._extHubListLoaded) extLoadHub('skills');
+    if(st === 'hub'){
+      window._extHubType = window._extHubType || 'skills';
+      if(!window._extHubListLoaded){ extSearchHub(); window._extHubListLoaded = true; }
+    }
   }
   function extSwitchHubTab(ht){
+    window._extHubType = ht;
     document.querySelectorAll('#extSkill-hub .ext-subtab').forEach(function(el){ el.classList.toggle('active', el.dataset.ht === ht); });
+    if(!window._extHubLoadedType || window._extHubLoadedType !== ht){ extSearchHub(); }
   }
 
   // ── 工作流 / 记忆 / 人格 ──
@@ -3243,41 +3255,85 @@
     }).catch(function(err){ if(box) box.innerHTML = '<div class="ext-empty" style="padding:14px">加载失败：' + escapeHtml(err) + '</div>'; });
   }
 
-  // ── SkillHub：技能 + 专家包 ──
-  function extLoadHub(type){
+  // ── 轻量 toast 提示 ──
+  function extToast(msg){
+    var t = document.getElementById('extToast');
+    if(!t){
+      t = document.createElement('div');
+      t.id = 'extToast';
+      t.style.cssText = 'position:fixed;left:50%;bottom:32px;transform:translateX(-50%);max-width:80%;padding:10px 16px;border-radius:10px;background:rgba(20,24,32,.95);color:#e8eaed;font-size:13px;line-height:1.5;border:1px solid #2a2f3a;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:9999;opacity:0;transition:opacity .2s;pointer-events:none;word-break:break-all';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(window._extToastTimer);
+    window._extToastTimer = setTimeout(function(){ t.style.opacity = '0'; }, 2600);
+  }
+
+  // ── SkillHub：基于官方 API 的技能 / 专家包搜索 ──
+  function extSearchHub(){
     var list = document.getElementById('extHubList');
     var hint = document.getElementById('extHubHint');
-    if(list) list.innerHTML = '<div class="ext-empty">拉取中…</div>';
-    if(hint) hint.textContent = '';
-    var url = (type === 'packages')
-      ? 'https://www.skillhub.cn/skillspackage'
-      : 'https://www.skillhub.cn/skills?sortBy=score';
-    _extFetch('/api/extensions/skills/remote?url=' + encodeURIComponent(url) + '&mode=list&type=' + type).then(function(res){
-      window._extHubListLoaded = true;
+    var input = document.getElementById('extHubSearch');
+    var kw = (input && input.value || '').trim();
+    var type = window._extHubType || 'skills';
+    if(!kw){
+      if(hint) hint.textContent = '请输入关键词搜索 SkillHub 上的技能与专家包（数据来自 SkillHub 官方 API）。';
+      if(list) list.innerHTML = '';
+      return;
+    }
+    if(list) list.innerHTML = '<div class="ext-empty">搜索中…</div>';
+    if(hint) hint.textContent = '正在搜索 “' + kw + '” …';
+    _extFetch('/api/extensions/skills/search?keyword=' + encodeURIComponent(kw) + '&type=' + type + '&pageSize=24').then(function(res){
+      window._extHubLoadedType = type;
       if(!res || !res.ok){
-        if(hint) hint.textContent = '拉取失败：' + ((res && res.error) || '未知错误') + '（可点击上方「打开 SkillHub ↗」在原站浏览）';
+        if(hint) hint.textContent = '搜索失败：' + ((res && res.error) || '未知错误') + '（可点击「打开 SkillHub ↗」在原站浏览）';
         if(list) list.innerHTML = '';
         return;
       }
       var items = res.items || [];
       if(!items.length){
-        if(hint) hint.textContent = (res.note || '未获取到技能列表') + ' 请直接点击「打开 SkillHub ↗」在原站浏览。';
+        if(hint) hint.textContent = '未找到与 “' + kw + '” 相关的' + (type === 'packages' ? '专家包' : '技能') + '。';
         if(list) list.innerHTML = '';
         return;
       }
-      if(hint) hint.textContent = '共获取到 ' + items.length + ' 个' + (type === 'packages' ? '专家包' : '技能') + '，点击「安装」尝试导入（需要页面包含 SKILL.md）。';
+      if(hint) hint.textContent = '共 ' + (res.total || items.length) + ' 个结果（关键词：“' + kw + '”），显示前 ' + items.length + ' 个。';
       if(list) list.innerHTML = items.map(function(it){
+        var stats = [];
+        if(it.installs) stats.push('安装 ' + it.installs);
+        if(it.downloads) stats.push('下载 ' + it.downloads);
+        if(it.stars) stats.push('★ ' + it.stars);
+        var tags = (it.tags && it.tags.length) ? it.tags.slice(0,3).map(function(tag){ return '<span class="ext-tag">'+escapeHtml(tag)+'</span>'; }).join('') : '';
         return '<div class="ext-card">'+
-          '<div class="ext-card-head"><span class="ext-card-icon">🧩</span>'+
-          '<span class="ext-card-title">'+escapeHtml(it.title || '未命名')+'</span>'+
-          '<span class="ext-badge">'+(it.type === 'packages' ? '专家包' : '技能')+'</span></div>'+
+          '<div class="ext-card-head"><span class="ext-card-icon">'+(it.iconUrl ? '<img src="'+escapeHtml(it.iconUrl)+'" style="width:20px;height:20px;border-radius:4px" onerror="this.style.display=\'none\'">' : '🧩')+'</span>'+
+          '<span class="ext-card-title" title="'+escapeHtml(it.name || '')+'">'+escapeHtml(it.name || '未命名')+'</span>'+
+          '<span class="ext-badge">'+(type === 'packages' ? '专家包' : '技能')+'</span></div>'+
           (it.description ? '<div class="ext-card-desc">'+escapeHtml(it.description)+'</div>' : '')+
+          (tags ? '<div class="ext-tags">'+tags+'</div>' : '')+
+          (stats.length ? '<div class="ext-card-meta">'+stats.join(' · ')+'</div>' : '')+
           '<div class="ext-card-actions">'+
-          '<button class="btn btn-sm" onclick="extInstallSkill(\''+encodeURIComponent(it.url)+'\',\''+it.type+'\',\''+encodeURIComponent(it.title || '')+'\')">安装</button>'+
-          '<a class="btn btn-sm" href="'+escapeHtml(it.url)+'" target="_blank" rel="noopener">详情 ↗</a>'+
+          '<button class="btn btn-sm" onclick="extCopyInstallCmd(\''+encodeURIComponent(it.installCmd || '')+'\')">复制安装命令</button>'+
+          '<a class="btn btn-sm" href="'+escapeHtml(it.webUrl || '#')+'" target="_blank" rel="noopener">详情 ↗</a>'+
           '</div></div>';
       }).join('');
-    }).catch(function(err){ if(hint) hint.textContent = '拉取失败：' + err; if(list) list.innerHTML = ''; });
+    }).catch(function(err){ if(hint) hint.textContent = '搜索失败：' + err; if(list) list.innerHTML = ''; });
+  }
+  function extClearHubSearch(){
+    var input = document.getElementById('extHubSearch');
+    if(input) input.value = '';
+    var list = document.getElementById('extHubList');
+    var hint = document.getElementById('extHubHint');
+    if(hint) hint.textContent = '请输入关键词搜索 SkillHub 上的技能与专家包（数据来自 SkillHub 官方 API）。';
+    if(list) list.innerHTML = '';
+  }
+  function extCopyInstallCmd(enc){
+    var cmd = decodeURIComponent(enc);
+    if(!cmd){ extToast('没有可用的安装命令'); return; }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(cmd).then(function(){ extToast('已复制安装命令：' + cmd); }).catch(function(){ extToast('复制失败，请手动复制：' + cmd); });
+    } else {
+      extToast('安装命令：' + cmd);
+    }
   }
   function extInstallSkill(encUrl, type, encName){
     var url = decodeURIComponent(encUrl);
@@ -4282,7 +4338,9 @@
   window.extSelectPersona = extSelectPersona;
   window.extLoadLocalSkills = extLoadLocalSkills;
   window.extLoadStore = extLoadStore;
-  window.extLoadHub = extLoadHub;
+  window.extSearchHub = extSearchHub;
+  window.extClearHubSearch = extClearHubSearch;
+  window.extCopyInstallCmd = extCopyInstallCmd;
   window.extAddMcp = extAddMcp;
   window.extEditMcp = extEditMcp;
   window.extDelMcp = extDelMcp;
