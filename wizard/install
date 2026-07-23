@@ -8,7 +8,7 @@
             },
             {
                 "type": "tips",
-                "helpText": "<br >安装完成后，打开Herme Agent控制面板，完成模型添加即可进行对话。"
+                "helpText": "<br >安装完成后，打开 Hermes Agent 控制面板，完成模型添加即可进行对话。"
             }
         ]
     }
