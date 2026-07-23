@@ -158,12 +158,13 @@ const HERMES_ENV     = `${DATA_DIR}/.env`;
 // fields: 凭证输入项；toggles: 行为开关；qrLogin: 微信扫码登录
 const CHANNEL_DEFS = {
   telegram: {
-    name: "Telegram", icon: "✈️",
+    name: "Telegram", icon: "✈️", qrLogin: true,
     fields: [
-      { env: "TELEGRAM_BOT_TOKEN", path: "token", label: "Bot Token", placeholder: "123456:ABC-DEF...", secret: true },
+      { env: "TELEGRAM_BOT_TOKEN", path: "token", label: "Bot Token", placeholder: "（扫码创建机器人后自动填入，也可手动输入 BotFather Token）", secret: true },
       { env: "TELEGRAM_PROXY", path: "proxy", label: "代理 (可选)", placeholder: "socks5://127.0.0.1:7890" },
     ],
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+    note: "Telegram 支持「扫码创建机器人」自动获取 Token（调用 Nous 托管服务），也支持手动填入 BotFather 创建的 Token。",
   },
   discord: {
     name: "Discord", icon: "🎮",
@@ -179,10 +180,10 @@ const CHANNEL_DEFS = {
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" }, { path: "allow_bots", label: "允许机器人消息" } ],
   },
   whatsapp: {
-    name: "WhatsApp", icon: "💬",
+    name: "WhatsApp", icon: "💬", qrLogin: true,
     fields: [],
-    toggles: [ { path: "enabled", label: "启用 WhatsApp 频道" }, { path: "require_mention", label: "需 @提及 才回复" } ],
-    note: "WhatsApp 启用后需通过 Hermes 网关完成手机号关联（扫码 / 验证码）。",
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+    note: "WhatsApp 通过本地 Baileys bridge 扫码配对。选择「独立号码」或「自用号码」模式，用 WhatsApp 扫描弹出的二维码即可完成关联。",
   },
   matrix: {
     name: "Matrix", icon: "🔷",
@@ -252,6 +253,13 @@ const resolvedNodeBin = NODE_CANDIDATES.find(p => {
   try { return existsSync(p) && (statSync(p).mode & 0o111) !== 0; } catch { return false; }
 }) || null;
 const resolvedNodeDir = resolvedNodeBin ? resolvedNodeBin.replace(/\/[^/]+$/, "") : null;
+
+// ─── 通讯平台 QR 扫码登录相关常量 ────────────────────────────────────────
+const TELEGRAM_ONBOARDING_URL = (process.env.TELEGRAM_ONBOARDING_URL || "https://setup.hermes-agent.nousresearch.com").replace(/\/+$/,"");
+const WHATSAPP_SESSION_DIR    = `${DATA_DIR}/whatsapp/session`;
+const WHATSAPP_ONBOARDING_TTL = 600000; // 10 分钟（与官方一致）
+const _telegramPairings = new Map(); // pairing_id -> {poll_token, expires_at_ts, bot_token, bot_username, owner_user_id}
+const _whatsappPairings = new Map(); // pairing_id -> {proc, status, qr_payload, mode, account_id, account_name, account_phone, error, expires_at_ts}
 
 // ─── HERMES_TUI_DIR：TUI 运行时 shim 目录 ──────────────────────────────
 const TUI_DIR = `${DATA_DIR}/tui`;
@@ -2862,6 +2870,133 @@ async function handleFetch(req) {
     for (let i = suffixStart; i < lines.length; i++) newLines.push(lines[i]); // 保留 platforms 段之后的其它顶层配置
     return newLines.join("\n") + "\n";
   }
+
+  // ─── 通讯平台 QR 扫码登录辅助函数 ────────────────────────────────────────
+  function _findHermesRoot(){
+    try {
+      const pyResult = spawnSync(
+        [`${VENV_BIN}/python3`, "-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
+        { stdout: "pipe", stderr: "pipe" }
+      );
+      const root = (pyResult.stdout ? pyResult.stdout.toString() : "").trim();
+      if (root && existsSync(`${root}/hermes_cli`)) return root;
+    } catch {}
+    return null;
+  }
+  function _findWhatsAppBridgeDir(){
+    const root = _findHermesRoot();
+    if (root && existsSync(`${root}/scripts/whatsapp-bridge/bridge.js`)) return `${root}/scripts/whatsapp-bridge`;
+    return null;
+  }
+  function _ensureWhatsAppBridgeDeps(bridgeDir){
+    if (existsSync(`${bridgeDir}/node_modules`)) return true;
+    if (!resolvedNodeBin) return false;
+    const npm = resolvedNodeBin.replace(/\/node$/, "/npm");
+    if (!existsSync(npm)) return false;
+    try {
+      const result = spawnSync([npm, "install", "--silent"], { cwd: bridgeDir, stdout: "pipe", stderr: "pipe", timeout: 300000 });
+      return result.exitCode === 0;
+    } catch { return false; }
+  }
+  function _spawnWhatsAppPairing(sessionDir, mode){
+    const bridgeDir = _findWhatsAppBridgeDir();
+    if (!bridgeDir) throw new Error("未找到 WhatsApp bridge 脚本，请确认 hermes-agent 已正确安装");
+    if (!resolvedNodeBin) throw new Error("未找到 Node.js，无法启动 WhatsApp bridge");
+    if (!_ensureWhatsAppBridgeDeps(bridgeDir)) throw new Error("安装 WhatsApp bridge 依赖失败，请检查网络");
+    try { mkdirSync(sessionDir, { recursive: true }); } catch {}
+    const env = { ...process.env, WHATSAPP_MODE: mode || "self-chat", WHATSAPP_DM_POLICY: "pairing" };
+    return spawn(
+      [resolvedNodeBin, `${bridgeDir}/bridge.js`, "--pair-only", "--pair-json", "--session", sessionDir],
+      { cwd: bridgeDir, stdout: "pipe", stderr: "stdout", env }
+    );
+  }
+  function _terminateProc(proc){
+    if (!proc) return;
+    try { if (proc.pid) process.kill(proc.pid, "SIGTERM"); } catch {}
+    try { proc.kill(); } catch {}
+  }
+  function _watchWhatsAppPairing(pairing_id, proc){
+    if (!proc || !proc.stdout) return;
+    try {
+      const reader = proc.stdout.getReader ? proc.stdout.getReader() : null;
+      if (!reader) return;
+      const decoder = new TextDecoder();
+      let buf = "";
+      const processChunk = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop();
+            for (const raw of lines) {
+              const line = raw.trim(); if (!line) continue;
+              try {
+                const payload = JSON.parse(line);
+                const event = String(payload.event || "").trim();
+                const rec = _whatsappPairings.get(pairing_id);
+                if (!rec || rec.proc !== proc) return;
+                if (event === "qr") {
+                  const qr = String(payload.qr || "").trim();
+                  if (qr) { rec.qr_payload = qr; rec.status = "waiting"; rec.error = null; }
+                } else if (event === "connected") {
+                  const user = payload.user || {};
+                  rec.account_id = String(user.id || "").trim() || null;
+                  rec.account_name = String(user.name || "").trim() || null;
+                  rec.account_phone = rec.account_id ? rec.account_id.replace(/[^0-9]/g, "").replace(/^\d+?:(\d+)@s\.whatsapp\.net$/, "$1") : null;
+                  rec.status = "connected"; rec.error = null;
+                } else if (event === "error") {
+                  rec.status = "error"; rec.error = String(payload.error || "WhatsApp 配对失败");
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+        // 进程结束处理
+        try { await proc.exited; } catch {}
+        const rec = _whatsappPairings.get(pairing_id);
+        if (!rec || rec.proc !== proc) return;
+        if (!["connected", "error", "expired", "cancelled"].includes(rec.status)) {
+          rec.status = "error"; rec.error = "WhatsApp 配对进程意外退出";
+        }
+      };
+      processChunk();
+    } catch {}
+  }
+  function _pruneTelegramPairings(){
+    const now = Date.now();
+    for (const [id, rec] of _telegramPairings) { if (rec.expires_at_ts <= now) _telegramPairings.delete(id); }
+  }
+  function _pruneWhatsAppPairings(){
+    const now = Date.now();
+    const terminal = {"connected":1,"error":1,"expired":1,"cancelled":1};
+    for (const [id, rec] of _whatsappPairings) {
+      if (!terminal[rec.status] && rec.expires_at_ts <= now) {
+        rec.status = "expired"; rec.error = "二维码已过期，请重新配对";
+        _terminateProc(rec.proc);
+      }
+      if (terminal[rec.status] && rec.expires_at_ts + 300000 <= now) _whatsappPairings.delete(id);
+    }
+  }
+  function _normalizeTelegramUserId(value){
+    const s = String(value || "").trim();
+    if (/^\d+$/.test(s)) return s;
+    return null;
+  }
+  function _normalizeWhatsAppAllowedUsers(value){
+    const s = String(value || "").trim();
+    if (!s) return "";
+    const parts = s.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
+    const out = [];
+    for (const p of parts) {
+      if (p === "*") { out.push("*"); continue; }
+      const digits = p.replace(/\D/g, "");
+      if (digits) out.push(digits);
+    }
+    return out.join(",");
+  }
+
   function _listChannels(){
     const env = _readEnvFile();
     const out = {};
@@ -2870,7 +3005,7 @@ async function handleFetch(req) {
       const cfg = _readPlatformConfig(id);
       let configured = false;
       (def.fields || []).forEach(f => { if (f.env && _getEnvValue(env, f.env)) configured = true; });
-      if (id === "whatsapp" && (cfg.enabled === "true" || cfg.enabled === true)) configured = true;
+      if (id === "whatsapp" && (_getEnvValue(env, "WHATSAPP_ENABLED") || cfg.enabled === "true" || cfg.enabled === true)) configured = true;
       if (id === "weixin") configured = !!_getEnvValue(env, "WEIXIN_TOKEN");
       out[id] = {
         id, name: def.name, icon: def.icon, configured, qrLogin: !!def.qrLogin, note: def.note || "",
@@ -3487,7 +3622,8 @@ async function handleFetch(req) {
       const res = await fetch("https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3", { signal: AbortSignal.timeout(15000) });
       const data = await res.json().catch(() => ({}));
       if (!data || !data.qrcode) return new Response(JSON.stringify({ ok: false, error: "无法获取微信二维码，请检查网络后重试" }), { status: 502, headers: jsonHeaders() });
-      return new Response(JSON.stringify({ ok: true, qrcode: data.qrcode, qrcode_img: data.qrcode_img_content || "" }), { headers: jsonHeaders() });
+      const qrImg = data.qrcode_img_content || "";
+      return new Response(JSON.stringify({ ok: true, qrcode: data.qrcode, qrcode_img: qrImg, use_render_qr: !qrImg }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 502, headers: jsonHeaders() });
     }
@@ -3507,6 +3643,175 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ ok: true, status }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+
+  // ── Telegram 扫码创建机器人 ───────────────────────────────────────────
+  // GET /api/channels/telegram/qr  → 创建配对，返回 deep_link/qr_payload
+  if (path === "/api/channels/telegram/qr" && req.method === "GET") {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      const botName = (u.searchParams.get("bot_name") || "Hermes Agent").trim() || "Hermes Agent";
+      const res = await fetch(`${TELEGRAM_ONBOARDING_URL}/v1/telegram/pairings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ bot_name: botName }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`onboarding service ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      const pairingId = String(data.pairing_id || "").trim();
+      const pollToken = String(data.poll_token || "").trim();
+      const expiresAt = String(data.expires_at || "").trim();
+      const deepLink  = String(data.deep_link || "").trim();
+      const qrPayload = String(data.qr_payload || deepLink || "").trim();
+      if (!pairingId || !pollToken || !expiresAt || !deepLink) throw new Error("incomplete onboarding response");
+      let expiresTs = Date.now() + 600000;
+      try { const d = new Date(expiresAt.replace("Z", "+00:00")); if (!isNaN(d)) expiresTs = d.getTime(); } catch {}
+      _pruneTelegramPairings();
+      _telegramPairings.set(pairingId, { poll_token: pollToken, expires_at_ts: expiresTs, bot_token: null, bot_username: null, owner_user_id: null });
+      return new Response(JSON.stringify({ ok: true, pairing_id: pairingId, qr_payload: qrPayload, deep_link: deepLink, expires_at: expiresAt }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: "无法创建 Telegram 配对：" + e.message }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+  // GET /api/channels/telegram/qr/status?pairing_id=...
+  if (path === "/api/channels/telegram/qr/status" && req.method === "GET") {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      const pairingId = (u.searchParams.get("pairing_id") || "").trim();
+      if (!pairingId) return new Response(JSON.stringify({ ok: false, error: "缺少 pairing_id" }), { status: 400, headers: jsonHeaders() });
+      _pruneTelegramPairings();
+      const rec = _telegramPairings.get(pairingId);
+      if (!rec) return new Response(JSON.stringify({ ok: false, error: "配对会话不存在或已过期" }), { status: 404, headers: jsonHeaders() });
+      if (rec.bot_token) return new Response(JSON.stringify({ ok: true, status: "ready", bot_username: rec.bot_username, owner_user_id: rec.owner_user_id }), { headers: jsonHeaders() });
+      const res = await fetch(`${TELEGRAM_ONBOARDING_URL}/v1/telegram/pairings/${encodeURIComponent(pairingId)}`, {
+        headers: { "Authorization": `Bearer ${rec.poll_token}`, "Accept": "application/json" },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`onboarding service ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      const status = String(data.status || "").trim();
+      if (status === "waiting") return new Response(JSON.stringify({ ok: true, status: "waiting" }), { headers: jsonHeaders() });
+      if (status === "ready") {
+        const token = String(data.token || "").trim();
+        if (!token) throw new Error("missing token in ready response");
+        const botUsername = String(data.bot_username || "").trim() || null;
+        const ownerId = (() => { const v = data.owner_user_id; if (typeof v === "number" && v > 0) return String(v); if (typeof v === "string" && /^\d+$/.test(v)) return v; return null; })();
+        rec.bot_token = token; rec.bot_username = botUsername; rec.owner_user_id = ownerId;
+        return new Response(JSON.stringify({ ok: true, status: "ready", bot_username: botUsername, owner_user_id: ownerId }), { headers: jsonHeaders() });
+      }
+      if (["expired", "claimed"].includes(status)) {
+        _telegramPairings.delete(pairingId);
+        return new Response(JSON.stringify({ ok: false, error: "配对已" + status + "，请重新扫码" }), { status: 410, headers: jsonHeaders() });
+      }
+      return new Response(JSON.stringify({ ok: true, status: "waiting" }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: "轮询 Telegram 状态失败：" + e.message }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+  // POST /api/channels/telegram/qr/apply  → 保存 token + allowed_user_ids + 启用平台
+  if (path === "/api/channels/telegram/qr/apply" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const pairingId = String(body.pairing_id || "").trim();
+      const rawAllowed = Array.isArray(body.allowed_user_ids) ? body.allowed_user_ids : String(body.allowed_user_ids || "").split(/[,;\s]+/);
+      const allowedUserIds = [];
+      for (const v of rawAllowed) {
+        const norm = _normalizeTelegramUserId(v);
+        if (norm && !allowedUserIds.includes(norm)) allowedUserIds.push(norm);
+      }
+      if (!pairingId) return new Response(JSON.stringify({ ok: false, error: "缺少 pairing_id" }), { status: 400, headers: jsonHeaders() });
+      if (allowedUserIds.length === 0) return new Response(JSON.stringify({ ok: false, error: "请至少填写一个允许的 Telegram 用户 ID（数字）" }), { status: 400, headers: jsonHeaders() });
+      _pruneTelegramPairings();
+      const rec = _telegramPairings.get(pairingId);
+      if (!rec) return new Response(JSON.stringify({ ok: false, error: "配对会话不存在或已过期" }), { status: 404, headers: jsonHeaders() });
+      if (!rec.bot_token) return new Response(JSON.stringify({ ok: false, error: "机器人尚未创建完成，请稍后再试" }), { status: 409, headers: jsonHeaders() });
+      let env = _readEnvFile();
+      env = _setEnvValue(env, "TELEGRAM_BOT_TOKEN", rec.bot_token);
+      env = _setEnvValue(env, "TELEGRAM_ALLOWED_USERS", allowedUserIds.join(","));
+      _writeEnvFile(env);
+      const cfg = _readPlatformConfig("telegram");
+      cfg.enabled = true;
+      _writeHermesConfig(_setPlatformConfig("telegram", cfg));
+      _telegramPairings.delete(pairingId);
+      return new Response(JSON.stringify({ ok: true, bot_username: rec.bot_username }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ── WhatsApp 扫码配对 ─────────────────────────────────────────────────
+  // GET /api/channels/whatsapp/qr?mode=bot|self-chat
+  if (path === "/api/channels/whatsapp/qr" && req.method === "GET") {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      const mode = ["bot", "self-chat"].includes(u.searchParams.get("mode")) ? u.searchParams.get("mode") : "self-chat";
+      if (!resolvedNodeBin) return new Response(JSON.stringify({ ok: false, error: "未找到 Node.js，无法启动 WhatsApp bridge" }), { status: 500, headers: jsonHeaders() });
+      const pairingId = randomBytes(16).toString("hex");
+      const sessionDir = `${WHATSAPP_SESSION_DIR}/${pairingId}`;
+      const expiresTs = Date.now() + WHATSAPP_ONBOARDING_TTL;
+      let initialQr = "";
+      // 如果已有 creds.json，视为已配对，直接返回 connected（与官方行为一致）
+      if (existsSync(`${sessionDir}/creds.json`)) {
+        _pruneWhatsAppPairings();
+        _whatsappPairings.set(pairingId, { proc: null, status: "connected", qr_payload: "", mode, account_id: null, account_name: null, account_phone: null, error: null, expires_at_ts: expiresTs });
+        return new Response(JSON.stringify({ ok: true, pairing_id: pairingId, status: "connected" }), { headers: jsonHeaders() });
+      }
+      const proc = _spawnWhatsAppPairing(sessionDir, mode);
+      _pruneWhatsAppPairings();
+      _whatsappPairings.set(pairingId, { proc, status: "starting", qr_payload: "", mode, account_id: null, account_name: null, account_phone: null, error: null, expires_at_ts: expiresTs });
+      _watchWhatsAppPairing(pairingId, proc);
+      // 等待一小段时间让 QR 出来（bridge 启动通常 1-3 秒）
+      for (let i = 0; i < 30 && !initialQr; i++) { await new Promise(r => setTimeout(r, 200)); initialQr = (_whatsappPairings.get(pairingId) || {}).qr_payload || ""; }
+      return new Response(JSON.stringify({ ok: true, pairing_id: pairingId, status: initialQr ? "waiting" : "starting", qr_payload: initialQr }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: "无法启动 WhatsApp 配对：" + e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // GET /api/channels/whatsapp/qr/status?pairing_id=...
+  if (path === "/api/channels/whatsapp/qr/status" && req.method === "GET") {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      const pairingId = (u.searchParams.get("pairing_id") || "").trim();
+      if (!pairingId) return new Response(JSON.stringify({ ok: false, error: "缺少 pairing_id" }), { status: 400, headers: jsonHeaders() });
+      _pruneWhatsAppPairings();
+      const rec = _whatsappPairings.get(pairingId);
+      if (!rec) return new Response(JSON.stringify({ ok: false, error: "配对会话不存在或已过期" }), { status: 404, headers: jsonHeaders() });
+      if (rec.status === "expired") return new Response(JSON.stringify({ ok: false, error: rec.error || "二维码已过期" }), { status: 410, headers: jsonHeaders() });
+      return new Response(JSON.stringify({
+        ok: true, status: rec.status, qr_payload: rec.qr_payload,
+        account_id: rec.account_id, account_name: rec.account_name, account_phone: rec.account_phone,
+        error: rec.error
+      }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // POST /api/channels/whatsapp/qr/apply  → 保存 mode/allowed_users + 启用平台
+  if (path === "/api/channels/whatsapp/qr/apply" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const pairingId = String(body.pairing_id || "").trim();
+      if (!pairingId) return new Response(JSON.stringify({ ok: false, error: "缺少 pairing_id" }), { status: 400, headers: jsonHeaders() });
+      _pruneWhatsAppPairings();
+      const rec = _whatsappPairings.get(pairingId);
+      if (!rec) return new Response(JSON.stringify({ ok: false, error: "配对会话不存在或已过期" }), { status: 404, headers: jsonHeaders() });
+      if (rec.status !== "connected") return new Response(JSON.stringify({ ok: false, error: "WhatsApp 尚未配对完成" }), { status: 409, headers: jsonHeaders() });
+      const allowedUsers = _normalizeWhatsAppAllowedUsers(body.allowed_users != null ? body.allowed_users : (rec.account_phone || ""));
+      let env = _readEnvFile();
+      env = _setEnvValue(env, "WHATSAPP_MODE", rec.mode || "self-chat");
+      env = _setEnvValue(env, "WHATSAPP_DM_POLICY", "pairing");
+      if (allowedUsers) env = _setEnvValue(env, "WHATSAPP_ALLOWED_USERS", allowedUsers);
+      env = _setEnvValue(env, "WHATSAPP_ENABLED", "true");
+      _writeEnvFile(env);
+      const cfg = _readPlatformConfig("whatsapp");
+      cfg.enabled = true;
+      _writeHermesConfig(_setPlatformConfig("whatsapp", cfg));
+      _whatsappPairings.delete(pairingId);
+      return new Response(JSON.stringify({ ok: true, account_id: rec.account_id, account_name: rec.account_name }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
   }
 
