@@ -1365,7 +1365,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if(!window._extLocalLoaded) extLoadLocalSkills();
     }
     if(view === 'channels'){
-      if(!window._channelsLoaded) channelsLoad();
+      if(!window._channelsLoaded){
+        // channelsLoad 定义在本 IIFE 末尾，初始化阶段可能尚未挂载到 window，延迟到脚本执行完毕后调用
+        setTimeout(function(){ if(window.channelsLoad) window.channelsLoad(); }, 0);
+      }
     }
     if(view === 'update') {
       // 进入更新页时自动填充当前版本
