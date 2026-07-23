@@ -21,14 +21,14 @@ log_msg "--- 目录状态 (安装前) ---"
 ls -la "${TRIM_APPDEST}" 2>&1 | while IFS= read -r line; do log_msg "  $line"; done
 
 # 强制 kill 可能残留的进程
-pkill -9 -f "bun.*monitor\.js" 2>/dev/null || true
+pkill -9 -f "node.*monitor\.js" 2>/dev/null || true
 pkill -9 -f "hermes.*gateway" 2>/dev/null || true
 pkill -9 -f "hermes.*dashboard" 2>/dev/null || true
 
 # 等待进程完全退出（最多 10 秒），避免文件句柄残留导致 fnOS 权限设置失败
 _wait=0
 while [ ${_wait} -lt 10 ]; do
-    if ! pgrep -f "bun.*monitor\.js" >/dev/null 2>&1 \
+    if ! pgrep -f "node.*monitor\.js" >/dev/null 2>&1 \
        && ! pgrep -f "hermes.*gateway" >/dev/null 2>&1 \
        && ! pgrep -f "hermes.*dashboard" >/dev/null 2>&1; then
         break

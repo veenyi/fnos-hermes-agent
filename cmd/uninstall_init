@@ -2,7 +2,7 @@
 
 "${TRIM_APPDEST}/cmd/main" stop 2>/dev/null || true
 
-pkill -f "bun.*monitor\.js" 2>/dev/null || true
+pkill -f "node.*monitor\.js" 2>/dev/null || true
 pkill -f "hermes.*gateway" 2>/dev/null || true
 pkill -f "hermes.*dashboard" 2>/dev/null || true
 
