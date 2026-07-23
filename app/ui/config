@@ -2,7 +2,7 @@
     ".url": {
         "hermes-agent.Application": {
             "title": "Hermes Agent",
-            "icon": "images/{0}.png",
+            "icon": "images/icon-{0}.png",
             "type": "iframe",
             "protocol": "http",
             "gatewaySocket": "hermes-agent.sock",

@@ -4,7 +4,7 @@
         "items": [
             {
                 "type": "tips",
-                "helpText": "<b>Herme Agent</b><br>开源AI Agent，支持多平台消息网关、内置学习循环、技能系统和MCP扩展。"
+                "helpText": "<b>Hermes Agent</b><br>开源 AI Agent，支持多平台消息网关、内置学习循环、技能系统和 MCP 扩展。"
             },
             {
                 "type": "tips",

@@ -67,7 +67,7 @@ jobs:
       - name: Update manifest version
         run: |
           VERSION="${{ steps.target_version.outputs.target_version }}"
-          sed -i "s/^version.*=/version       = $VERSION/" ${{ env.MANIFEST_FILE }} || exit 1
+          sed -i "s/^version[[:space:]]*=.*/version = $VERSION/" ${{ env.MANIFEST_FILE }} || exit 1
           echo "Updated manifest:"
           grep "^version" ${{ env.MANIFEST_FILE }}
 
