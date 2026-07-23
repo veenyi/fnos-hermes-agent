@@ -2715,6 +2715,73 @@ async function handleFetch(req) {
     return items;
   }
 
+  // ── Hermes 官方技能目录（从 GitHub 仓库 Markdown 解析）──
+  const HERMES_CATALOG_CACHE = { ts: 0, data: null };
+  const HERMES_CATALOG_TTL = 10 * 60 * 1000;
+  const HERMES_CATALOG_URLS = {
+    bundled: [
+      "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/website/docs/reference/skills-catalog.md",
+      "https://cdn.jsdelivr.net/gh/NousResearch/hermes-agent@main/website/docs/reference/skills-catalog.md"
+    ],
+    optional: [
+      "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/website/docs/reference/optional-skills-catalog.md",
+      "https://cdn.jsdelivr.net/gh/NousResearch/hermes-agent@main/website/docs/reference/optional-skills-catalog.md"
+    ]
+  };
+  async function _fetchTextWithFallback(urls){
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(15000) });
+        if (r.ok) return await r.text();
+      } catch (e) {}
+    }
+    throw new Error("无法获取 Hermes 技能目录");
+  }
+  function _parseHermesCatalog(md, kind){
+    const items = [];
+    let category = "";
+    const lines = md.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const heading = line.match(/^#{2,3}\s+(.+)$/);
+      if (heading) { category = heading[1].trim(); continue; }
+      if (line.startsWith("|") && /Skill\s*\|/.test(line) && /Description\s*\|/.test(line)) { i++; continue; }
+      if (line.startsWith("|")) {
+        const cols = line.split("|").map(s => s.trim()).filter(s => s.length > 0);
+        if (cols.length < 2) continue;
+        const m = cols[0].match(/\[([^\]]+)\]\(([^)]+)\)/);
+        if (!m) continue;
+        const name = m[1].replace(/[`\\*]/g, "").trim();
+        const href = m[2].trim();
+        const description = cols[1].replace(/\s+/g, " ").trim();
+        let path = "";
+        let installCmd = "";
+        let webUrl = href.startsWith("http") ? href : ("https://hermes-agent.nousresearch.com" + href);
+        if (kind === "bundled") {
+          path = (cols[2] || "").replace(/`/g, "").trim();
+          installCmd = "hermes skills reset " + (path || name) + " --restore";
+        } else {
+          path = "official/" + category + "/" + name;
+          installCmd = "hermes skills install " + path;
+        }
+        items.push({ kind, category, name, description, path, installCmd, webUrl });
+      }
+    }
+    return items;
+  }
+  async function _getHermesCatalog(){
+    const now = Date.now();
+    if (HERMES_CATALOG_CACHE.data && (now - HERMES_CATALOG_CACHE.ts) < HERMES_CATALOG_TTL) return HERMES_CATALOG_CACHE.data;
+    const [bundledMd, optionalMd] = await Promise.all([
+      _fetchTextWithFallback(HERMES_CATALOG_URLS.bundled),
+      _fetchTextWithFallback(HERMES_CATALOG_URLS.optional)
+    ]);
+    const data = { bundled: _parseHermesCatalog(bundledMd, "bundled"), optional: _parseHermesCatalog(optionalMd, "optional"), fetchedAt: now };
+    HERMES_CATALOG_CACHE.data = data;
+    HERMES_CATALOG_CACHE.ts = now;
+    return data;
+  }
+
   if (path === "/api/config" && req.method === "GET") {
     // ── 读取 providers-state.yaml（控制面板专属配置文件）────────────
     const statePath = `${VAR_DIR}/providers-state.yaml`;
@@ -3028,6 +3095,25 @@ async function handleFetch(req) {
     } catch (e) {
       const msg = /timeout/i.test(String(e && e.message || e)) ? "SkillHub API 请求超时" : ("搜索失败：" + (e && e.message || e));
       return new Response(JSON.stringify({ ok: false, error: msg }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+
+  // ── Hermes 官方技能目录搜索（解析 GitHub Markdown）──
+  if (path === "/api/extensions/skills/hermes-catalog" && req.method === "GET") {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      const keyword = (u.searchParams.get("keyword") || "").trim().toLowerCase();
+      const type = u.searchParams.get("type") || "all"; // bundled | optional | all
+      const catalog = await _getHermesCatalog();
+      let arr = [];
+      if (type === "bundled" || type === "all") arr = arr.concat(catalog.bundled);
+      if (type === "optional" || type === "all") arr = arr.concat(catalog.optional);
+      if (keyword) {
+        arr = arr.filter(it => ((it.name + " " + it.category + " " + it.description).toLowerCase().indexOf(keyword) !== -1));
+      }
+      return new Response(JSON.stringify({ ok: true, type, keyword, total: arr.length, items: arr.slice(0, 100) }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 502, headers: jsonHeaders() });
     }
   }
 
