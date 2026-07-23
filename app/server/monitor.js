@@ -3624,8 +3624,9 @@ async function handleFetch(req) {
       const res = await fetch("https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3", { signal: AbortSignal.timeout(15000) });
       const data = await res.json().catch(() => ({}));
       if (!data || !data.qrcode) return new Response(JSON.stringify({ ok: false, error: "无法获取微信二维码，请检查网络后重试" }), { status: 502, headers: jsonHeaders() });
-      const qrImg = data.qrcode_img_content || "";
-      return new Response(JSON.stringify({ ok: true, qrcode: data.qrcode, qrcode_img: qrImg, use_render_qr: !qrImg }), { headers: jsonHeaders() });
+      // iLink 返回的 qrcode_img_content 是一个 deep-link URL（https://liteapp.weixin.qq.com/q/...），不是图片 base64
+      const deepLink = data.qrcode_img_content || "";
+      return new Response(JSON.stringify({ ok: true, qrcode: data.qrcode, qrcode_url: deepLink, qrcode_img: deepLink, use_render_qr: true }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 502, headers: jsonHeaders() });
     }

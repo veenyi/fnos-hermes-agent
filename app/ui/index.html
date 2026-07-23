@@ -4811,21 +4811,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     body.innerHTML = '<div class="ext-hint">正在获取微信登录二维码…</div>';
     apiGet('/api/channels/weixin/qr').then(function(res){
       if(!res || !res.ok) throw new Error(res.error || '获取二维码失败');
-      _chState.wxQr = res.qrcode || '';
-      var img = res.qrcode_img || '';
-      var src;
-      if(!img || res.use_render_qr){
-        src = renderQr(res.qrcode, 6, 6) || '';
-      } else {
-        src = img.indexOf('data:')===0 ? img : (/^https?:\/\//.test(img) ? img : 'data:image/png;base64,' + img);
-      }
-      var fallbackHtml = '<div class="ext-hint" style="color:var(--red)">二维码图片加载失败，请复制下方链接在微信中打开。</div>' +
-        '<div style="font-size:12px;word-break:break-all;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;margin:8px 0">' + escAttr(res.qrcode) + '</div>' +
+      // iLink 返回的 qrcode_img_content 是 deep-link URL，本地渲染二维码最可靠
+      var deepLink = res.qrcode_url || res.qrcode_img || '';
+      if(!deepLink && res.qrcode) deepLink = 'https://ilinkai.weixin.qq.com/ilink/bot/scan?qrcode=' + encodeURIComponent(res.qrcode);
+      _chState.wxQr = deepLink;
+      var src = deepLink ? (renderQr(deepLink, 6, 6) || '') : '';
+      var fallbackHtml = '<div class="ext-hint" style="color:var(--red)">二维码生成失败，请复制下方链接在微信中打开。</div>' +
+        '<div style="font-size:12px;word-break:break-all;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;margin:8px 0">' + escAttr(deepLink) + '</div>' +
         '<button class="btn btn-sm" onclick="copyText(_chState.wxQr,\'已复制扫码链接\')">复制扫码链接</button>';
-      var onerr = "this.onerror=null; var ns=renderQr(_chState.wxQr,6,6); if(ns){this.src=ns;} else {this.style.display='none'; this.parentNode.innerHTML='" + escAttr(fallbackHtml).replace(/'/g, "&#39;") + "';}";
       var qrHtml;
       if(src){
-        qrHtml = '<img id="wxQrImg" src="' + src + '" onerror="' + escAttr(onerr) + '" style="width:220px;height:220px;background:#fff;border-radius:8px">';
+        qrHtml = '<img id="wxQrImg" src="' + src + '" style="width:220px;height:220px;background:#fff;border-radius:8px">';
       } else {
         qrHtml = fallbackHtml;
       }
