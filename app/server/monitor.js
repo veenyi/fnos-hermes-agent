@@ -1767,12 +1767,18 @@ async function proxyDashboard(req) {
   try {
     const headers = new Headers(req.headers);
     headers.delete("host");
-    const upstream = await fetch(target, {
-      method:  req.method,
+    // Node 的全局 fetch 在转发流 body（ReadableStream）时必须显式传 duplex:'half'，
+    // 否则报 "RequestInit: duplex option is required when sending a body"。
+    const init = {
+      method: req.method,
       headers,
-      body:    req.method !== "GET" && req.method !== "HEAD" ? req.body : undefined,
-      signal:  AbortSignal.timeout(10000),
-    });
+      signal: AbortSignal.timeout(10000),
+    };
+    if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
+      init.body = req.body;
+      init.duplex = "half";
+    }
+    const upstream = await fetch(target, init);
 
     const respHeaders = new Headers(upstream.headers);
 
