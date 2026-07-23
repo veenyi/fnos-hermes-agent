@@ -12,7 +12,8 @@ TRIM_PKGVAR="${TRIM_PKGVAR:-/var/apps/hermes-agent/var}"
 
 LOG_FILE="${TRIM_PKGVAR}/info.log"
 PID_FILE="${TRIM_PKGVAR}/app.pid"
-export PATH=/var/apps/nodejs/target/bin:$PATH
+# 优先使用 v24（manifest install_dep_apps=nodejs_v24），并向后兼容其他常见 Node 安装路径
+export PATH=/var/apps/nodejs_v24/target/bin:/var/apps/nodejs_v22/target/bin:/var/apps/nodejs_v20/target/bin:/var/apps/nodejs/target/bin:$PATH
 DATA_DIR="${TRIM_PKGHOME}/data"
 VAR_DIR="${TRIM_PKGVAR}"
 MONITOR_SCRIPT="${TRIM_APPDEST}/server/monitor.js"
@@ -36,7 +37,7 @@ start_process() {
     log_msg "TRIM_APPDEST=${TRIM_APPDEST}"
     rm -f "${SOCKET_PATH}"
 
-    HOME="${DATA_DIR}" HERMES_HOME="${DATA_DIR}" APP_DIR="${TRIM_APPDEST}" DATA_DIR="${DATA_DIR}" VAR_DIR="${VAR_DIR}" MONITOR_SOCKET_PATH="${SOCKET_PATH}" BASE_PATH="/app/hermes-agent" PATH="${DATA_DIR}/venv/bin:/var/apps/nodejs/target/bin:/usr/local/bin:/usr/bin:/bin" node "${MONITOR_SCRIPT}" >> ${LOG_FILE} 2>&1 &
+    HOME="${DATA_DIR}" HERMES_HOME="${DATA_DIR}" APP_DIR="${TRIM_APPDEST}" DATA_DIR="${DATA_DIR}" VAR_DIR="${VAR_DIR}" MONITOR_SOCKET_PATH="${SOCKET_PATH}" BASE_PATH="/app/hermes-agent" PATH="${DATA_DIR}/venv/bin:/var/apps/nodejs_v24/target/bin:/var/apps/nodejs_v22/target/bin:/var/apps/nodejs_v20/target/bin:/var/apps/nodejs/target/bin:/usr/local/bin:/usr/bin:/bin" node "${MONITOR_SCRIPT}" >> ${LOG_FILE} 2>&1 &
     printf "%s" "$!" > ${PID_FILE}
 
     # 等待 socket 创建（最多 5 秒）
