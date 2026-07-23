@@ -3009,6 +3009,7 @@ async function handleFetch(req) {
       if (id === "weixin") configured = !!_getEnvValue(env, "WEIXIN_TOKEN");
       out[id] = {
         id, name: def.name, icon: def.icon, configured, qrLogin: !!def.qrLogin, note: def.note || "",
+        last_configured_at: (cfg && cfg.updated_at) ? cfg.updated_at : null,
         credentials: (def.fields || []).filter(f => f.env).map(f => ({ env: f.env, path: f.path, label: f.label, value: _getEnvValue(env, f.env) || "" })),
         config: cfg
       };
@@ -3040,6 +3041,7 @@ async function handleFetch(req) {
         const v = body.config[p]; if (v != null) _setValByPath(cfg, p, v);
       });
     }
+    cfg.updated_at = Date.now();
     _writeHermesConfig(_setPlatformConfig(id, cfg));
     return { ok: true };
   }
@@ -3733,6 +3735,7 @@ async function handleFetch(req) {
       _writeEnvFile(env);
       const cfg = _readPlatformConfig("telegram");
       cfg.enabled = true;
+      cfg.updated_at = Date.now();
       _writeHermesConfig(_setPlatformConfig("telegram", cfg));
       _telegramPairings.delete(pairingId);
       return new Response(JSON.stringify({ ok: true, bot_username: rec.bot_username }), { headers: jsonHeaders() });
@@ -3807,6 +3810,7 @@ async function handleFetch(req) {
       _writeEnvFile(env);
       const cfg = _readPlatformConfig("whatsapp");
       cfg.enabled = true;
+      cfg.updated_at = Date.now();
       _writeHermesConfig(_setPlatformConfig("whatsapp", cfg));
       _whatsappPairings.delete(pairingId);
       return new Response(JSON.stringify({ ok: true, account_id: rec.account_id, account_name: rec.account_name }), { headers: jsonHeaders() });
@@ -4666,7 +4670,10 @@ process.on("unhandledRejection", (err) => {
   log(`[FATAL] unhandledRejection: ${err?.message || err}\n${err?.stack || ""}`);
 });
 
-Bun.serve({
+// ─── HTTP/WS 服务（unix socket），支持 socket 文件丢失后自愈重建 ───
+let server = null;
+function startServer() {
+  server = Bun.serve({
   fetch(req, server) {
     const url = new URL(req.url);
     const wsPath = url.pathname.replace(/^\/app\/[^/]+/, "") || "/";
@@ -4714,6 +4721,30 @@ Bun.serve({
   },
   unix: SOCKET_PATH,
   idleTimeout: 255,
-});
-try { chmodSync(SOCKET_PATH, 0o777); } catch {}
-log(`Monitor ready — unix:${SOCKET_PATH} (base=${BASE_PATH || "/"}) | dashboard proxied at /proxy/dashboard/`);
+  });
+  try { chmodSync(SOCKET_PATH, 0o777); } catch {}
+  log(`Monitor ready — unix:${SOCKET_PATH} (base=${BASE_PATH || "/"}) | dashboard proxied at /proxy/dashboard/`);
+  return server;
+}
+
+// 启动前清理可能残留的旧 socket，避免 EADDRINUSE 导致启动失败
+try { unlinkSync(SOCKET_PATH); } catch {}
+startServer();
+
+// ─── 自愈：socket 文件被外部清理（如 fnOS 重置 @appcenter 安装目录）后自动重建 ───
+// 现象：monitor.js 进程存活，但 socket 文件被删除，fnOS 代理连不上、UI 转圈。
+// 监测到文件丢失即重建监听，无需依赖 fnOS 重启进程。
+const _sockDir = SOCKET_PATH.replace(/\/[^/]+$/, '');
+setInterval(() => {
+  try {
+    if (!existsSync(SOCKET_PATH)) {
+      log(`[self-heal] 检测到 socket 文件丢失 (${SOCKET_PATH})，正在重建监听…`);
+      try { if (server) server.stop(); } catch (e) {}
+      try { unlinkSync(SOCKET_PATH); } catch (e) {}
+      try { mkdirSync(_sockDir, { recursive: true }); } catch (e) {}
+      startServer();
+    }
+  } catch (e) {
+    log(`[self-heal] 重建失败: ${e?.message || e}`);
+  }
+}, 10000);

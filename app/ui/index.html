@@ -1045,6 +1045,11 @@
           </div>
           <div class="card-body">
             <div class="ext-hint">将 Hermes 接入各类即时通讯平台。凭证写入 <code>~/.hermes/.env</code>，行为配置写入 <code>config.yaml</code> 的 <code>platforms</code> 段（与 hermes-studio 一致）。保存后需<b>重启网关</b>方能生效。</div>
+            <div id="chFilterBar" style="display:flex;gap:8px;margin:4px 0 14px;flex-wrap:wrap">
+              <button class="ch-filter-btn active" data-f="all" onclick="channelsSetFilter('all')">全部</button>
+              <button class="ch-filter-btn" data-f="configured" onclick="channelsSetFilter('configured')">已配置</button>
+              <button class="ch-filter-btn" data-f="unconfigured" onclick="channelsSetFilter('unconfigured')">未配置</button>
+            </div>
             <div class="ext-grid" id="chGrid"></div>
           </div>
         </div>
@@ -4534,7 +4539,67 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.clearLog = clearLog;
   window.chatNewSession = chatNewSession;
   // ─── 通讯 / 平台频道 ───
-  var _chState = { defs: {}, channels: {}, current: null, qrTimer: null, tgPairingId: null, waPairingId: null, waMode: 'self-chat' };
+  var _chState = { defs: {}, channels: {}, current: null, qrTimer: null, tgPairingId: null, waPairingId: null, waMode: 'self-chat', filter: 'all', wxQr: '', tgDeepLink: '' };
+  window._chState = _chState;
+
+  window.copyText = function(text, okMsg){
+    if(!text) return;
+    var done = function(){ if(okMsg) extToast(okMsg); };
+    var fb = function(){
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); done();
+      } catch(e){ if(okMsg) extToast('复制失败，请手动复制'); }
+      try { document.body.removeChild(ta); } catch(e){}
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(fb);
+    } else { fb(); }
+  };
+
+  function fmtTime(ts){
+    try {
+      var d = new Date(Number(ts));
+      if(isNaN(d.getTime())) return '';
+      var p = function(n){ return (n < 10 ? '0' : '') + n; };
+      return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    } catch(e){ return ''; }
+  }
+
+  // 成功收尾：切换概览并触发重启网关
+  window.channelsGoRestart = function(){
+    channelsCloseModal();
+    if(window.switchView) switchView('overview');
+    setTimeout(function(){ if(window.act) act('/api/restart', '正在重启'); }, 350);
+  };
+
+  function channelsShowQrSuccess(name){
+    var body = document.getElementById('channelModalBody');
+    var foot = document.getElementById('channelModalFoot');
+    if(foot) foot.innerHTML = '';
+    if(body) body.innerHTML =
+      '<div style="text-align:center;padding:18px 8px">' +
+        '<div style="font-size:42px;line-height:1">✅</div>' +
+        '<div style="font-weight:600;margin-top:8px">' + (name || '频道') + ' 已成功关联</div>' +
+        '<div class="ext-hint" style="margin-top:8px">凭证已写入本机，需重启网关以生效。</div>' +
+        '<button class="btn btn-go" style="margin-top:14px" onclick="channelsGoRestart()">前往概览并重启网关</button>' +
+      '</div>';
+  }
+
+  window.channelsSetFilter = function(f){
+    _chState.filter = f;
+    var btns = document.querySelectorAll('#chFilterBar .ch-filter-btn');
+    btns.forEach(function(b){
+      var on = b.getAttribute('data-f') === f;
+      b.classList.toggle('active', on);
+      b.style.background = on ? 'var(--accent)' : 'var(--bg2)';
+      b.style.color = on ? '#fff' : 'var(--text2)';
+      b.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+    });
+    renderChannels();
+  };
 
   window.channelsLoad = function(){
     window._channelsLoaded = true;
@@ -4542,7 +4607,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if(!res || !res.ok){ throw new Error((res && res.error) || 'load failed'); }
       _chState.defs = res.defs || {};
       _chState.channels = res.channels || {};
-      renderChannels();
+      channelsSetFilter('all');
     }).catch(function(e){
       var g = document.getElementById('chGrid');
       if(g) g.innerHTML = '<div class="ext-hint" style="color:var(--red)">加载频道失败：' + (e.message||e) + '</div>';
@@ -4554,32 +4619,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if(!grid) return;
     var defs = _chState.defs, ch = _chState.channels;
     var ids = Object.keys(defs);
-    var configuredCount = 0;
+    if(_chState.filter === 'configured') ids = ids.filter(function(id){ return !!((ch[id]||{}).configured); });
+    else if(_chState.filter === 'unconfigured') ids = ids.filter(function(id){ return !((ch[id]||{}).configured); });
+    // 已配置优先排序
+    ids.sort(function(a,b){ return ((ch[b]||{}).configured?1:0) - ((ch[a]||{}).configured?1:0); });
+    var configuredCount = ids.filter(function(id){ return !!((ch[id]||{}).configured); }).length;
     var html = ids.map(function(id){
       var def = defs[id];
       var c = ch[id] || {};
       var configured = !!c.configured;
-      if(configured) configuredCount++;
       var badge = configured
         ? '<span class="badge badge-ok"><span class="dot"></span>已配置</span>'
         : '<span class="badge badge-off"><span class="dot"></span>未配置</span>';
+      var timeHtml = (configured && c.last_configured_at) ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">配置于 ' + fmtTime(c.last_configured_at) + '</div>' : '';
       var action = def.qrLogin
         ? '<button class="btn btn-go btn-sm" onclick="channelsConfig(\'' + id + '\')">扫码登录</button>'
         : '<button class="btn btn-sm" onclick="channelsConfig(\'' + id + '\')">配置</button>';
-      return '<div class="ext-card">' +
+      var cardStyle = configured ? 'border-left:3px solid var(--accent)' : '';
+      return '<div class="ext-card" style="' + cardStyle + '">' +
         '<div style="display:flex;align-items:center;gap:8px">' +
           '<span style="font-size:22px">' + (def.icon||'🔌') + '</span>' +
           '<div style="font-weight:600">' + def.name + '</div>' +
           '<div style="margin-left:auto">' + badge + '</div>' +
         '</div>' +
-        '<div style="font-size:12px;color:var(--text3);min-height:32px">' + (def.note ? def.note : '配置后可在该平台收发消息') + '</div>' +
+        '<div style="font-size:12px;color:var(--text3);min-height:32px">' + (def.note ? def.note : '配置后可在该平台收发消息') + timeHtml + '</div>' +
         '<div style="margin-top:4px;display:flex;justify-content:flex-end">' + action + '</div>' +
       '</div>';
     }).join('');
-    grid.innerHTML = html;
+    grid.innerHTML = html || '<div class="ext-hint">该筛选下暂无频道。</div>';
     var sum = document.getElementById('chSummaryText');
     var sumBadge = document.getElementById('chSummary');
-    if(sum) sum.textContent = '已配置 ' + configuredCount + ' / ' + ids.length;
+    var total = Object.keys(defs).length;
+    if(sum) sum.textContent = '已配置 ' + configuredCount + ' / ' + total;
     if(sumBadge) sumBadge.className = 'badge ' + (configuredCount > 0 ? 'badge-ok' : 'badge-wait');
   }
 
@@ -4668,6 +4739,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     body.innerHTML = '<div class="ext-hint">正在获取微信登录二维码…</div>';
     apiGet('/api/channels/weixin/qr').then(function(res){
       if(!res || !res.ok) throw new Error(res.error || '获取二维码失败');
+      _chState.wxQr = res.qrcode || '';
       var img = res.qrcode_img || '';
       var src;
       if(!img || res.use_render_qr){
@@ -4675,10 +4747,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else {
         src = img.indexOf('data:')===0 ? img : (/^https?:\/\//.test(img) ? img : 'data:image/png;base64,' + img);
       }
+      var qrHtml;
+      if(src){
+        qrHtml = '<img id="wxQrImg" src="' + src + '" style="width:220px;height:220px;background:#fff;border-radius:8px">';
+      } else {
+        // 渲染失败兜底：显示 deep link + 复制按钮，避免空白
+        qrHtml = '<div class="ext-hint" style="color:var(--red)">本地无法渲染二维码，请复制链接在浏览器打开。</div>' +
+          '<div style="font-size:12px;word-break:break-all;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;margin:8px 0">' + escAttr(res.qrcode) + '</div>' +
+          '<button class="btn btn-sm" onclick="copyText(_chState.wxQr,\'已复制扫码链接\')">复制扫码链接</button>';
+      }
       var html = '<div class="ext-hint">请用<strong>微信</strong>扫描下方二维码完成登录（腾讯 iLink 官方接口，无需自备 App）。</div>' +
-        '<div style="display:flex;justify-content:center;padding:12px">' +
-        (src ? '<img id="wxQrImg" src="' + src + '" style="width:220px;height:220px;background:#fff;border-radius:8px">' : '<div class="ext-hint" style="color:var(--red)">二维码生成失败</div>') +
-        '</div>' +
+        '<div style="display:flex;justify-content:center;padding:12px">' + qrHtml + '</div>' +
+        (src ? '<div style="text-align:center;margin-bottom:6px"><button class="btn btn-sm" onclick="copyText(_chState.wxQr,\'已复制扫码链接\')">复制扫码链接</button></div>' : '') +
         '<div id="wxQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码…</div>';
       body.innerHTML = html;
       channelsPollWeixinQr(res.qrcode);
@@ -4698,7 +4778,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if(stEl) stEl.textContent = '已扫码，请在微信中确认登录…';
         _chState.qrTimer = setTimeout(function(){ channelsPollWeixinQr(qrcode); }, 3000);
       } else if(st === 'expired'){
-        if(stEl) stEl.textContent = '二维码已过期，请重新点击「微信扫码登录」。';
+        var body = document.getElementById('channelModalBody');
+        if(body) body.innerHTML = '<div class="ext-hint">二维码已过期，请重新获取。</div><button class="btn btn-go" style="margin-top:10px" onclick="channelsStartWeixinQr()">重新获取二维码</button>';
       } else if(st === 'confirmed'){
         if(stEl) stEl.textContent = '登录成功，正在保存凭证…';
         return api('/api/channels/weixin', 'POST', {
@@ -4713,7 +4794,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }).then(function(r2){
           _chState.channels = r2.channels || {};
           renderChannels();
-          if(stEl) stEl.textContent = '✅ 微信已关联成功！请到「概览」重启网关生效。';
+          channelsShowQrSuccess('微信');
         });
       }
     }).catch(function(e){
@@ -4731,7 +4812,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return qr.createDataURL(cellSize || 6, (margin == null ? 6 : margin));
     } catch(e){
       try {
-        var qr2 = qrcode(10, 'M');
+        // 兜底：自动版本 + 低纠错（L）以容纳更长的链接
+        var qr2 = qrcode(0, 'L');
         qr2.addData(String(payload || ''));
         qr2.make();
         return qr2.createDataURL(cellSize || 6, (margin == null ? 6 : margin));
@@ -4747,9 +4829,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     apiGet('/api/channels/telegram/qr').then(function(res){
       if(!res || !res.ok) throw new Error(res.error || '获取二维码失败');
       _chState.tgPairingId = res.pairing_id;
+      _chState.tgDeepLink = res.deep_link || res.qr_payload || '';
       var src = res.qr_payload ? renderQr(res.qr_payload, 6, 6) : '';
+      var qrHtml;
+      if(src){
+        qrHtml = '<img id="tgQrImg" src="' + src + '" style="width:240px;height:240px;background:#fff;border-radius:8px">';
+      } else {
+        qrHtml = '<div class="ext-hint" style="color:var(--red)">本地无法生成二维码，请复制链接在 Telegram 打开。</div>' +
+          '<div style="font-size:12px;word-break:break-all;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;margin:8px 0">' + escAttr(_chState.tgDeepLink) + '</div>' +
+          '<button class="btn btn-sm" onclick="copyText(_chState.tgDeepLink,\'已复制配对链接\')">复制配对链接</button>';
+      }
       var html = '<div class="ext-hint">用 <strong>Telegram</strong> 扫描下方二维码，在弹窗中点击「Create Bot / 创建机器人」即可自动创建并获取 Token（由 Nous 托管服务完成，无需 BotFather）。</div>' +
-        (src ? '<div style="display:flex;justify-content:center;padding:12px"><img id="tgQrImg" src="' + src + '" style="width:240px;height:240px;background:#fff;border-radius:8px"></div>' : '<div class="ext-hint" style="color:var(--red)">无法生成二维码（请确认二维码内容已返回）</div>') +
+        '<div style="display:flex;justify-content:center;padding:12px">' + qrHtml + '</div>' +
+        (src ? '<div style="text-align:center;margin-bottom:6px"><button class="btn btn-sm" onclick="copyText(_chState.tgDeepLink,\'已复制配对链接\')">复制配对链接</button></div>' : '') +
         '<div id="tgQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码创建…</div>' +
         '<div id="tgAllowWrap" style="display:none;margin-top:12px">' +
           '<label style="font-size:13px">允许的 Telegram 用户 ID（多个用逗号分隔；默认为创建者，可稍后在配置中修改）</label>' +
@@ -4798,10 +4890,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }).then(function(r2){
       _chState.channels = r2.channels || {};
       renderChannels();
-      var stEl = document.getElementById('tgQrStatus');
-      if(stEl) stEl.textContent = '✅ Telegram 已关联成功！请到「概览」重启网关生效。';
-      var wrap = document.getElementById('tgAllowWrap');
-      if(wrap) wrap.style.display = 'none';
+      channelsShowQrSuccess('Telegram');
     }).catch(function(e){
       alert('保存失败：' + (e.message||e));
     });
@@ -4820,7 +4909,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           '<label class="ext-toggle" id="waModeBot" onclick="channelsSetWaMode(\'bot\')"><span class="ext-toggle-switch"></span><span class="ext-toggle-label">独立号码</span></label>' +
         '</div>' +
       '</div>' +
-      '<div id="waQrZone" style="text-align:center;margin-top:8px"><div class="ext-hint">请选择模式后点击下方「开始配对」。</div></div>';
+      '<div id="waQrZone" style="text-align:center;margin-top:8px"><div class="ext-hint">请选择模式后点击下方「开始配对」。</div></div>' +
+      '<div style="text-align:center;margin-top:8px"><button class="btn btn-sm" onclick="copyText(_chState.waMode,\'已复制配对模式\')">复制配对模式</button></div>';
     var foot = document.getElementById('channelModalFoot');
     if(foot) foot.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-right:auto">凭证仅保存在本机 ~/.hermes</div><button class="btn btn-go" onclick="channelsWaStart()">开始配对</button>';
   };
@@ -4876,7 +4966,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         channelsApplyWhatsAppQr(pairingId);
       } else if(st === 'expired' || st === 'error'){
         var z2 = document.getElementById('waQrZone');
-        if(z2) z2.innerHTML = '<div class="ext-hint" style="color:var(--red)">' + (res.error || '配对失败或二维码已过期，请重新点击「开始配对」。') + '</div>';
+        if(z2) z2.innerHTML = '<div class="ext-hint" style="color:var(--red)">' + (res.error || '配对失败或二维码已过期。') + '</div><button class="btn btn-go" style="margin-top:10px" onclick="channelsWaStart()">重新获取二维码</button>';
       }
     }).catch(function(e){
       var stEl = document.getElementById('waQrStatus');
@@ -4891,8 +4981,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }).then(function(r2){
       _chState.channels = r2.channels || {};
       renderChannels();
-      var z = document.getElementById('waQrZone');
-      if(z) z.innerHTML = '<div class="ext-hint" style="color:#3fb950">✅ WhatsApp 已配对成功！请到「概览」重启网关生效。</div>';
+      channelsShowQrSuccess('WhatsApp');
     }).catch(function(e){
       var z = document.getElementById('waQrZone');
       if(z) z.innerHTML = '<div class="ext-hint" style="color:var(--red)">保存失败：' + (e.message||e) + '</div>';

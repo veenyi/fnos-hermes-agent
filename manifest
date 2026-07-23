@@ -1,5 +1,5 @@
 appname               = hermes-agent
-version               = 0.19.9
+version               = 0.19.10
 install_dep_apps      = bunjs
 display_name          = "Hermes Agent"
 desc                  = "Hermes Agent 开源 AI Agent，支持多平台消息网关、内置学习循环、技能系统和 MCP 扩展。通过飞牛应用中心安装，即开即用。<br/><br/><strong>核心能力：</strong><br/>• 多模型支持：OpenAI、Anthropic、Kimi、MiniMax 等<br/>• 消息平台：微信ClawBot、QQ Bot、飞书、WhatsApp、Telegram 等<br/>• 定时任务：自然语言描述的自动化调度<br/>• 持久记忆：跨会话学习和技能进化<br/>• MCP 扩展：连接 GitHub 等外部工具<br/><br/><strong>免责声明：</strong><br/>本应用仅作为服务集成工具，不对 Hermes Agent 软件本身的安全性、稳定性作任何保证。使用过程中产生的所有风险由用户自行承担。"
