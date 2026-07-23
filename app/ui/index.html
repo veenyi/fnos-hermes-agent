@@ -1327,7 +1327,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var opts = { method: method, headers: headers, cache: 'no-store' };
     if(body) opts.body = JSON.stringify(body);
     return fetch(apiUrl(path), opts).then(function(r){
-      if(!r.ok) throw new Error('HTTP '+r.status);
+      if(!r.ok){
+        return r.json().catch(function(){ return null; }).then(function(j){
+          throw new Error((j && j.error) ? (j.error + ' (HTTP ' + r.status + ')') : ('HTTP ' + r.status));
+        });
+      }
       return r.json();
     });
   }
@@ -4815,14 +4819,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else {
         src = img.indexOf('data:')===0 ? img : (/^https?:\/\//.test(img) ? img : 'data:image/png;base64,' + img);
       }
+      var fallbackHtml = '<div class="ext-hint" style="color:var(--red)">二维码图片加载失败，请复制下方链接在微信中打开。</div>' +
+        '<div style="font-size:12px;word-break:break-all;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;margin:8px 0">' + escAttr(res.qrcode) + '</div>' +
+        '<button class="btn btn-sm" onclick="copyText(_chState.wxQr,\'已复制扫码链接\')">复制扫码链接</button>';
+      var onerr = "this.onerror=null; var ns=renderQr(_chState.wxQr,6,6); if(ns){this.src=ns;} else {this.style.display='none'; this.parentNode.innerHTML='" + escAttr(fallbackHtml).replace(/'/g, "&#39;") + "';}";
       var qrHtml;
       if(src){
-        qrHtml = '<img id="wxQrImg" src="' + src + '" style="width:220px;height:220px;background:#fff;border-radius:8px">';
+        qrHtml = '<img id="wxQrImg" src="' + src + '" onerror="' + escAttr(onerr) + '" style="width:220px;height:220px;background:#fff;border-radius:8px">';
       } else {
-        // 渲染失败兜底：显示 deep link + 复制按钮，避免空白
-        qrHtml = '<div class="ext-hint" style="color:var(--red)">本地无法渲染二维码，请复制链接在浏览器打开。</div>' +
-          '<div style="font-size:12px;word-break:break-all;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;margin:8px 0">' + escAttr(res.qrcode) + '</div>' +
-          '<button class="btn btn-sm" onclick="copyText(_chState.wxQr,\'已复制扫码链接\')">复制扫码链接</button>';
+        qrHtml = fallbackHtml;
       }
       var html = '<div class="ext-hint">请用<strong>微信</strong>扫描下方二维码完成登录（腾讯 iLink 官方接口，无需自备 App）。</div>' +
         '<div style="display:flex;justify-content:center;padding:12px">' + qrHtml + '</div>' +
@@ -4973,8 +4978,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       '<div class="ext-hint">WhatsApp 通过本地 Baileys 桥接扫码配对，消息在本地处理，不上传到第三方云服务。</div>' +
       '<div class="form-group" style="margin-top:12px"><label>配对模式</label>' +
         '<div style="display:flex;gap:10px;margin-top:6px">' +
-          '<label class="ext-toggle on" id="waModeSelf" onclick="channelsSetWaMode(\'self-chat\')"><span class="ext-toggle-switch"></span><span class="ext-toggle-label">自用号码</span></label>' +
-          '<label class="ext-toggle" id="waModeBot" onclick="channelsSetWaMode(\'bot\')"><span class="ext-toggle-switch"></span><span class="ext-toggle-label">独立号码</span></label>' +
+          '<button type="button" class="btn btn-go btn-sm" id="waModeSelf" onclick="channelsSetWaMode(\'self-chat\')" style="flex:1;white-space:nowrap">自用号码</button>' +
+          '<button type="button" class="btn btn-sm" id="waModeBot" onclick="channelsSetWaMode(\'bot\')" style="flex:1;white-space:nowrap">独立号码</button>' +
         '</div>' +
       '</div>' +
       '<div id="waQrZone" style="text-align:center;margin-top:8px"><div class="ext-hint">请选择模式后点击下方「开始配对」。</div></div>' +
@@ -4987,8 +4992,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     _chState.waMode = mode;
     var a = document.getElementById('waModeSelf');
     var b = document.getElementById('waModeBot');
-    if(a) a.className = 'ext-toggle' + (mode === 'self-chat' ? ' on' : '');
-    if(b) b.className = 'ext-toggle' + (mode === 'bot' ? ' on' : '');
+    if(a){ a.className = 'btn btn-sm' + (mode === 'self-chat' ? ' btn-go' : ''); a.disabled = mode === 'self-chat'; }
+    if(b){ b.className = 'btn btn-sm' + (mode === 'bot' ? ' btn-go' : ''); b.disabled = mode === 'bot'; }
   };
 
   window.channelsWaStart = function(){
