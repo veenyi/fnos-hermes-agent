@@ -1281,8 +1281,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   });
 
   // ─── 基础路径 ───
-  var pathname = window.location.pathname;
-  var BASE = pathname.replace(/\/$/, '') || '';
+  // 从 <base href> 推导 BASE，避免 pathname 带 index.html / 查询参数时拼错 API 路径导致请求挂起、页面永久转圈
+  function _resolveBase(){
+    try {
+      var b = document.querySelector('base');
+      var href = (b && b.getAttribute('href')) || document.baseURI || window.location.pathname;
+      var path = String(href).split('?')[0].split('#')[0];
+      if (/\/[^\/]+\.[a-zA-Z0-9]+$/.test(path)) path = path.replace(/\/[^\/]+\.[a-zA-Z0-9]+$/, '');
+      return path.replace(/\/$/, '') || '';
+    } catch(e){ return (window.location.pathname || '').replace(/\/$/, '') || ''; }
+  }
+  var BASE = _resolveBase();
   function apiUrl(p){ return BASE + p; }
 
   // ─── DOM 引用 ───
@@ -1436,6 +1445,53 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       loading.classList.add('hide');
       setTimeout(function(){ loading.style.display='none'; }, 300);
     }
+  }
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function showFatal(title, detailHtml){
+    var el = document.getElementById('loading');
+    if(!el) return;
+    el.classList.remove('hide');
+    el.style.display = 'flex';
+    el.innerHTML = '<div style="max-width:600px;margin:auto;padding:24px;color:#fff;text-align:left">'
+      + '<div style="font-size:18px;color:#ff6b6b;margin-bottom:12px">⚠️ ' + escapeHtml(title) + '</div>'
+      + '<div style="font-size:13px;line-height:1.8;color:#e0e0e0;word-break:break-all">' + detailHtml + '</div>'
+      + '</div>';
+  }
+  function _probeApi(url){
+    return fetch(url, { cache:'no-store' }).then(function(r){
+      return r.text().then(function(t){ return { url:url, status:r.status, ok:r.ok, body:t.slice(0,160) }; });
+    }).catch(function(e){ return { url:url, status:0, ok:false, error:String(e) }; });
+  }
+  // 看门狗：诊断 API 路径是否可达，可达则自动修正并热修复，不可达则显示面板
+  function runDiagnostics(){
+    var cands = [
+      { label:'BASE 派生 ('+BASE+')', url: apiUrl('/api/health'), base: BASE },
+      { label:'根相对 (/api/health)', url: '/api/health', base: '' },
+      { label:'baseURI 派生', url: (document.baseURI||'').replace(/\/$/,'') + '/api/health', base: (document.baseURI||'').replace(/\/$/,'') }
+    ];
+    Promise.all(cands.map(function(c){ return _probeApi(c.url).then(function(r){ r.label=c.label; r.base=c.base; return r; }); }))
+      .then(function(results){
+        var good = results.find(function(r){ return r.ok && /"ok"\s*:\s*true/.test(r.body); });
+        if(good && good.base !== BASE){
+          BASE = good.base;
+          showFatal('已自动修正 API 路径', '检测到可用路径：<b>'+escapeHtml(good.label)+'</b>，正在重新加载…');
+          setTimeout(function(){ fetchToken().then(function(){ hideLoading(); refresh(); settingsEnsureLoaded().catch(function(){}); }); }, 700);
+          return;
+        }
+        if(good && good.base === BASE){
+          showFatal('API 可达但页面脚本未初始化', 'API 路径 <b>'+escapeHtml(BASE)+'</b> 正常返回，问题在页面初始化阶段。请按 F12 打开控制台，把红色报错贴回。');
+          return;
+        }
+        var html = results.map(function(r){
+          return '• '+escapeHtml(r.label)+' → '+(r.ok?('HTTP '+r.status):('失败 '+(r.error||'')))+'<br>&nbsp;&nbsp;<span style="color:#9aa">'+escapeHtml(r.url)+'</span>';
+        }).join('<br>');
+        showFatal('所有 API 路径均不可达', html + '<br><br>说明 fnOS 未把 /api/* 请求转发到本应用，或 monitor 未正常监听。socket 正常时通常是路径前缀问题。');
+      });
   }
 
   function refresh(){
@@ -4505,13 +4561,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     window.savedView = null;
     try { window.savedView = localStorage.getItem('hermes_view'); } catch(e){}
   }
-  switchView(window.savedView || 'overview');
-  fetchToken().then(function(){
-    refresh();
-    // 预加载模型配置，避免首次打开"添加模型服务"时预设列表为空
-    settingsEnsureLoaded().catch(function(){});
-  });
-  setInterval(refresh, 10000);
+  try {
+    switchView(window.savedView || 'overview');
+    fetchToken().then(function(){
+      refresh();
+      // 预加载模型配置，避免首次打开"添加模型服务"时预设列表为空
+      settingsEnsureLoaded().catch(function(){});
+    }).catch(function(e){ /* fetchToken 失败不阻塞，看门狗 8s 后会诊断 */ });
+    setInterval(refresh, 10000);
+  } catch(e){
+    showFatal('页面初始化脚本异常', 'BASE='+escapeHtml(BASE)+'<br><pre style="white-space:pre-wrap;color:#ffb3b3">'+escapeHtml(String((e && e.stack) || e))+'</pre>');
+  }
+  // 看门狗：8 秒后若仍在转圈，显示诊断面板（不再无限 spinner）
+  setTimeout(function(){
+    var el = document.getElementById('loading');
+    if(el && !el.classList.contains('hide') && el.style.display !== 'none'){ runDiagnostics(); }
+  }, 8000);
 
   if (window.visualViewport) {
     var appContainer = document.querySelector('.app-layout');
