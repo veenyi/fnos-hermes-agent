@@ -770,6 +770,14 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span class="nav-label">模型</span>
       </button>
+      <button class="nav-item" data-view="extensions" onclick="switchView('extensions')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span class="nav-label">扩展</span>
+      </button>
+      <button class="nav-item" data-view="channels" onclick="switchView('channels')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <span class="nav-label">通讯</span>
+      </button>
       <button class="nav-item" data-view="update" onclick="switchView('update')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span class="nav-label">更新</span>
@@ -899,6 +907,12 @@
 
         </div>
 
+      </div>
+    </div>
+
+    <!-- ═══ 扩展能力视图 ═══ -->
+    <div class="view" id="viewExtensions">
+      <div class="main-inner">
         <!-- ═══ 扩展能力卡片（LightAgent 集成）═══ -->
         <div class="card">
           <div class="card-head">
@@ -1021,6 +1035,22 @@
       </div>
     </div>
 
+    <!-- ═══ 通讯 / 平台频道视图 ═══ -->
+    <div class="view" id="viewChannels">
+      <div class="main-inner">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">通讯 · 平台频道</span>
+            <span class="badge badge-wait" id="chSummary"><span class="dot"></span><span id="chSummaryText">加载中…</span></span>
+          </div>
+          <div class="card-body">
+            <div class="ext-hint">将 Hermes 接入各类即时通讯平台。凭证写入 <code>~/.hermes/.env</code>，行为配置写入 <code>config.yaml</code> 的 <code>platforms</code> 段（与 hermes-studio 一致）。保存后需<b>重启网关</b>方能生效。</div>
+            <div class="ext-grid" id="chGrid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ 更新视图 ═══ -->
     <div class="view" id="viewUpdate">
       <div class="main-inner">
@@ -1073,6 +1103,8 @@
           <button class="mobile-nav-btn" data-view="overview" onclick="switchView('overview')">概览</button>
           <button class="mobile-nav-btn" data-view="chat" onclick="switchView('chat')">对话</button>
           <button class="mobile-nav-btn" data-view="settings" onclick="switchView('settings')">模型</button>
+          <button class="mobile-nav-btn" data-view="extensions" onclick="switchView('extensions')">扩展</button>
+          <button class="mobile-nav-btn" data-view="channels" onclick="switchView('channels')">通讯</button>
           <button class="mobile-nav-btn" data-view="update" onclick="switchView('update')">更新</button>
         </div>
         <div class="chat-sessions-head">
@@ -1203,6 +1235,18 @@
   </div>
 </div>
 
+<!-- 频道配置弹窗 -->
+<div class="modal-overlay" id="channelModal" onclick="if(event.target===this)channelsCloseModal()">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <h3 id="channelModalTitle">频道配置</h3>
+      <button class="modal-close" onclick="channelsCloseModal()">×</button>
+    </div>
+    <div class="modal-body" id="channelModalBody"></div>
+    <div class="modal-foot" id="channelModalFoot"></div>
+  </div>
+</div>
+
 <div class="img-zoom-backdrop" id="imgZoomBackdrop"><img id="zoomImg" src="" alt=""></div>
 
 <script>
@@ -1289,6 +1333,14 @@
       }
     }
     if(view === 'settings') settingsLoad();
+    if(view === 'extensions'){
+      if(!settingsState.loaded) settingsLoad();
+      else settingsRenderExtensions();
+      if(!window._extLocalLoaded) extLoadLocalSkills();
+    }
+    if(view === 'channels'){
+      if(!window._channelsLoaded) channelsLoad();
+    }
     if(view === 'update') {
       // 进入更新页时自动填充当前版本
       var curEl = document.getElementById('updateCurrentVer');
@@ -2569,8 +2621,8 @@
       var sendContent = await buildMessageContent(text);
       // 角色 / 人格（多智能体切换）：注入系统指令，用户气泡保持原样
       try {
-        var _p = (chatState && chatState.persona) || (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default';
-        var _pobj = EXT_PERSONAS[_p] || null;
+      var _p = (chatState && chatState.persona) || (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default';
+      var _pobj = extAllPersonas()[_p] || null;
         var _pfx = (_pobj && _pobj.prompt) ? _pobj.prompt : '';
         if (_pfx) {
           if (typeof sendContent === 'string') {
@@ -3116,20 +3168,40 @@
     var mlv = document.getElementById('extMemLimitVal');
     if(mlv) mlv.textContent = ext.memory.char_limit;
 
-    // 多智能体人格卡片
+    // 多智能体人格卡片（内置 + 自定义）
+    var personas = extAllPersonas();
     var pg = document.getElementById('extPersonaGrid');
-    if(pg) pg.innerHTML = Object.keys(EXT_PERSONAS).map(function(k){
-      var p = EXT_PERSONAS[k];
-      var active = (ext.persona === k);
-      return '<div class="ext-card'+(active?' on':'')+'" style="cursor:pointer" onclick="extSelectPersona(\''+k+'\')">'+
-        '<div class="ext-card-head"><span class="ext-card-icon">'+(p.emoji||"🤖")+'</span>'+
-        '<span class="ext-card-title">'+escapeHtml(p.label)+'</span>'+
-        '<span class="ext-badge '+(active?'':'muted')+'">'+(active?'使用中':'选择')+'</span></div>'+
-        '<div class="ext-card-desc">'+(p.prompt ? escapeHtml(p.prompt.slice(0,42)+'…') : '通用助手，无额外系统指令')+'</div></div>';
-    }).join('');
+    if(pg){
+      var builtInKeys = Object.keys(EXT_PERSONAS);
+      pg.innerHTML = Object.keys(personas).map(function(k){
+        var p = personas[k];
+        var active = (ext.persona === k);
+        var isCustom = builtInKeys.indexOf(k) === -1;
+        var editBtn = isCustom
+          ? '<button class="btn btn-sm" style="margin-left:auto" onclick="event.stopPropagation();extEditPersona(\''+k+'\')">编辑</button><button class="btn btn-sm" onclick="event.stopPropagation();extDeletePersona(\''+k+'\')">删除</button>'
+          : '';
+        return '<div class="ext-card'+(active?' on':'')+'" style="cursor:pointer" onclick="extSelectPersona(\''+k+'\')">'+
+          '<div class="ext-card-head"><span class="ext-card-icon">'+(p.emoji||"🤖")+'</span>'+
+          '<span class="ext-card-title">'+escapeHtml(p.label)+'</span>'+
+          '<span class="ext-badge '+(active?'':'muted')+'">'+(active?'使用中':'选择')+'</span>'+editBtn+'</div>'+
+          '<div class="ext-card-desc">'+(p.prompt ? escapeHtml(p.prompt.slice(0,42)+'…') : '通用助手，无额外系统指令')+'</div></div>';
+      }).join('') +
+      '<div class="ext-card" style="cursor:pointer;border-style:dashed;align-items:center;justify-content:center;min-height:90px" onclick="extAddPersona()">'+
+        '<div style="text-align:center;color:var(--text3)"><div style="font-size:22px;margin-bottom:4px">+</div><div>添加角色</div></div>'+
+      '</div>';
+    }
 
     // 本地技能：已加载则静默刷新
     if(window._extLocalLoaded) extLoadLocalSkills();
+  }
+  // 合并内置与自定义人格
+  function extAllPersonas(){
+    var ext = settingsState.config.extensions || {};
+    var custom = ext.personas || {};
+    var out = {};
+    Object.keys(EXT_PERSONAS).forEach(function(k){ out[k] = EXT_PERSONAS[k]; });
+    Object.keys(custom).forEach(function(k){ out[k] = custom[k]; });
+    return out;
   }
 
   function extToggleToolset(id){
@@ -3206,6 +3278,54 @@
     try { localStorage.setItem('hermes_persona', k); } catch(e){}
     renderPersonaBar();
   }
+  function extAddPersona(){
+    var label = prompt('角色名称（如：产品经理）：');
+    if(!label) return;
+    label = label.trim();
+    if(!label) return;
+    var emoji = prompt('角色表情符号（如：🚀，可直接回车使用默认 🤖）：') || '🤖';
+    var promptText = prompt('系统提示词 / 角色设定：');
+    if(promptText === null) promptText = '';
+    var key = 'custom_' + Date.now();
+    var ext = settingsState.config.extensions;
+    if(!ext.personas) ext.personas = {};
+    ext.personas[key] = { emoji: emoji.trim() || '🤖', label: label, prompt: promptText.trim() };
+    ext.persona = key;
+    settingsRenderExtensions();
+    settingsSaveConfig();
+    if(window.chatState) chatState.persona = key;
+    try { localStorage.setItem('hermes_persona', key); } catch(e){}
+    renderPersonaBar();
+  }
+  function extEditPersona(k){
+    var ext = settingsState.config.extensions;
+    var p = (ext.personas || {})[k];
+    if(!p) return;
+    var label = prompt('角色名称：', p.label);
+    if(label === null) return;
+    label = label.trim();
+    if(!label){ extToast('角色名称不能为空'); return; }
+    var emoji = prompt('角色表情符号：', p.emoji || '🤖') || '🤖';
+    var promptText = prompt('系统提示词 / 角色设定：', p.prompt || '');
+    if(promptText === null) return;
+    ext.personas[k] = { emoji: emoji.trim() || '🤖', label: label, prompt: promptText.trim() };
+    settingsRenderExtensions();
+    settingsSaveConfig();
+  }
+  function extDeletePersona(k){
+    var ext = settingsState.config.extensions;
+    if(!(ext.personas && ext.personas[k])) return;
+    if(!confirm('确定删除自定义角色「' + ext.personas[k].label + '」吗？')) return;
+    delete ext.personas[k];
+    if(ext.persona === k){
+      ext.persona = 'default';
+      if(window.chatState) chatState.persona = 'default';
+      try { localStorage.setItem('hermes_persona', 'default'); } catch(e){}
+      renderPersonaBar();
+    }
+    settingsRenderExtensions();
+    settingsSaveConfig();
+  }
 
   // ── 本地已安装技能 ──
   function extLoadLocalSkills(){
@@ -3218,20 +3338,34 @@
       if(!res || !res.ok){ if(hint) hint.textContent = '读取失败：' + ((res && res.error) || '未知错误'); if(box) box.innerHTML = ''; return; }
       var skills = res.skills || [];
       if(!skills.length){
-        if(box) box.innerHTML = '<div class="ext-empty">尚未发现已安装技能。请在「+ 添加技能目录」中填入包含 SKILL.md 的目录。</div>';
+        if(box) box.innerHTML = '<div class="ext-empty">尚未发现已安装技能。请在「+ 添加技能目录」中填入包含 SKILL.md 的目录，或使用 SkillHub / 在线技能商店安装。</div>';
         if(hint) hint.textContent = '已扫描目录：' + ((res.dirs && res.dirs.length) ? res.dirs.length : 0) + ' 个';
         return;
       }
-      if(hint) hint.textContent = '已发现 ' + skills.length + ' 个技能（来自 ' + (res.dirs ? res.dirs.length : 0) + ' 个目录）';
+      var hermesCount = res.hermesCount || skills.filter(function(s){ return s.origin === 'hermes'; }).length;
+      var dirCount = res.dirCount || skills.filter(function(s){ return s.origin === 'dir'; }).length;
+      if(hint) hint.textContent = '已发现 ' + skills.length + ' 个技能（Hermes: ' + hermesCount + '，目录: ' + dirCount + '，扫描目录: ' + (res.dirs ? res.dirs.length : 0) + ' 个）';
       window._extLocalSkills = skills;
+      window._extLocalSkillNames = new Set(skills.map(function(s){ return s.name; }));
       if(box) box.innerHTML = skills.map(function(s, i){
+        var isHermes = s.origin === 'hermes';
+        var badges = ['已安装'];
+        if(isHermes){
+          if(s.source) badges.push(s.source);
+          if(s.status && s.status !== 'enabled') badges.push(s.status);
+        } else {
+          badges.push('本地目录');
+        }
+        var badgeHtml = badges.map(function(b){ return '<span class="ext-badge">'+escapeHtml(b)+'</span>'; }).join('');
+        var actions = isHermes
+          ? ''
+          : '<div class="ext-card-actions"><button class="btn btn-sm" onclick="extRemoveSkill('+i+')">移除目录</button></div>';
+        var meta = (isHermes && s.category) ? '<div class="ext-card-meta">分类：'+escapeHtml(s.category)+' · 信任：'+escapeHtml(s.trust || s.source || '')+'</div>' : '';
         return '<div class="ext-card">'+
           '<div class="ext-card-head"><span class="ext-card-icon">'+(s.emoji || "📦")+'</span>'+
-          '<span class="ext-card-title">'+escapeHtml(s.name || '未命名')+'</span>'+
-          '<span class="ext-badge">已安装</span></div>'+
-          '<div class="ext-card-desc">'+escapeHtml(s.description || '无描述')+'</div>'+
-          '<div class="ext-card-actions"><button class="btn btn-sm" onclick="extRemoveSkill('+i+')">移除目录</button></div>'+
-          '</div>';
+          '<span class="ext-card-title">'+escapeHtml(s.name || '未命名')+'</span>'+badgeHtml+'</div>'+
+          (s.description ? '<div class="ext-card-desc">'+escapeHtml(s.description)+'</div>' : '')+
+          meta + actions + '</div>';
       }).join('');
     }).catch(function(err){ if(hint) hint.textContent = '加载失败：' + err; if(box) box.innerHTML = ''; });
   }
@@ -3281,14 +3415,17 @@
       }
       if(hint) hint.textContent = '共 ' + (res.total || items.length) + ' 个结果（关键词：“' + kw + '”）' + (type === 'all' ? '，含内置与可选' : '') + '。';
       if(list) list.innerHTML = items.map(function(it){
+        var installed = window._extLocalSkillNames && window._extLocalSkillNames.has(it.name);
+        var btnLabel = installed ? '已安装' : '安装';
+        var btnDisabled = installed ? ' disabled' : '';
         return '<div class="ext-card">'+
           '<div class="ext-card-head"><span class="ext-card-icon">🧩</span>'+
           '<span class="ext-card-title" title="'+escapeHtml(it.name || '')+'">'+escapeHtml(it.name || '未命名')+'</span>'+
-          '<span class="ext-badge">'+(it.kind === 'bundled' ? '内置' : '可选')+'</span></div>'+
+          '<span class="ext-badge">'+(it.kind === 'bundled' ? '内置' : '可选')+'</span>'+(installed?'<span class="ext-badge">已安装</span>':'')+'</div>'+
           '<div class="ext-card-desc">'+escapeHtml(it.description || '无描述')+'</div>'+
           '<div class="ext-card-meta">分类：'+escapeHtml(it.category || '')+' · 路径：'+escapeHtml(it.path || '')+'</div>'+
           '<div class="ext-card-actions">'+
-          '<button class="btn btn-sm" onclick="extInstallToChat(\''+encodeURIComponent(it.installCmd || '')+'\')">安装</button>'+
+          '<button class="btn btn-sm"'+btnDisabled+' onclick="extInstallToChat(\''+encodeURIComponent(it.installCmd || '')+'\')">'+btnLabel+'</button>'+
           '<button class="btn btn-sm" onclick="extCopyInstallCmd(\''+encodeURIComponent(it.installCmd || '')+'\')">复制</button>'+
           '<a class="btn btn-sm" href="'+escapeHtml(it.webUrl || '#')+'" target="_blank" rel="noopener">详情 ↗</a>'+
           '</div></div>';
@@ -3353,15 +3490,18 @@
         if(it.downloads) stats.push('下载 ' + it.downloads);
         if(it.stars) stats.push('★ ' + it.stars);
         var tags = (it.tags && it.tags.length) ? it.tags.slice(0,3).map(function(tag){ return '<span class="ext-tag">'+escapeHtml(tag)+'</span>'; }).join('') : '';
+        var installed = window._extLocalSkillNames && window._extLocalSkillNames.has(it.name);
+        var btnLabel = installed ? '已安装' : '安装';
+        var btnDisabled = installed ? ' disabled' : '';
         return '<div class="ext-card">'+
           '<div class="ext-card-head"><span class="ext-card-icon">'+(it.iconUrl ? '<img src="'+escapeHtml(it.iconUrl)+'" style="width:20px;height:20px;border-radius:4px" onerror="this.style.display=\'none\'">' : '🧩')+'</span>'+
           '<span class="ext-card-title" title="'+escapeHtml(it.name || '')+'">'+escapeHtml(it.name || '未命名')+'</span>'+
-          '<span class="ext-badge">'+(type === 'packages' ? '专家包' : '技能')+'</span></div>'+
+          '<span class="ext-badge">'+(type === 'packages' ? '专家包' : '技能')+'</span>'+(installed?'<span class="ext-badge">已安装</span>':'')+'</div>'+
           (it.description ? '<div class="ext-card-desc">'+escapeHtml(it.description)+'</div>' : '')+
           (tags ? '<div class="ext-tags">'+tags+'</div>' : '')+
           (stats.length ? '<div class="ext-card-meta">'+stats.join(' · ')+'</div>' : '')+
           '<div class="ext-card-actions">'+
-          '<button class="btn btn-sm" onclick="extInstallToChat(\''+encodeURIComponent(it.installCmd || '')+'\')">安装</button>'+
+          '<button class="btn btn-sm"'+btnDisabled+' onclick="extInstallToChat(\''+encodeURIComponent(it.installCmd || '')+'\')">'+btnLabel+'</button>'+
           '<button class="btn btn-sm" onclick="extCopyInstallCmd(\''+encodeURIComponent(it.installCmd || '')+'\')">复制</button>'+
           '<a class="btn btn-sm" href="'+escapeHtml(it.webUrl || '#')+'" target="_blank" rel="noopener">详情 ↗</a>'+
           '</div></div>';
@@ -3490,14 +3630,17 @@
     extSelectPersona(v);
   }
 
-  // 聊天工具栏角色快速切换条
+  // 聊天工具栏角色快速切换条（内置 + 自定义）
   function renderPersonaBar(){
     var bar = document.getElementById('personaBar');
     if(!bar) return;
     var cur = (chatState && chatState.persona) || (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default';
-    var labels = { default:'默认', coder:'程序员', researcher:'研究员', writer:'写作', analyst:'分析' };
-    bar.innerHTML = Object.keys(labels).map(function(k){
-      return '<span class="ext-persona-bar'+(k===cur?' active':'')+'" onclick="extQuickPersona(\''+k+'\')">'+labels[k]+'</span>';
+    var personas = extAllPersonas();
+    // 最多展示 6 个，内置优先，再按自定义添加顺序
+    var keys = Object.keys(personas).slice(0, 8);
+    bar.innerHTML = keys.map(function(k){
+      var p = personas[k];
+      return '<span class="ext-persona-bar'+(k===cur?' active':'')+'" title="'+escapeHtml(p.label)+'" onclick="extQuickPersona(\''+k+'\')">'+escapeHtml(p.emoji || '🤖')+' '+escapeHtml(p.label)+'</span>';
     }).join('');
   }
   function extQuickPersona(k){
@@ -4378,6 +4521,185 @@
   window.act = act;
   window.clearLog = clearLog;
   window.chatNewSession = chatNewSession;
+  // ─── 通讯 / 平台频道 ───
+  var _chState = { defs: {}, channels: {}, current: null, wxTimer: null };
+
+  window.channelsLoad = function(){
+    window._channelsLoaded = true;
+    apiGet('/api/channels').then(function(res){
+      if(!res || !res.ok){ throw new Error((res && res.error) || 'load failed'); }
+      _chState.defs = res.defs || {};
+      _chState.channels = res.channels || {};
+      renderChannels();
+    }).catch(function(e){
+      var g = document.getElementById('chGrid');
+      if(g) g.innerHTML = '<div class="ext-hint" style="color:var(--red)">加载频道失败：' + (e.message||e) + '</div>';
+    });
+  };
+
+  function renderChannels(){
+    var grid = document.getElementById('chGrid');
+    if(!grid) return;
+    var defs = _chState.defs, ch = _chState.channels;
+    var ids = Object.keys(defs);
+    var configuredCount = 0;
+    var html = ids.map(function(id){
+      var def = defs[id];
+      var c = ch[id] || {};
+      var configured = !!c.configured;
+      if(configured) configuredCount++;
+      var badge = configured
+        ? '<span class="badge badge-ok"><span class="dot"></span>已配置</span>'
+        : '<span class="badge badge-off"><span class="dot"></span>未配置</span>';
+      var action = def.qrLogin
+        ? '<button class="btn btn-go btn-sm" onclick="channelsConfig(\'' + id + '\')">扫码登录</button>'
+        : '<button class="btn btn-sm" onclick="channelsConfig(\'' + id + '\')">配置</button>';
+      return '<div class="ext-card">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:22px">' + (def.icon||'🔌') + '</span>' +
+          '<div style="font-weight:600">' + def.name + '</div>' +
+          '<div style="margin-left:auto">' + badge + '</div>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text3);min-height:32px">' + (def.note ? def.note : '配置后可在该平台收发消息') + '</div>' +
+        '<div style="margin-top:4px;display:flex;justify-content:flex-end">' + action + '</div>' +
+      '</div>';
+    }).join('');
+    grid.innerHTML = html;
+    var sum = document.getElementById('chSummaryText');
+    var sumBadge = document.getElementById('chSummary');
+    if(sum) sum.textContent = '已配置 ' + configuredCount + ' / ' + ids.length;
+    if(sumBadge) sumBadge.className = 'badge ' + (configuredCount > 0 ? 'badge-ok' : 'badge-wait');
+  }
+
+  function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  window.channelsConfig = function(id){
+    var def = _chState.defs[id];
+    var c = _chState.channels[id] || {};
+    if(!def) return;
+    _chState.current = id;
+    document.getElementById('channelModalTitle').textContent = (def.icon||'') + ' ' + def.name + ' 配置';
+    var body = document.getElementById('channelModalBody');
+    var html = '';
+    (def.fields||[]).forEach(function(f){
+      if(!f.env) return;
+      var val = (c.credentials||[]).filter(function(x){return x.env===f.env;})[0];
+      var cur = val ? val.value : '';
+      var type = f.secret ? 'password' : 'text';
+      html += '<div class="form-group"><label>' + f.label + (f.secret?'（保密）':'') + '</label>' +
+        '<input id="chf_' + f.env + '" type="' + type + '" placeholder="' + escAttr(f.placeholder||'') + '" value="' + escAttr(cur) + '"></div>';
+    });
+    (def.toggles||[]).forEach(function(t){
+      var cur = (c.config && (c.config[t.path]===true || c.config[t.path]==='true')) ? true : false;
+      var cls = 'ext-toggle' + (cur ? ' on' : '');
+      html += '<label class="' + cls + '" id="cht_' + t.path + '" onclick="channelsToggle(\'' + t.path + '\')">' +
+        '<span class="ext-toggle-switch"></span>' +
+        '<span class="ext-toggle-label">' + t.label + '</span></label>';
+    });
+    if(def.note && (!def.fields || !def.fields.length) && (!def.toggles || !def.toggles.length)){
+      html += '<div class="ext-hint">' + def.note + '</div>';
+    }
+    body.innerHTML = html;
+    var foot = document.getElementById('channelModalFoot');
+    var footHtml = '<div style="font-size:11px;color:var(--text3);margin-right:auto">凭证仅保存在本机 ~/.hermes</div>';
+    if(def.qrLogin){
+      footHtml += '<button class="btn btn-go" onclick="channelsStartWeixinQr()">微信扫码登录</button>';
+    }
+    footHtml += '<button class="btn btn-go" onclick="channelsSave(\'' + id + '\')">保存</button>';
+    foot.innerHTML = footHtml;
+    document.getElementById('channelModal').classList.add('show');
+  };
+
+  window.channelsToggle = function(path){
+    var el = document.getElementById('cht_' + path);
+    if(el) el.classList.toggle('on');
+  };
+
+  window.channelsSave = function(id){
+    var def = _chState.defs[id];
+    if(!def) return;
+    var credentials = {};
+    (def.fields||[]).forEach(function(f){
+      if(!f.env) return;
+      var el = document.getElementById('chf_' + f.env);
+      credentials[f.env] = el ? el.value : '';
+    });
+    var toggles = {};
+    (def.toggles||[]).forEach(function(t){
+      var el = document.getElementById('cht_' + t.path);
+      toggles[t.path] = !!(el && el.classList.contains('on'));
+    });
+    api('/api/channels/' + id, 'POST', { credentials: credentials, toggles: toggles }).then(function(res){
+      if(!res || !res.ok) throw new Error((res&&res.error)||'save failed');
+      return apiGet('/api/channels');
+    }).then(function(res){
+      _chState.channels = res.channels || {};
+      renderChannels();
+      channelsCloseModal();
+      alert('已保存 ' + def.name + ' 配置。请到「概览」页重启网关以生效。');
+    }).catch(function(e){
+      alert('保存失败：' + (e.message||e));
+    });
+  };
+
+  window.channelsCloseModal = function(){
+    var m = document.getElementById('channelModal');
+    if(m) m.classList.remove('show');
+    if(_chState.wxTimer){ clearTimeout(_chState.wxTimer); _chState.wxTimer = null; }
+  };
+
+  window.channelsStartWeixinQr = function(){
+    var body = document.getElementById('channelModalBody');
+    body.innerHTML = '<div class="ext-hint">正在获取微信登录二维码…</div>';
+    apiGet('/api/channels/weixin/qr').then(function(res){
+      if(!res || !res.ok) throw new Error(res.error || '获取二维码失败');
+      var img = res.qrcode_img || '';
+      var src = img.indexOf('data:')===0 ? img : (/^https?:\/\//.test(img) ? img : 'data:image/png;base64,' + img);
+      var html = '<div class="ext-hint">请用<strong>微信</strong>扫描下方二维码完成登录（腾讯 iLink 官方接口，无需自备 App）。</div>' +
+        '<div style="display:flex;justify-content:center;padding:12px"><img id="wxQrImg" src="' + src + '" style="width:220px;height:220px;background:#fff;border-radius:8px"></div>' +
+        '<div id="wxQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码…</div>';
+      body.innerHTML = html;
+      channelsPollWeixinQr(res.qrcode);
+    }).catch(function(e){
+      body.innerHTML = '<div class="ext-hint" style="color:var(--red)">无法获取二维码：' + (e.message||e) + '</div>';
+    });
+  };
+
+  function channelsPollWeixinQr(qrcode){
+    api('/api/channels/weixin/qr/status?qrcode=' + encodeURIComponent(qrcode), 'GET').then(function(res){
+      if(!res || !res.ok) throw new Error(res.error || 'poll failed');
+      var st = res.status;
+      var stEl = document.getElementById('wxQrStatus');
+      if(st === 'wait'){
+        _chState.wxTimer = setTimeout(function(){ channelsPollWeixinQr(qrcode); }, 3000);
+      } else if(st === 'scaned'){
+        if(stEl) stEl.textContent = '已扫码，请在微信中确认登录…';
+        _chState.wxTimer = setTimeout(function(){ channelsPollWeixinQr(qrcode); }, 3000);
+      } else if(st === 'expired'){
+        if(stEl) stEl.textContent = '二维码已过期，请重新点击「微信扫码登录」。';
+      } else if(st === 'confirmed'){
+        if(stEl) stEl.textContent = '登录成功，正在保存凭证…';
+        return api('/api/channels/weixin', 'POST', {
+          credentials: {
+            WEIXIN_TOKEN: res.token || '',
+            WEIXIN_ACCOUNT_ID: res.account_id || '',
+            WEIXIN_BASE_URL: res.base_url || ''
+          }
+        }).then(function(r){
+          if(!r || !r.ok) throw new Error(r.error || 'save failed');
+          return apiGet('/api/channels');
+        }).then(function(r2){
+          _chState.channels = r2.channels || {};
+          renderChannels();
+          if(stEl) stEl.textContent = '✅ 微信已关联成功！请到「概览」重启网关生效。';
+        });
+      }
+    }).catch(function(e){
+      var stEl = document.getElementById('wxQrStatus');
+      if(stEl) stEl.textContent = '轮询出错：' + (e.message||e);
+    });
+  }
+
   window.chatSend = chatSend;
   window.chatStop = chatStop;
   window.chatSwitchSession = chatSwitchSession;
@@ -4414,6 +4736,9 @@
   window.extRemoveSkill = extRemoveSkill;
   window.extInstallSkill = extInstallSkill;
   window.extQuickPersona = extQuickPersona;
+  window.extAddPersona = extAddPersona;
+  window.extEditPersona = extEditPersona;
+  window.extDeletePersona = extDeletePersona;
   window.extDelSkillDir = extDelSkillDir;
 })();
 </script>

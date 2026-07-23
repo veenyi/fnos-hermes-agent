@@ -150,6 +150,97 @@ const STATIC_DIR     = `${APP_DIR}/ui`;
 const VENV_BIN       = `${DATA_DIR}/venv/bin`;
 const HERMES_BIN     = `${VENV_BIN}/hermes`;
 const UV_BIN_PATH    = `${VENV_BIN}/uv`;
+const HERMES_CONFIG  = `${DATA_DIR}/config.yaml`;
+const HERMES_ENV     = `${DATA_DIR}/.env`;
+
+// 平台频道定义（与 hermes-studio 的 Platform Channels 对齐）
+// 凭证写 ~/.hermes/.env（env），行为写 config.yaml platforms.<id>（path，支持 extra.x 嵌套）
+// fields: 凭证输入项；toggles: 行为开关；qrLogin: 微信扫码登录
+const CHANNEL_DEFS = {
+  telegram: {
+    name: "Telegram", icon: "✈️",
+    fields: [
+      { env: "TELEGRAM_BOT_TOKEN", path: "token", label: "Bot Token", placeholder: "123456:ABC-DEF...", secret: true },
+      { env: "TELEGRAM_PROXY", path: "proxy", label: "代理 (可选)", placeholder: "socks5://127.0.0.1:7890" },
+    ],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+  },
+  discord: {
+    name: "Discord", icon: "🎮",
+    fields: [
+      { env: "DISCORD_BOT_TOKEN", path: "token", label: "Bot Token", placeholder: "Bot token...", secret: true },
+      { env: "DISCORD_PROXY", path: "proxy", label: "代理 (可选)", placeholder: "socks5://127.0.0.1:7890" },
+    ],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" }, { path: "auto_thread", label: "自动线程" }, { path: "reactions", label: "启用反应" } ],
+  },
+  slack: {
+    name: "Slack", icon: "💼",
+    fields: [ { env: "SLACK_BOT_TOKEN", path: "token", label: "Bot Token", placeholder: "xoxb-...", secret: true } ],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" }, { path: "allow_bots", label: "允许机器人消息" } ],
+  },
+  whatsapp: {
+    name: "WhatsApp", icon: "💬",
+    fields: [],
+    toggles: [ { path: "enabled", label: "启用 WhatsApp 频道" }, { path: "require_mention", label: "需 @提及 才回复" } ],
+    note: "WhatsApp 启用后需通过 Hermes 网关完成手机号关联（扫码 / 验证码）。",
+  },
+  matrix: {
+    name: "Matrix", icon: "🔷",
+    fields: [
+      { env: "MATRIX_ACCESS_TOKEN", path: "token", label: "Access Token", placeholder: "syt_...", secret: true },
+      { env: "MATRIX_PROXY", path: "proxy", label: "代理 (可选)", placeholder: "socks5://127.0.0.1:7890" },
+      { env: "MATRIX_HOMESERVER", path: "extra.homeserver", label: "Homeserver", placeholder: "https://matrix.org" },
+      { env: "MATRIX_USER_ID", path: "extra.user_id", label: "User ID (可选)", placeholder: "@user:matrix.org" },
+    ],
+    toggles: [ { path: "auto_thread", label: "自动线程" }, { path: "dm_mention_thread", label: "私信提及线程" } ],
+  },
+  feishu: {
+    name: "飞书 (Lark)", icon: "🪽",
+    fields: [
+      { env: "FEISHU_APP_ID", path: "extra.app_id", label: "App ID", placeholder: "cli_..." },
+      { env: "FEISHU_APP_SECRET", path: "extra.app_secret", label: "App Secret", placeholder: "...", secret: true },
+      { env: "FEISHU_ENCRYPT_KEY", path: "extra.encrypt_key", label: "Encrypt Key (可选)", placeholder: "..." },
+      { env: "FEISHU_VERIFICATION_TOKEN", path: "extra.verification_token", label: "Verification Token (可选)", placeholder: "..." },
+    ],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+  },
+  dingtalk: {
+    name: "钉钉 (DingTalk)", icon: "🔔",
+    fields: [
+      { env: "DINGTALK_CLIENT_ID", path: "extra.client_id", label: "Client ID (AppKey)", placeholder: "ding..." },
+      { env: "DINGTALK_CLIENT_SECRET", path: "extra.client_secret", label: "Client Secret (AppSecret)", placeholder: "...", secret: true },
+      { env: "DINGTALK_APP_KEY", path: "extra.app_key", label: "App Key (可选)", placeholder: "..." },
+    ],
+    toggles: [],
+  },
+  qqbot: {
+    name: "QQ 机器人 (QQBot)", icon: "🐧",
+    fields: [
+      { env: "QQ_APP_ID", path: "extra.app_id", label: "App ID", placeholder: "..." },
+      { env: "QQ_CLIENT_SECRET", path: "extra.client_secret", label: "Client Secret", placeholder: "...", secret: true },
+    ],
+    toggles: [],
+  },
+  weixin: {
+    name: "微信 (WeChat)", icon: "💬",
+    qrLogin: true,
+    fields: [
+      { env: "WEIXIN_TOKEN", path: "token", label: "Token", placeholder: "（扫码登录后自动填入）", secret: true },
+      { env: "WEIXIN_ACCOUNT_ID", path: "extra.account_id", label: "Account ID", placeholder: "（扫码登录后自动填入）" },
+      { env: "WEIXIN_BASE_URL", path: "extra.base_url", label: "Base URL (可选)", placeholder: "（扫码登录后自动填入）" },
+    ],
+    toggles: [],
+    note: "微信个人号通过腾讯 iLink 扫码登录，无需自备 App。点击下方「微信扫码登录」完成关联。",
+  },
+  wecom: {
+    name: "企业微信 (WeCom)", icon: "💼",
+    fields: [
+      { env: "WECOM_BOT_ID", path: "extra.bot_id", label: "Bot ID", placeholder: "..." },
+      { env: "WECOM_SECRET", path: "extra.secret", label: "Secret", placeholder: "...", secret: true },
+    ],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+  },
+};
 
 // ─── Node.js 运行时探测（hermes TUI 需要 node；版本在安装期由 install_callback 固定） ───
 
@@ -2608,6 +2699,216 @@ async function handleFetch(req) {
   function _dirName(p){ const a = (p || "").split("/").filter(Boolean); a.pop(); return "/" + a.join("/"); }
   function _joinPath(a, b){ return (a || "").replace(/\/$/, "") + "/" + (b || "").replace(/^\//, ""); }
 
+  // 调用 hermes skills list --source all 解析已安装技能（Name | Category | Source | Trust | Status）
+  function _listHermesSkills(){
+    try {
+      const { spawnSync } = require("bun");
+      const r = spawnSync([HERMES_BIN, "skills", "list", "--source", "all"], {
+        stdout: "pipe", stderr: "pipe",
+        env: { ...process.env, HOME: DATA_DIR, HERMES_HOME: DATA_DIR }
+      });
+      const out = (r.stdout ? r.stdout.toString() : "") || (r.stderr ? r.stderr.toString() : "");
+      const skills = [];
+      out.split("\n").forEach(line => {
+        const parts = line.split("│").map(s => s.trim()).filter(Boolean);
+        if (parts.length < 5) return;
+        const name = parts[0], category = parts[1], source = parts[2], trust = parts[3], status = parts[4];
+        if (name === "Name" || source === "Source" || !name || !source) return;
+        skills.push({ name, category, source, trust, status });
+      });
+      return skills;
+    } catch (e) { return []; }
+  }
+
+  // ── 平台频道配置读写（~/.hermes/.env + ~/.hermes/config.yaml）──
+  function _readEnvFile(){
+    try { if (existsSync(HERMES_ENV)) return readFileSync(HERMES_ENV, "utf8"); } catch (e) {}
+    return "";
+  }
+  function _writeEnvFile(content){
+    try { writeFileSync(HERMES_ENV, content, { mode: 0o600 }); return true; } catch (e) { return false; }
+  }
+  function _getEnvValue(content, key){
+    const m = content.match(new RegExp("^" + key.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*=\\s*(.+)$", "m"));
+    return m ? m[1].trim() : "";
+  }
+  function _setEnvValue(content, key, value){
+    const safeKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const line = key + "=" + (value || "");
+    if (content.match(new RegExp("^" + safeKey + "\\s*=", "m"))) {
+      return content.replace(new RegExp("^" + safeKey + "\\s*=.*$", "m"), line);
+    }
+    return (content ? content.replace(/\n?$/, "\n") : "") + line + "\n";
+  }
+  function _readHermesConfig(){
+    try { if (existsSync(HERMES_CONFIG)) return readFileSync(HERMES_CONFIG, "utf8"); } catch (e) {}
+    return "";
+  }
+  function _writeHermesConfig(content){
+    try { writeFileSync(HERMES_CONFIG, content, { mode: 0o644 }); return true; } catch (e) { return false; }
+  }
+  // ── YAML 标量安全引用（保留 token 中的 : # 等字符）──
+  function _yamlQuote(v){
+    if (v === true) return "true";
+    if (v === false) return "false";
+    if (v === null || v === undefined) return '""';
+    const s = String(v);
+    if (s === "") return '""';
+    if (/[:#\[\]{}&*!|>'"%@`,]/.test(s) || /^\s|\s$/.test(s) || /[\n\r\t]/.test(s)) {
+      return '"' + s.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+    }
+    return s;
+  }
+  function _yamlUnquote(s){
+    if (s === "true") return true;
+    if (s === "false") return false;
+    if (s === "null" || s === "~" || s === "") return null;
+    if ((s[0] === '"' && s[s.length-1] === '"') || (s[0] === "'" && s[s.length-1] === "'")) {
+      return s.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    }
+    return s;
+  }
+  function _objToYaml(obj, spaces){
+    const pad = " ".repeat(spaces);
+    let out = "";
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      if (v === undefined || v === null) continue;
+      if (typeof v === "object" && !Array.isArray(v)) {
+        out += pad + k + ":\n" + _objToYaml(v, spaces + 2);
+      } else if (Array.isArray(v)) {
+        out += pad + k + (v.length ? ":\n" + v.map(x => pad + "  - " + _yamlQuote(x) + "\n").join("") : ": []\n");
+      } else {
+        out += pad + k + ": " + _yamlQuote(v) + "\n";
+      }
+    }
+    return out;
+  }
+  function _setValByPath(obj, path, val){
+    const parts = path.split(".");
+    let cur = obj;
+    for (let i = 0; i < parts.length - 1; i++) { const p = parts[i]; cur[p] = (cur[p] && typeof cur[p] === "object") ? cur[p] : {}; cur = cur[p]; }
+    cur[parts[parts.length - 1]] = val;
+  }
+  function _getValByPath(obj, path){
+    const parts = path.split("."); let cur = obj;
+    for (const p of parts) { if (cur == null || typeof cur !== "object") return undefined; cur = cur[p]; }
+    return cur;
+  }
+  // 读取 config.yaml 中 platforms.<id> 下的嵌套键值
+  function _readPlatformConfig(id){
+    const yml = _readHermesConfig();
+    const re = new RegExp("^  " + id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ":(?:\\n((?:    .*(?:\\n      .*)*\\n?)*))?", "m");
+    const m = yml.match(re);
+    if (!m || !m[1]) return {};
+    const obj = {};
+    let curObj = null;
+    m[1].split("\n").forEach(l => {
+      if (!l.trim()) return;
+      const mm = l.match(/^    ([a-zA-Z_][\w-]*):\s*(.*)$/);
+      if (mm) {
+        const key = mm[1], val = mm[2].trim();
+        if (val === "") { obj[key] = {}; curObj = obj[key]; }
+        else { obj[key] = _yamlUnquote(val); curObj = null; }
+      } else {
+        const em = l.match(/^      ([a-zA-Z_][\w-]*):\s*(.*)$/);
+        if (em) { const k = em[1], v = _yamlUnquote(em[2].trim()); (curObj && typeof curObj === "object" ? curObj : (obj.__extra = obj.__extra || {}))[k] = v; }
+      }
+    });
+    delete obj.__extra;
+    return obj;
+  }
+  function _setPlatformConfig(id, obj){
+    const block = "  " + id + ":\n" + _objToYaml(obj, 4);
+    let yml = _readHermesConfig();
+    if (!/^platforms:/m.test(yml)) {
+      yml = (yml ? yml.replace(/\n?$/, "\n") : "") + "platforms:\n" + block;
+      return yml;
+    }
+    // 定位 platforms: 段，按行解析各平台块，仅重建该段（保留其它顶层配置）
+    const lines = yml.split("\n");
+    let header = -1;
+    for (let i = 0; i < lines.length; i++) { if (/^platforms:\s*$/.test(lines[i])) { header = i; break; } }
+    if (header < 0) { yml = yml.replace(/\n?$/, "\n") + "platforms:\n" + block; return yml; }
+    // 记录每个 2 空格平台块的 [起始行, 结束行]，并保留出现顺序
+    const order = [];
+    const blocks = {};
+    let curId = null, curStart = null, suffixStart = lines.length;
+    for (let i = header + 1; i < lines.length; i++) {
+      const l = lines[i];
+      if (/^[a-zA-Z_]/.test(l)) { // 顶层键 → platforms 段结束，记录后缀起点
+        if (curId !== null) blocks[curId].e = i - 1;
+        suffixStart = i;
+        break;
+      }
+      const mm = l.match(/^  ([a-zA-Z_][\w-]*):/);
+      if (mm) {
+        if (curId !== null) blocks[curId].e = i - 1;
+        curId = mm[1]; curStart = i;
+        if (!blocks[curId]) { blocks[curId] = { s: i, e: i }; if (order[order.length - 1] !== curId) order.push(curId); }
+      } else if (curId !== null) {
+        blocks[curId].e = i;
+      }
+    }
+    if (curId !== null && suffixStart === lines.length) blocks[curId].e = lines.length - 1; // 段延伸到文件末尾
+    const newLines = [];
+    for (let i = 0; i <= header; i++) newLines.push(lines[i]);
+    let wroteTarget = false;
+    order.forEach(pid => {
+      if (pid === id) { newLines.push(block.replace(/\n$/, "")); wroteTarget = true; }
+      else { for (let i = blocks[pid].s; i <= blocks[pid].e; i++) newLines.push(lines[i]); }
+    });
+    if (!wroteTarget) newLines.push(block.replace(/\n$/, ""));
+    for (let i = suffixStart; i < lines.length; i++) newLines.push(lines[i]); // 保留 platforms 段之后的其它顶层配置
+    return newLines.join("\n") + "\n";
+  }
+  function _listChannels(){
+    const env = _readEnvFile();
+    const out = {};
+    Object.keys(CHANNEL_DEFS).forEach(id => {
+      const def = CHANNEL_DEFS[id];
+      const cfg = _readPlatformConfig(id);
+      let configured = false;
+      (def.fields || []).forEach(f => { if (f.env && _getEnvValue(env, f.env)) configured = true; });
+      if (id === "whatsapp" && (cfg.enabled === "true" || cfg.enabled === true)) configured = true;
+      if (id === "weixin") configured = !!_getEnvValue(env, "WEIXIN_TOKEN");
+      out[id] = {
+        id, name: def.name, icon: def.icon, configured, qrLogin: !!def.qrLogin, note: def.note || "",
+        credentials: (def.fields || []).filter(f => f.env).map(f => ({ env: f.env, path: f.path, label: f.label, value: _getEnvValue(env, f.env) || "" })),
+        config: cfg
+      };
+    });
+    return out;
+  }
+  function _saveChannel(id, body){
+    const def = CHANNEL_DEFS[id]; if (!def) return { ok: false, error: "unknown channel" };
+    let env = _readEnvFile();
+    const cfg = _readPlatformConfig(id);
+    // 凭证字段：写 .env + 写 platforms.<id>.<path>
+    (def.fields || []).forEach(f => {
+      if (!f.env) return;
+      const v = (body.credentials && body.credentials[f.env] != null) ? body.credentials[f.env]
+              : (body.config && _getValByPath(body.config, f.path) != null ? _getValByPath(body.config, f.path) : null);
+      if (v == null) return;
+      env = _setEnvValue(env, f.env, v || "");
+      if (f.path) _setValByPath(cfg, f.path, v || "");
+    });
+    _writeEnvFile(env);
+    // 行为开关
+    if (body.toggles && typeof body.toggles === "object") {
+      Object.keys(body.toggles).forEach(p => { const v = body.toggles[p]; if (v != null) _setValByPath(cfg, p, v); });
+    }
+    // 其余 config（非凭证字段）兜底写入
+    if (body.config && typeof body.config === "object") {
+      Object.keys(body.config).forEach(p => {
+        if ((def.fields || []).some(f => f.path === p)) return;
+        const v = body.config[p]; if (v != null) _setValByPath(cfg, p, v);
+      });
+    }
+    _writeHermesConfig(_setPlatformConfig(id, cfg));
+    return { ok: true };
+  }
+
   // 解析技能目录中的 SKILL.md frontmatter（name / description / emoji）
   function _readSkillFrontmatter(dir){
     try {
@@ -3001,9 +3302,18 @@ async function handleFetch(req) {
     try {
       const ext = _readExtensionsFile() || {};
       const dirs = (ext.skills_dirs || []).map(_expandHome).filter(Boolean);
+      const dirSkills = [];
+      dirs.forEach(d => { if (_isDir(d)) _readSkillFrontmatter(d).forEach(s => dirSkills.push({ name: s.name, description: s.description, emoji: s.emoji, dir: s.dir, file: s.file, origin: "dir" })); });
+      const hermesSkills = _listHermesSkills().map(s => ({
+        name: s.name, category: s.category, source: s.source, trust: s.trust,
+        status: s.status, emoji: "", description: "", origin: "hermes"
+      }));
+      // 去重：Hermes  skills 为主，目录扫描补充
+      const seen = new Set();
       const skills = [];
-      dirs.forEach(d => { if (_isDir(d)) _readSkillFrontmatter(d).forEach(s => skills.push({ name: s.name, description: s.description, emoji: s.emoji, dir: s.dir, file: s.file })); });
-      return new Response(JSON.stringify({ ok: true, skills, dirs }), { headers: jsonHeaders() });
+      hermesSkills.forEach(s => { seen.add(s.name); skills.push(s); });
+      dirSkills.forEach(s => { if (!seen.has(s.name)) { seen.add(s.name); skills.push(s); } });
+      return new Response(JSON.stringify({ ok: true, skills, dirs, hermesCount: hermesSkills.length, dirCount: dirSkills.length }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
@@ -3088,7 +3398,7 @@ async function handleFetch(req) {
           source: it.source || "",
           tags: subcats,
           webUrl: webUrl,
-          installCmd: "npx -y agentskills install " + canonical,
+          installCmd: "hermes skills install " + canonical,
         };
       });
       return new Response(JSON.stringify({ ok: true, type: type, keyword: keyword, total: (j.data && j.data.total) || items.length, items }), { headers: jsonHeaders() });
@@ -3147,6 +3457,56 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ ok: true, name, dir: destDir }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ── 平台频道 / 通讯 ────────────────────────────────────────────────
+  if (path === "/api/channels" && req.method === "GET") {
+    try {
+      return new Response(JSON.stringify({ ok: true, channels: _listChannels(), defs: CHANNEL_DEFS }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // POST /api/channels/:id  → 保存凭证 + 行为配置
+  const chSaveMatch = path.match(/^\/api\/channels\/([a-zA-Z0-9_]+)$/);
+  if (chSaveMatch && req.method === "POST") {
+    try {
+      const id = chSaveMatch[1];
+      const body = await req.json().catch(() => ({}));
+      const r = _saveChannel(id, body);
+      if (!r.ok) return new Response(JSON.stringify(r), { status: 400, headers: jsonHeaders() });
+      return new Response(JSON.stringify(r), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // 微信扫码登录：获取二维码（腾讯 iLink 公共接口，无需自备 App）
+  if (path === "/api/channels/weixin/qr" && req.method === "GET") {
+    try {
+      const res = await fetch("https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3", { signal: AbortSignal.timeout(15000) });
+      const data = await res.json().catch(() => ({}));
+      if (!data || !data.qrcode) return new Response(JSON.stringify({ ok: false, error: "无法获取微信二维码，请检查网络后重试" }), { status: 502, headers: jsonHeaders() });
+      return new Response(JSON.stringify({ ok: true, qrcode: data.qrcode, qrcode_img: data.qrcode_img_content || "" }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+  // 微信扫码登录：轮询扫码状态
+  if (path === "/api/channels/weixin/qr/status" && req.method === "GET") {
+    try {
+      const url = new URL(req.url);
+      const qrcode = url.searchParams.get("qrcode") || "";
+      if (!qrcode) return new Response(JSON.stringify({ ok: false, error: "缺少 qrcode 参数" }), { status: 400, headers: jsonHeaders() });
+      const res = await fetch("https://ilinkai.weixin.qq.com/ilink/bot/get_qrcode_status?qrcode=" + encodeURIComponent(qrcode), { signal: AbortSignal.timeout(35000) });
+      const data = await res.json().catch(() => ({}));
+      const status = data?.status || "wait";
+      if (status === "confirmed") {
+        return new Response(JSON.stringify({ ok: true, status, account_id: data.ilink_bot_id, token: data.bot_token, base_url: data.baseurl }), { headers: jsonHeaders() });
+      }
+      return new Response(JSON.stringify({ ok: true, status }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 502, headers: jsonHeaders() });
     }
   }
 
