@@ -349,6 +349,80 @@ ensure_whatsapp_bridge() {
 }
 
 # ---------------------------------------------------------------------------
+# 3.8 修复 dashboard/chat TUI 在桌面 IME 下输入文字消失的问题
+# ---------------------------------------------------------------------------
+# hermes-agent 0.19.0 web bundle 的 pty-mobile-input 对桌面浏览器的
+# compositionend/insertCompositionText 也会启用 mobile-replacement 归一化，
+# 导致中文/日文 IME 输入时被误判为整行替换，文字消失。这里对已知 0.19.0
+# 打包后的 minified 函数做一次幂等补丁，仅当精确匹配原函数时才替换。
+patch_hermes_web_mobile_input() {
+    local HERMES_CLI_DIR
+    HERMES_CLI_DIR=$("${VENV_DIR}/bin/python3" -c "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))" 2>/dev/null)
+    if [ -z "${HERMES_CLI_DIR}" ] || [ ! -d "${HERMES_CLI_DIR}" ]; then
+        log_msg "WARNING: cannot locate hermes_cli package dir, skipping mobile-input patch"
+        return 0
+    fi
+
+    local JS_FILE
+    JS_FILE=$(find "${HERMES_CLI_DIR}/web_dist/assets" -maxdepth 1 -type f -name 'index-*.js' -print -quit 2>/dev/null)
+    if [ -z "${JS_FILE}" ] || [ ! -f "${JS_FILE}" ]; then
+        log_msg "WARNING: hermes web bundle not found, skipping mobile-input patch"
+        return 0
+    fi
+
+    # 0.19.0 wheel 中 shouldTreatInputAsMobileReplacement 的 minified 形态
+    local OLD_FN='function sY(e,t,n){return e===`insertReplacementText`||e===`insertFromComposition`||e===`insertCompositionText`?!0:n&&e===`insertText`&&(t?.length??0)>1}'
+    local NEW_FN='function sY(e,t,n){if(!n)return!1;if(e===`insertReplacementText`||e===`insertFromComposition`||e===`insertCompositionText`)return!0;return e===`insertText`&&(t?.length??0)>1}'
+
+    # ChatPage 的 compositionend 监听（minified 箭头函数 n）。原版无条件置位 350ms
+    # 替换窗口，导致桌面 IME 每次候选提交都会误入整行替换、已输入文字被删。改为仅当
+    # isMobileLike（闭包变量 e）为真时才置位。e 与该作用域内 isMobileLike 同一变量。
+    local OLD_CE='n=()=>{w.current=Date.now()+350}'
+    local NEW_CE='n=()=>{e&&(w.current=Date.now()+350)}'
+
+    if ! grep -Fq "${OLD_FN}" "${JS_FILE}" && ! grep -Fq "${OLD_CE}" "${JS_FILE}"; then
+        if grep -Fq "${NEW_FN}" "${JS_FILE}" && grep -Fq "${NEW_CE}" "${JS_FILE}"; then
+            log_msg "hermes web mobile-input already patched: ${JS_FILE}"
+        else
+            log_msg "WARNING: hermes web mobile-input patch pattern not found (bundle may have changed): ${JS_FILE}"
+        fi
+        return 0
+    fi
+
+    local RESULT
+    RESULT=$("${VENV_DIR}/bin/python3" - <<PY
+old_fn = '''${OLD_FN}'''
+new_fn = '''${NEW_FN}'''
+old_ce = '''${OLD_CE}'''
+new_ce = '''${NEW_CE}'''
+path = '''${JS_FILE}'''
+with open(path, 'r', encoding='utf-8') as f:
+    s = f.read()
+applied = 0
+if old_fn in s:
+    s = s.replace(old_fn, new_fn)
+    applied += 1
+if old_ce in s:
+    s = s.replace(old_ce, new_ce)
+    applied += 1
+with open(path, 'w', encoding='utf-8') as f:
+    f.write(s)
+print(applied)
+PY
+    )
+
+    if [ "${RESULT}" = "2" ]; then
+        log_msg "patched hermes web mobile-input normalization (2 sites): ${JS_FILE}"
+    elif [ "${RESULT}" = "1" ]; then
+        log_msg "patched hermes web mobile-input normalization (1 site): ${JS_FILE}"
+    elif [ "${RESULT}" = "0" ]; then
+        log_msg "WARNING: hermes web mobile-input patch did not apply: ${JS_FILE}"
+    else
+        log_msg "WARNING: hermes web mobile-input patch unexpected result (${RESULT}): ${JS_FILE}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # 1. 创建数据目录
 # ---------------------------------------------------------------------------
 log_msg "Creating data directories under ${DATA_DIR} ..."
@@ -458,6 +532,11 @@ ensure_tui_bundle
 # 3.7 补齐 WhatsApp bridge 脚本（hermes-agent 0.19.0 wheel 未打包，非致命）
 # ---------------------------------------------------------------------------
 ensure_whatsapp_bridge
+
+# ---------------------------------------------------------------------------
+# 3.8 修复 dashboard/chat TUI 桌面 IME 输入文字消失（非致命）
+# ---------------------------------------------------------------------------
+patch_hermes_web_mobile_input
 
 # ---------------------------------------------------------------------------
 # 4. 部署 prompts
