@@ -749,6 +749,27 @@
     .ext-field-label{font-size:13px;color:var(--text,#e8eaed);margin-bottom:6px}
     .ext-subsection{margin-top:18px;padding-top:14px;border-top:1px solid var(--border,#2a2f3a)}
     .ext-range{width:100%;max-width:360px;accent-color:var(--accent,#4f8cff)}
+    /* ── 专家团工作流（DAG 编排）── */
+    .ext-wf-arrow{text-align:center;color:var(--text3,#8a909c);font-size:18px;line-height:1.2;margin:2px 0}
+    .ext-wf-step{margin:4px 0;box-shadow:none}
+    .ext-wf-step-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .wf-status{font-size:12px;color:var(--text3,#8a909c);margin-left:4px}
+    .ext-wf-field{margin-bottom:8px;display:flex;flex-direction:column;gap:4px}
+    .ext-wf-field>label{font-size:12px;color:var(--text3,#8a909c)}
+    .ext-wf-task{min-height:64px;resize:vertical;font-family:inherit;line-height:1.5}
+    .ext-wf-expert-pick{position:relative}
+    .ext-wf-expert-cur{font-size:13px;color:var(--accent,#4f8cff);margin-top:4px;min-height:18px}
+    .ext-wf-pick-list{position:absolute;z-index:30;left:0;right:0;max-height:240px;overflow:auto;background:var(--bg2,#1a1d24);border:1px solid var(--border,#2a2f3a);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);margin-top:2px}
+    .ext-wf-pick-item{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:13px}
+    .ext-wf-pick-item:hover{background:var(--bg3,#23272f)}
+    .ext-wf-pick-item .ext-card-icon{font-size:16px}
+    .ext-wf-deps{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:2px}
+    .ext-wf-dep{font-size:12px;color:var(--text,#e8eaed);display:flex;align-items:center;gap:4px;cursor:pointer}
+    .workflow-node{background:var(--bg2,#1a1d24);border:1px solid var(--border,#2a2f3a);border-radius:12px;padding:10px 14px;margin:8px 0}
+    .workflow-node>summary{list-style:none;cursor:pointer;font-weight:600}
+    .workflow-node>summary::-webkit-details-marker{display:none}
+    .workflow-node .wf-task{font-size:13px;color:var(--text3,#8a909c);margin-bottom:6px}
+    .workflow-node .wf-result{font-size:14px}
   </style>
 </head>
 <body>
@@ -1068,9 +1089,14 @@
                 <span class="ext-hint" id="extTeamHint" style="margin:0"></span>
               </div>
               <div id="extTeamCurrent" class="ext-team-current"></div>
-              <div class="ext-subsection">
+                <div class="ext-subsection">
                 <div class="ext-section-title">从专家库选择成员（可多选）</div>
                 <div class="ext-grid" id="extTeamGrid"></div>
+              </div>
+              <div class="ext-subsection" style="border-top:1px dashed var(--border);margin-top:14px;padding-top:12px">
+                <div class="ext-section-title">🔀 专家团工作流（DAG 编排）</div>
+                <div class="ext-hint">把专家团升级为「工作流」：每个步骤指派一名专家，前一步的输出通过 <code>{{变量}}</code> 流入下一步。点「设为当前工作流并使用」后，在对话中发送消息即按 DAG 顺序串联执行（同一拓扑层并行，跨层顺序）。</div>
+                <div id="extWorkflowBuilder"></div>
               </div>
             </div>
           </div>
@@ -2779,6 +2805,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       userDiv.innerHTML = '<div class="msg-role">你</div><div class="msg-content">'+escapeHtml(text).replace(/\n/g, '<br>')+imgThumbsHtml+(fileTagsHtml?'<div style="margin-top:6px">'+fileTagsHtml+'</div>':'')+'</div><div class="msg-time" data-full="'+nowFull+'">'+nowTime+'</div>';
       box.appendChild(userDiv);
 
+      // ── 工作流编排模式：DAG 串联执行（取代普通单轮发送）──
+      if (_p === '__workflow__') {
+        try {
+          var _wfRes = await extRunWorkflow(text);
+          var _asstDiv = document.createElement('div');
+          _asstDiv.className = 'message assistant anim-in';
+          _asstDiv.innerHTML = '<div class="msg-role">Hermes · 工作流终稿</div><div class="msg-content" id="wfFinalContent"></div><div class="msg-time" data-full="'+nowFull+'">'+nowTime+'</div>';
+          box.appendChild(_asstDiv);
+          var _fc = _asstDiv.querySelector('#wfFinalContent');
+          if (_wfRes && _wfRes.finalText) {
+            _fc.innerHTML = renderMarkdown(_wfRes.finalText);
+            enhanceLinksWithQR(_fc); addCopyButtonsToPre(_fc);
+          } else {
+            _fc.textContent = '（工作流未产生最终输出）';
+          }
+        } catch(e) {
+          var _wfErr = document.createElement('div');
+          _wfErr.className = 'message assistant anim-in';
+          _wfErr.innerHTML = '<div class="msg-role">Hermes</div><div class="msg-content"><span style="color:var(--red)">工作流执行失败：'+escapeHtml((e&&e.message)||e)+'</span></div>';
+          box.appendChild(_wfErr);
+        }
+        scrollChatToBottom(true);
+        _unlockUI();
+        chatLoadSessions(true);
+        return;
+      }
+
       // 独立进度容器（默认隐藏,有工具事件时显示）
       var progressDiv = document.createElement('div');
       progressDiv.className = 'assistant-progress';
@@ -3261,6 +3314,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if(!ext.team) ext.team = [];
     if(ext.team_name === undefined) ext.team_name = "";
     if(!ext.memory) ext.memory = { enabled:true, char_limit:2200 };
+    if(!ext.workflow) ext.workflow = { name:'我的专家团工作流', concurrency:2, steps:[] };
+    if(!ext.workflow.steps) ext.workflow.steps = [];
+    if(ext.workflow.concurrency === undefined) ext.workflow.concurrency = 2;
 
     // 工具集卡片网格（优先原生 25 个，失败回退静态 11 个）
     if (!_nativeToolsetsLoaded && window._nativeToolsets === undefined) extLoadNativeToolsets();
@@ -3908,6 +3964,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
     extRenderTeamCurrent();
+    extRenderWorkflowBuilder();
   }
   function extToggleTeamMember(id){
     var ext = settingsState.config.extensions;
@@ -3960,6 +4017,328 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
     var name = ext.team_name ? ('「' + ext.team_name + '」') : '';
     return '你正在以多智能体专家团' + name + '模式协作。团队由以下专家组成，请根据用户需求判断由哪位专家主导，并在复杂任务中拆分给对应专家协作、最后汇总：\n' + lines.join('\n') + '\n\n当任务明确属于某位专家领域时，以该专家的身份与口吻作答；跨领域任务请综合各方视角。';
+  }
+
+  // ───────────────────────────────────────────────────────────
+  // 专家团工作流（DAG 编排）—— 取代扁平专家团
+  // 数据模型：settingsState.config.extensions.workflow = { name, concurrency, steps:[{id,expert,task,output,depends_on[]}] }
+  // 执行：按 depends_on 求拓扑分层；同层并行（上限 concurrency），跨层顺序；
+  //       每步 task 中 {{var}} 取自 context（含全局 {{input}} 与上一步 output）；终稿 = 最后一个无下游依赖的步骤的输出。
+  // ───────────────────────────────────────────────────────────
+
+  // 轻量保存（不重新渲染扩展页，避免输入框失焦）
+  function extWfSave(){
+    var headers = { 'Content-Type': 'application/json' };
+    if(monitorToken) headers['X-Monitor-Token'] = monitorToken;
+    fetch(apiUrl('/api/config'), { method:'POST', headers:headers, cache:'no-store', body: JSON.stringify(settingsState.config) }).catch(function(){});
+  }
+  function extWfField(field, value){
+    var wf = settingsState.config.extensions.workflow;
+    if(field === 'concurrency'){ wf.concurrency = Math.max(1, Math.min(8, parseInt(value,10)||1)); }
+    else { wf[field] = value; }
+    extWfSave();
+  }
+  function extWfNextId(){
+    var wf = settingsState.config.extensions.workflow;
+    var n = (wf.steps||[]).length + 1;
+    var id = 's' + n;
+    var taken = {}; (wf.steps||[]).forEach(function(s){ taken[s.id]=1; });
+    while(taken[id]){ n++; id = 's' + n; }
+    return id;
+  }
+  function extAddWorkflowStep(){
+    var wf = settingsState.config.extensions.workflow;
+    if(!wf.steps) wf.steps = [];
+    var id = extWfNextId();
+    wf.steps.push({ id:id, expert:'', task:'', output:'out'+wf.steps.length, depends_on:[] });
+    extWfSave(); extRenderWorkflowBuilder();
+  }
+  function extRemoveWorkflowStep(id){
+    var wf = settingsState.config.extensions.workflow;
+    wf.steps = (wf.steps||[]).filter(function(s){ return s.id !== id; });
+    // 清理其它步骤对其的依赖
+    wf.steps.forEach(function(s){ s.depends_on = (s.depends_on||[]).filter(function(d){ return d !== id; }); });
+    extWfSave(); extRenderWorkflowBuilder();
+  }
+  function extWfStepField(id, field, value){
+    var wf = settingsState.config.extensions.workflow;
+    var s = (wf.steps||[]).filter(function(x){ return x.id === id; })[0];
+    if(s){ s[field] = value; }
+    extWfSave();
+  }
+  function extWfToggleDep(id, depId, checked){
+    var wf = settingsState.config.extensions.workflow;
+    var s = (wf.steps||[]).filter(function(x){ return x.id === id; })[0];
+    if(!s) return;
+    s.depends_on = s.depends_on || [];
+    var i = s.depends_on.indexOf(depId);
+    if(checked && i === -1) s.depends_on.push(depId);
+    if(!checked && i !== -1) s.depends_on.splice(i, 1);
+    extWfSave();
+  }
+  function extWfExpertSearch(id, q){
+    var box = document.getElementById('wfstep-pick-' + id);
+    if(!box) return;
+    var list = window.AGENCY_PERSONAS || [];
+    var ql = (q||'').trim().toLowerCase();
+    var matches = ql ? list.filter(function(p){
+      return (p.label||'').toLowerCase().indexOf(ql) !== -1
+        || (p.desc||'').toLowerCase().indexOf(ql) !== -1
+        || (p.dept_label||'').toLowerCase().indexOf(ql) !== -1
+        || (p.id||'').toLowerCase().indexOf(ql) !== -1;
+    }) : list.slice(0, 8);
+    matches = matches.slice(0, 30);
+    box.innerHTML = matches.map(function(p){
+      var pid = (p.id||'').replace(/'/g, "\\'");
+      return '<div class="ext-wf-pick-item" onclick="extWfAssignExpert(\''+id+'\',\''+pid+'\')">'+
+        '<span class="ext-card-icon">'+(p.emoji||'🤖')+'</span>'+
+        '<span>'+escapeHtml(p.label)+'</span>'+
+        '<span class="ext-badge muted">'+(p.dept_label||'')+'</span></div>';
+    }).join('');
+  }
+  function extWfAssignExpert(id, expertId){
+    var wf = settingsState.config.extensions.workflow;
+    var s = (wf.steps||[]).filter(function(x){ return x.id === id; })[0];
+    if(s){ s.expert = expertId; }
+    var cur = document.getElementById('wfstep-expert-' + id);
+    if(cur){ var m = extAgencyMap(); var p = m[expertId]; cur.textContent = p ? (p.emoji + ' ' + p.label) : expertId; }
+    var pick = document.getElementById('wfstep-pick-' + id);
+    if(pick) pick.innerHTML = '';
+    extWfSave();
+  }
+  function extUseWorkflow(){
+    var wf = settingsState.config.extensions.workflow;
+    if(!wf.steps || !wf.steps.length){ var h=document.getElementById('extWfHint'); if(h) h.textContent='请先添加至少一个步骤'; return; }
+    var bad = wf.steps.filter(function(s){ return !s.expert || !s.output; });
+    if(bad.length){ var h2=document.getElementById('extWfHint'); if(h2) h2.textContent='请为每个步骤选择专家并填写输出变量名'; return; }
+    if(window.chatState) chatState.persona = '__workflow__';
+    try { localStorage.setItem('hermes_persona', '__workflow__'); } catch(e){}
+    settingsState.config.extensions.persona = '__workflow__';
+    extWfSave();
+    settingsRenderExtensions(); renderPersonaBar();
+    var h3 = document.getElementById('extWfHint'); if(h3) h3.textContent = '工作流已启用，切换至对话发送消息即可执行。';
+    if(window.switchView) switchView('chat');
+  }
+  function extClearWorkflow(){
+    var ext = settingsState.config.extensions;
+    ext.workflow = { name:'我的专家团工作流', concurrency:2, steps:[] };
+    if(ext.persona === '__workflow__'){ ext.persona = 'default'; if(window.chatState) chatState.persona = 'default'; try{ localStorage.setItem('hermes_persona','default'); }catch(e){} }
+    extWfSave();
+    settingsRenderExtensions(); renderPersonaBar(); extRenderWorkflowBuilder();
+  }
+
+  function extWfStepCardHtml(s, idx, all){
+    var m = extAgencyMap();
+    var p = m[s.expert];
+    var expertLabel = p ? (p.emoji + ' ' + p.label) : (s.expert ? s.expert : '（未选择专家）');
+    var arrow = idx > 0 ? '<div class="ext-wf-arrow">↓</div>' : '';
+    var depOpts = all.filter(function(o){ return o.id !== s.id; }).map(function(o){
+      var on = (s.depends_on||[]).indexOf(o.id) !== -1;
+      return '<label class="ext-wf-dep"><input type="checkbox" '+(on?'checked':'')+' onchange="extWfToggleDep(\''+s.id+'\',\''+o.id+'\',this.checked)"> #'+(all.indexOf(o)+1)+' '+(o.output||o.id)+'</label>';
+    }).join('');
+    return ''+
+      arrow+
+      '<div class="ext-card ext-wf-step" data-step="'+s.id+'">'+
+        '<div class="ext-wf-step-head"><span class="ext-card-title">步骤 #'+(idx+1)+'</span>'+
+          '<span class="wf-status" id="wfstep-status-'+s.id+'"></span>'+
+          '<button class="btn btn-sm" style="margin-left:auto" onclick="extRemoveWorkflowStep(\''+s.id+'\')">删除</button></div>'+
+        '<div class="ext-wf-field"><label>专家</label>'+
+          '<div class="ext-wf-expert-pick">'+
+            '<input class="ext-input" type="text" placeholder="搜索并选择专家…" value="" oninput="extWfExpertSearch(\''+s.id+'\',this.value)" onfocus="extWfExpertSearch(\''+s.id+'\',\'\')">'+
+            '<div class="ext-wf-expert-cur" id="wfstep-expert-'+s.id+'">'+escapeHtml(expertLabel)+'</div>'+
+            '<div class="ext-wf-pick-list" id="wfstep-pick-'+s.id+'"></div>'+
+          '</div></div>'+
+        '<div class="ext-wf-field"><label>任务（支持 {{input}} 与 {{上一步输出变量}}）</label>'+
+          '<textarea class="ext-input ext-wf-task" oninput="extWfStepField(\''+s.id+'\',\'task\',this.value)">'+escapeHtml(s.task||'')+'</textarea></div>'+
+        '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
+          '<div class="ext-wf-field"><label>输出变量名</label><input class="ext-input" type="text" value="'+escapeHtml(s.output||'')+'" placeholder="如 research" oninput="extWfStepField(\''+s.id+'\',\'output\',this.value)"></div>'+
+          '<div class="ext-wf-field" style="flex:1;min-width:220px"><label>依赖（上游步骤）</label><div class="ext-wf-deps">'+depOpts+'</div></div>'+
+        '</div>'+
+      '</div>';
+  }
+  function extRenderWorkflowBuilder(){
+    var host = document.getElementById('extWorkflowBuilder');
+    if(!host) return;
+    var ext = settingsState.config.extensions;
+    var wf = ext.workflow = ext.workflow || { name:'我的专家团工作流', concurrency:2, steps:[] };
+    if(!wf.steps) wf.steps = [];
+    if(wf.concurrency === undefined) wf.concurrency = 2;
+    var html = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
+      '<input id="extWfName" class="ext-input" type="text" value="'+escapeHtml(wf.name||'')+'" placeholder="工作流名称" oninput="extWfField(\'name\',this.value)" style="max-width:240px">'+
+      '<span class="ext-hint" style="margin:0">并行度</span>'+
+      '<input class="ext-input" type="number" min="1" max="8" value="'+Number(wf.concurrency||2)+'" oninput="extWfField(\'concurrency\',this.value)" style="width:72px">'+
+      '</div>';
+    html += '<div id="extWorkflowSteps">';
+    wf.steps.forEach(function(s, idx){ html += extWfStepCardHtml(s, idx, wf.steps); });
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">'+
+      '<button class="btn btn-sm" onclick="extAddWorkflowStep()">＋ 添加步骤</button>'+
+      '<button class="btn btn-sm primary" onclick="extUseWorkflow()">▶ 设为当前工作流并使用</button>'+
+      '<button class="btn btn-sm" onclick="extClearWorkflow()">清除</button>'+
+      '</div>';
+    html += '<div class="ext-hint" id="extWfHint"></div>';
+    host.innerHTML = html;
+  }
+
+  // ── 拓扑分层 ──
+  function extTopoLevels(steps){
+    var placed = {}; var levels = []; var remaining = steps.slice(); var guard = 0;
+    while(remaining.length && guard < 10000){
+      guard++;
+      var level = remaining.filter(function(s){ return (s.depends_on||[]).every(function(d){ return placed[d]; }); });
+      if(!level.length) break; // 环路保护
+      level.forEach(function(s){ placed[s.id] = true; });
+      levels.push(level);
+      remaining = remaining.filter(function(s){ return !placed[s.id]; });
+    }
+    if(remaining.length){ remaining.forEach(function(s){ levels.push([s]); }); }
+    return levels;
+  }
+  function extRenderTemplate(str, ctx){
+    return String(str == null ? '' : str).replace(/\{\{(\w+)\}\}/g, function(mk, name){
+      if(ctx[name] === undefined || ctx[name] === null) return '';
+      return String(ctx[name]);
+    });
+  }
+
+  // ── 单次步骤调用：复刻 chatSend 的 /api/chat/stream POST，返回完整回复字符串，无 DOM 副作用 ──
+  function extWorkflowStepCall(systemPrompt, userText, sessionId){
+    return new Promise(function(resolve, reject){
+      var message = (systemPrompt ? (systemPrompt + "\n\n") : "") + userText;
+      var doStream = function(sid){
+        fetch(apiUrl('/api/chat/stream'), {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'X-Monitor-Token': monitorToken || '' },
+          body: JSON.stringify({ session_id: sid, message: message })
+        }).then(function(resp){
+          if(!resp.ok) throw new Error('HTTP ' + resp.status);
+          if(!resp.body) throw new Error('无响应流');
+          var reader = resp.body.getReader();
+          var decoder = new TextDecoder();
+          var buf = ''; var full = ''; var errMsg = '';
+          var flush = function(isFinal){
+            var events = buf.split('\n\n');
+            if(!isFinal) buf = events.pop() || ''; else buf = '';
+            for(var i=0;i<events.length;i++){
+              var ev = events[i]; if(!ev) continue;
+              var lines = ev.split('\n');
+              for(var j=0;j<lines.length;j++){
+                var line = lines[j];
+                if(line.indexOf('data: ') === 0){
+                  var data = line.slice(6).trim();
+                  if(data === '[DONE]') continue;
+                  try {
+                    var parsed = JSON.parse(data);
+                    if(parsed.delta) full += parsed.delta;
+                    if(parsed.error) errMsg = parsed.error;
+                  } catch(e){}
+                }
+              }
+            }
+          };
+          var pump = function(){
+            return reader.read().then(function(r){
+              if(r.done){ flush(true); if(errMsg) return reject(new Error(errMsg)); return resolve(full); }
+              buf += decoder.decode(r.value, { stream:true });
+              flush(false);
+              return pump();
+            });
+          };
+          return pump();
+        }).catch(function(e){ reject(e); });
+      };
+      if(sessionId){ doStream(sessionId); }
+      else {
+        fetch(apiUrl('/api/sessions'), { method:'POST' })
+          .then(function(r){ return r.json(); })
+          .then(function(s){ doStream(s.id); })
+          .catch(function(e){ reject(e); });
+      }
+    });
+  }
+
+  // 聊天区渲染：每个步骤一个可折叠节点
+  function extWfRenderNode(box, s, idx, m){
+    var p = m[s.expert];
+    var emoji = (p && p.emoji) || '🤖';
+    var label = (p && p.label) || s.expert || '专家';
+    var det = document.createElement('details');
+    det.className = 'message workflow-node anim-in';
+    det.open = true;
+    det.id = 'wfnode-' + s.id;
+    det.innerHTML =
+      '<summary class="msg-role">'+emoji+' '+escapeHtml(label)+' · 步骤 #'+idx+
+      ' <span class="wf-status" id="wfstat-'+s.id+'">⏳ 待运行</span></summary>'+
+      '<div class="msg-content"><div class="wf-task"><b>任务</b>：'+escapeHtml(s.task||'')+'</div>'+
+      '<div class="wf-result" id="wfres-'+s.id+'"><span class="thinking-indicator"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></span></div></div>';
+    box.appendChild(det);
+    return det;
+  }
+  function extWfSetNodeStatus(id, st){
+    var el = document.getElementById('wfstat-' + id); if(el) el.textContent = st;
+  }
+  function extWfSetNodeResult(id, text){
+    var el = document.getElementById('wfres-' + id);
+    if(el){ el.innerHTML = renderMarkdown(text); enhanceLinksWithQR(el); addCopyButtonsToPre(el); }
+  }
+  function extWfSetBuilderStatus(id, text){
+    var el = document.getElementById('wfstep-status-' + id); if(el) el.textContent = text;
+  }
+
+  // ── 工作流总执行：拓扑分层 → 同层并行（限 concurrency）→ 跨层顺序 ──
+  async function extRunWorkflow(userText){
+    var box = document.getElementById('chatMessages');
+    var ext = settingsState.config.extensions;
+    var wf = ext.workflow || { steps: [] };
+    // 降级：无步骤时退化为扁平专家团（沿用 extBuildTeamPrompt）
+    if(!wf.steps || !wf.steps.length){
+      var sysP = extBuildTeamPrompt();
+      var flatText = await extWorkflowStepCall(sysP, userText);
+      return { finalText: flatText };
+    }
+    var m = extAgencyMap();
+    var ctx = { input: userText };
+    var levels = extTopoLevels(wf.steps);
+    var concurrency = Math.max(1, Math.min(8, parseInt(wf.concurrency, 10) || 2));
+    // 终稿节点：无其它步骤依赖它的最后一个步骤
+    var dependents = {};
+    wf.steps.forEach(function(s){ (s.depends_on||[]).forEach(function(d){ dependents[d] = true; }); });
+    var terminals = wf.steps.filter(function(s){ return !dependents[s.id]; });
+    var finalStep = terminals.length ? terminals[terminals.length - 1] : wf.steps[wf.steps.length - 1];
+
+    for(var li=0; li<levels.length; li++){
+      var level = levels[li];
+      level.forEach(function(s){
+        var idx = wf.steps.indexOf(s) + 1;
+        extWfRenderNode(box, s, idx, m);
+      });
+      for(var c=0; c<level.length; c+=concurrency){
+        var chunk = level.slice(c, c + concurrency);
+        await Promise.all(chunk.map(async function(s){
+          var idx = wf.steps.indexOf(s) + 1;
+          extWfSetNodeStatus(s.id, '🔄 运行中');
+          extWfSetBuilderStatus(s.id, '⏳ 运行中');
+          try {
+            var p = m[s.expert];
+            var sysP2 = (p && p.prompt) ? p.prompt : '';
+            if(!p){ var fb = extLookupPersona('default'); sysP2 = fb ? fb.prompt : ''; }
+            var task = extRenderTemplate(s.task || '', ctx);
+            var result = await extWorkflowStepCall(sysP2, task);
+            ctx[s.output] = result;
+            extWfSetNodeResult(s.id, result);
+            extWfSetNodeStatus(s.id, '✅ 完成');
+            extWfSetBuilderStatus(s.id, '✅ 完成');
+          } catch(e){
+            var errMsg = (e && e.message) || String(e);
+            ctx[s.output] = '（步骤执行失败：' + errMsg + '）';
+            extWfSetNodeResult(s.id, '⚠ 步骤执行失败：' + errMsg);
+            extWfSetNodeStatus(s.id, '❌ 失败');
+            extWfSetBuilderStatus(s.id, '❌ 失败');
+          }
+        }));
+      }
+    }
+    return { finalText: ctx[finalStep.output] || '', finalStep: finalStep };
   }
 
   // ── 原生 Hermes 技能（/proxy/dashboard/api/skills）──
@@ -4023,10 +4402,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var personas = extAllPersonas();
     // 最多展示 6 个，内置优先，再按自定义添加顺序
     var keys = Object.keys(personas).slice(0, 8);
-    bar.innerHTML = keys.map(function(k){
+    var html = keys.map(function(k){
       var p = personas[k];
       return '<span class="ext-persona-bar'+(k===cur?' active':'')+'" title="'+escapeHtml(p.label)+'" onclick="extQuickPersona(\''+k+'\')">'+escapeHtml(p.emoji || '🤖')+' '+escapeHtml(p.label)+'</span>';
     }).join('');
+    // 工作流快捷入口（存在步骤时显示）
+    var _wf = settingsState.config.extensions && settingsState.config.extensions.workflow;
+    if (_wf && _wf.steps && _wf.steps.length) {
+      html += '<span class="ext-persona-bar'+(cur==='__workflow__'?' active':'')+'" title="执行专家团工作流" onclick="extQuickPersona(\'__workflow__\')">🔀 工作流</span>';
+    }
+    bar.innerHTML = html;
   }
   function extQuickPersona(k){
     if(window.chatState) chatState.persona = k;
@@ -5411,6 +5796,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.extToggleNativeSkill = extToggleNativeSkill;
   window.extLoadNativeSkills = extLoadNativeSkills;
   window.extLoadNativeToolsets = extLoadNativeToolsets;
+  // 专家团工作流（DAG 编排）函数暴露到全局，供内联 onclick 调用
+  window.extWfField = extWfField;
+  window.extAddWorkflowStep = extAddWorkflowStep;
+  window.extRemoveWorkflowStep = extRemoveWorkflowStep;
+  window.extWfStepField = extWfStepField;
+  window.extWfToggleDep = extWfToggleDep;
+  window.extWfExpertSearch = extWfExpertSearch;
+  window.extWfAssignExpert = extWfAssignExpert;
+  window.extUseWorkflow = extUseWorkflow;
+  window.extClearWorkflow = extClearWorkflow;
+  window.extRenderWorkflowBuilder = extRenderWorkflowBuilder;
+  window.extRunWorkflow = extRunWorkflow;
+  window.extWorkflowStepCall = extWorkflowStepCall;
 })();
 </script>
 </body>
