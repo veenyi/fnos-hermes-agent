@@ -4,7 +4,7 @@
 [![Platform: fnOS](https://img.shields.io/badge/Platform-fnOS%20-green.svg)]()
 [![Arch: x86_64 | arm64](https://img.shields.io/badge/Arch-x86__64%20%7C%20arm64-orange.svg)]()
 
-> 最新版本：**v0.20.24**（适用于 fnOS 的 AI 助手微应用）
+> 最新版本：**v0.20.25**（适用于 fnOS 的 AI 助手微应用）
 
 fnOS Hermes Agent 是专为飞牛 NAS（fnOS）适配的 AI 助手应用，通过原生 `fpk` 包在应用中心部署。基于 Node.js Monitor 服务进行进程管理，提供 Web 控制面板用于配置、对话交互、多智能体编排与通讯平台管理。
 
@@ -132,7 +132,8 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 | v0.20.21 | 通讯平台字段同步 hermes-studio 0.6.33 |
 | v0.20.22 | 应用更新卡片展示 GitHub Release body；修复 IIFE 函数未挂 `window` 导致专家团胶囊失效 |
 | v0.20.23 | 工作流以对话驱动：未预设的输入变量（idea 等）自动采用会话窗口内容 |
-| **v0.20.24** | **顶层文件随版本同步刷新：README / LICENSE / .gitignore 更新** |
+| v0.20.24 | 顶层文件随版本同步刷新：README / LICENSE / .gitignore 更新 |
+| **v0.20.25** | **打包工作流补充 README.md 与 .gitignore；修复 tar 路径前缀** |
 
 ## 截图
 

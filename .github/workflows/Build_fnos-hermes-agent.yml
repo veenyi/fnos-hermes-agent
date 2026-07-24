@@ -102,7 +102,7 @@ jobs:
             TMP_DIR=$(mktemp -d)
             tar -xzf "$SOURCE_FPK" -C "$TMP_DIR"
             cp README.md .gitignore "$TMP_DIR/"
-            tar -czf "$SOURCE_FPK" -C "$TMP_DIR" .
+            tar -czf "$SOURCE_FPK" --transform='s,^\./,,' -C "$TMP_DIR" .
             rm -rf "$TMP_DIR"
             
             mv "$SOURCE_FPK" "$DIST_DIR/$TARGET_NAME"
