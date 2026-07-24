@@ -4061,15 +4061,16 @@ async function handleFetch(req) {
           const yamlPath2 = `${DATA_DIR}/config.yaml`;
           if (existsSync(yamlPath2)) {
             let y2 = readFileSync(yamlPath2, "utf8");
-            // toolsets：基础 hermes-cli 必留；保留原生/其他来源已有的工具集，避免覆盖
-            // （用户在 /proxy/dashboard 开启的 25 个工具集应被保留，而非被这 11 项列表覆盖）
+            // toolsets：基础 hermes-cli 必留；保留 config.yaml 中已有的全部工具集
+            // （含用户在 /proxy/dashboard 开启的 25 个），仅依据 fnos 镜像「补充」显式开启项，
+            // 绝不因镜像未列出而禁用原生已开启的工具集。
             const BASE_TS = ["hermes-cli"];
             const TOGGLE_TS = ["code_execution","terminal","file","web","browser","vision","memory","todo","skills","clarify","delegation"];
-            const knownTs = new Set([...BASE_TS, ...TOGGLE_TS]);
-            let mergedTs = _extractYamlList(y2, "toolsets").filter(t => !knownTs.has(t));
+            let mergedTs = _extractYamlList(y2, "toolsets");
+            const seen = new Set(mergedTs);
+            BASE_TS.forEach(b => { if (!seen.has(b)) { mergedTs.unshift(b); seen.add(b); } });
             const tsMap = body.extensions.toolsets || {};
-            TOGGLE_TS.forEach(n => { if (tsMap[n] && mergedTs.indexOf(n) === -1) mergedTs.push(n); });
-            BASE_TS.forEach(b => { if (mergedTs.indexOf(b) === -1) mergedTs.unshift(b); });
+            TOGGLE_TS.forEach(n => { if (tsMap[n] && !seen.has(n)) { mergedTs.push(n); seen.add(n); } });
             y2 = _setYamlListBlock(y2, "toolsets", mergedTs);
             // mcp_servers
             const mcpObj = {};

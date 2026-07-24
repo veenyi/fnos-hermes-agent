@@ -3358,6 +3358,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (nts && nts[id]){
       var t = nts[id];
       var newOn = !t.enabled;
+      // 同步 fnos 镜像，保证 /api/config 合并时不会误禁用原生已开启的工具集
+      if (settingsState.config.extensions) settingsState.config.extensions.toolsets[id] = newOn;
       fetch(apiUrl('/proxy/dashboard/api/tools/toolsets/'+encodeURIComponent(id)), {
         method:'PUT', headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ enabled: newOn })
