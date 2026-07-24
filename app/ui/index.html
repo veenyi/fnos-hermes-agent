@@ -1232,15 +1232,18 @@
                 <div id="appUpdateLatestVer" style="font-size:18px;font-weight:700;letter-spacing:-0.3px;color:var(--text3)">未检查</div>
               </div>
             </div>
-            <div class="ext-hint" style="margin-top:10px">应用包版本对应 GitHub Release 标签 <code>fnos-hermes-agent_vX.Y.Z</code>，与底层 Hermes Agent PyPI 版本不同。检测到新版本时，点击下方按钮前往下载最新安装包（.fpk），在 fnOS 应用中心更新即可。</div>
             <div style="display:flex;gap:8px;margin-top:16px">
               <button class="btn" id="appCheckUpdateBtn" onclick="checkAppUpdate()" style="font-size:13px">检查更新</button>
               <a class="btn btn-go" id="appDownloadBtn" href="#" target="_blank" rel="noopener noreferrer" style="font-size:13px;display:none">前往下载最新版</a>
             </div>
             <div id="appUpdateNotes" style="display:none;margin-top:14px">
-              <div style="font-size:12px;color:var(--text3);margin-bottom:6px">更新说明</div>
-              <pre style="background:var(--bg2);border-radius:6px;padding:10px 12px;font-size:11px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text2);line-height:1.5;font-family:'SF Mono','Cascadia Code','Fira Code',Consolas,monospace" id="appUpdateNotesBody"></pre>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+                <span style="font-size:12px;color:var(--text3)" id="appUpdateNotesTitle">更新说明</span>
+                <span style="font-size:11px;color:var(--text3)">来源：GitHub Release</span>
+              </div>
+              <pre style="background:var(--bg2);border-radius:6px;padding:10px 12px;font-size:11px;max-height:220px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text2);line-height:1.5;font-family:'SF Mono','Cascadia Code','Fira Code',Consolas,monospace" id="appUpdateNotesBody"></pre>
             </div>
+            <div class="ext-hint" style="margin-top:10px;font-size:11px">应用包版本对应 GitHub Release 标签 <code>fnos-hermes-agent_vX.Y.Z</code>，与底层 Hermes Agent PyPI 版本不同。检测到新版本时，点击下方按钮前往下载最新安装包（.fpk），在 fnOS 应用中心更新即可。</div>
           </div>
         </div>
 
@@ -4666,6 +4669,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var _team = ext.team || [];
     if (_team.length) {
       extQuickPersona('__team__');
+      settingsSaveConfig().catch(function(e){ console.error('save persona failed', e); });
       return;
     }
     // 未配置时自动组建默认专家团，保证胶囊始终可激活（长期方案：真多智能体协作入口）
@@ -4686,7 +4690,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       ext.team = ids;
       ext.team_name = '默认专家团';
       extQuickPersona('__team__');
-      if (window.settingsSaveConfig) settingsSaveConfig();
+      settingsSaveConfig().catch(function(e){ console.error('save default team failed', e); });
       if (window.settingsRenderExtensions) settingsRenderExtensions();
       renderPersonaBar();
       if (window.extRenderTeamCurrent) extRenderTeamCurrent();
@@ -5573,10 +5577,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           dlBtn.href = data.download_url || data.html_url || '#';
           dlBtn.style.display = '';
         }
-        var notesBody = document.getElementById('appUpdateNotesBody');
-        if (notesBody) notesBody.textContent = data.body || '（无更新说明）';
-        if (notesBox) notesBox.style.display = '';
       }
+      var notesBody = document.getElementById('appUpdateNotesBody');
+      var notesTitle = document.getElementById('appUpdateNotesTitle');
+      if (notesBody) notesBody.textContent = data.body || '（无更新说明）';
+      if (notesTitle) notesTitle.textContent = data.updateAvailable ? 'v' + data.latest + ' 更新说明' : '当前版本 v' + data.current + ' 更新说明';
+      if (notesBox) notesBox.style.display = '';
       if (btn) { btn.disabled = false; btn.textContent = '检查更新'; }
     }).catch(function(err){
       if (latEl) { latEl.textContent = '检查失败'; latEl.style.color = 'var(--red)'; }
@@ -6139,6 +6145,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.extRemoveSkill = extRemoveSkill;
   window.extInstallSkill = extInstallSkill;
   window.extQuickPersona = extQuickPersona;
+  window.extQuickTeam = extQuickTeam;
   window.extAddPersona = extAddPersona;
   window.extEditPersona = extEditPersona;
   window.extDeletePersona = extDeletePersona;
@@ -6172,6 +6179,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.extWfPresetInput = extWfPresetInput;
   window.extRenderWorkflowPage = extRenderWorkflowPage;
   window.checkAppUpdate = checkAppUpdate;
+  window.settingsSaveConfig = settingsSaveConfig;
+  window.refreshSysInfo = refreshSysInfo;
 })();
 </script>
 </body>
