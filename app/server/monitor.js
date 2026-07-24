@@ -215,6 +215,11 @@ const HERMES_ENV     = `${DATA_DIR}/.env`;
 // 平台频道定义（与 hermes-studio 的 Platform Channels 对齐）
 // 凭证写 ~/.hermes/.env（env），行为写 config.yaml platforms.<id>（path，支持 extra.x 嵌套）
 // fields: 凭证输入项；toggles: 行为开关；qrLogin: 微信扫码登录
+// 平台频道定义（与 hermes-studio 的 Platform Channels 对齐；2026-07-24 同步 hermes-studio 0.6.30 通讯字段）
+// 凭证写 ~/.hermes/.env（env），行为写 config.yaml platforms.<id>.<path>（支持 extra.x 嵌套）
+// fields: 凭证输入项（env→.env + platforms.<id>.<path>）
+// toggles: 布尔行为开关（platforms.<id>.<path> = true/false）
+// behavior: 非凭证字符串/列表行为项（platforms.<id>.<path>；list:true 表示逗号分隔多值）
 const CHANNEL_DEFS = {
   telegram: {
     name: "Telegram", icon: "✈️", qrLogin: true,
@@ -222,7 +227,11 @@ const CHANNEL_DEFS = {
       { env: "TELEGRAM_BOT_TOKEN", path: "token", label: "Bot Token", placeholder: "（扫码创建机器人后自动填入，也可手动输入 BotFather Token）", secret: true },
       { env: "TELEGRAM_PROXY", path: "proxy", label: "代理 (可选)", placeholder: "socks5://127.0.0.1:7890" },
     ],
-    toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" }, { path: "reactions", label: "启用消息反应" } ],
+    behavior: [
+      { path: "free_response_chats", label: "自由回复的会话 (多个用逗号分隔)", placeholder: "chat_id1,chat_id2" },
+      { path: "mention_patterns", label: "提及匹配规则 (正则，多个用逗号分隔)", placeholder: "@hermes,hermes" },
+    ],
     note: "Telegram 支持「扫码创建机器人」自动获取 Token（调用 Nous 托管服务），也支持手动填入 BotFather 创建的 Token。",
   },
   discord: {
@@ -232,16 +241,29 @@ const CHANNEL_DEFS = {
       { env: "DISCORD_PROXY", path: "proxy", label: "代理 (可选)", placeholder: "socks5://127.0.0.1:7890" },
     ],
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" }, { path: "auto_thread", label: "自动线程" }, { path: "reactions", label: "启用反应" } ],
+    behavior: [
+      { path: "free_response_channels", label: "自由回复的频道 (多个用逗号分隔)", placeholder: "channel_id1,channel_id2" },
+      { path: "allowed_channels", label: "仅允许的频道 (多个用逗号分隔，留空=全部)", placeholder: "channel_id1,channel_id2" },
+      { path: "ignored_channels", label: "忽略的频道 (多个用逗号分隔)", placeholder: "channel_id1,channel_id2" },
+      { path: "no_thread_channels", label: "不创建线程的频道 (多个用逗号分隔)", placeholder: "channel_id1,channel_id2" },
+    ],
   },
   slack: {
     name: "Slack", icon: "💼",
     fields: [ { env: "SLACK_BOT_TOKEN", path: "token", label: "Bot Token", placeholder: "xoxb-...", secret: true } ],
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" }, { path: "allow_bots", label: "允许机器人消息" } ],
+    behavior: [
+      { path: "free_response_channels", label: "自由回复的频道 (多个用逗号分隔)", placeholder: "channel_id1,channel_id2" },
+    ],
   },
   whatsapp: {
     name: "WhatsApp", icon: "💬", qrLogin: true,
     fields: [],
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+    behavior: [
+      { path: "free_response_chats", label: "自由回复的会话 (多个用逗号分隔)", placeholder: "chat_id1,chat_id2" },
+      { path: "mention_patterns", label: "提及匹配规则 (正则，多个用逗号分隔)", placeholder: "@hermes,hermes" },
+    ],
     note: "WhatsApp 通过本地 Baileys bridge 扫码配对。选择「独立号码」或「自用号码」模式，用 WhatsApp 扫描弹出的二维码即可完成关联。",
   },
   matrix: {
@@ -252,7 +274,11 @@ const CHANNEL_DEFS = {
       { env: "MATRIX_HOMESERVER", path: "extra.homeserver", label: "Homeserver", placeholder: "https://matrix.org" },
       { env: "MATRIX_USER_ID", path: "extra.user_id", label: "User ID (可选)", placeholder: "@user:matrix.org" },
     ],
-    toggles: [ { path: "auto_thread", label: "自动线程" }, { path: "dm_mention_thread", label: "私信提及线程" } ],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" }, { path: "auto_thread", label: "自动线程" }, { path: "dm_mention_thread", label: "私信提及线程" } ],
+    behavior: [
+      { path: "extra.password", label: "密码 (Password，可选)", placeholder: "Matrix 密码", type: "password" },
+      { path: "free_response_rooms", label: "自由回复的房间 (多个用逗号分隔)", placeholder: "room_id1,room_id2" },
+    ],
   },
   feishu: {
     name: "飞书 (Lark)", icon: "🪽",
@@ -263,6 +289,9 @@ const CHANNEL_DEFS = {
       { env: "FEISHU_VERIFICATION_TOKEN", path: "extra.verification_token", label: "Verification Token (可选)", placeholder: "..." },
     ],
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+    behavior: [
+      { path: "free_response_chats", label: "自由回复的会话 (多个用逗号分隔)", placeholder: "chat_id1,chat_id2" },
+    ],
   },
   dingtalk: {
     name: "钉钉 (DingTalk)", icon: "🔔",
@@ -271,7 +300,12 @@ const CHANNEL_DEFS = {
       { env: "DINGTALK_CLIENT_SECRET", path: "extra.client_secret", label: "Client Secret (AppSecret)", placeholder: "...", secret: true },
       { env: "DINGTALK_APP_KEY", path: "extra.app_key", label: "App Key (可选)", placeholder: "..." },
     ],
-    toggles: [],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" }, { path: "allow_all_users", label: "允许所有用户" } ],
+    behavior: [
+      { path: "extra.card_template_id", label: "AI 卡片模板 ID (可选)", placeholder: "Card Template ID" },
+      { path: "allowed_users", label: "允许的用户 (多个用逗号分隔，留空=仅创建者)", placeholder: "user_id1,user_id2" },
+      { path: "free_response_chats", label: "自由回复的会话 (多个用逗号分隔)", placeholder: "chat_id1,chat_id2" },
+    ],
   },
   qqbot: {
     name: "QQ 机器人 (QQBot)", icon: "🐧",
@@ -279,7 +313,10 @@ const CHANNEL_DEFS = {
       { env: "QQ_APP_ID", path: "extra.app_id", label: "App ID", placeholder: "..." },
       { env: "QQ_CLIENT_SECRET", path: "extra.client_secret", label: "Client Secret", placeholder: "...", secret: true },
     ],
-    toggles: [],
+    toggles: [ { path: "allow_all_users", label: "允许所有用户" }, { path: "qq_markdown", label: "使用 Markdown 消息" } ],
+    behavior: [
+      { path: "allowed_users", label: "允许的用户 (多个用逗号分隔，留空=仅创建者)", placeholder: "openid1,openid2" },
+    ],
   },
   weixin: {
     name: "微信 (WeChat)", icon: "💬",
@@ -289,7 +326,7 @@ const CHANNEL_DEFS = {
       { env: "WEIXIN_ACCOUNT_ID", path: "extra.account_id", label: "Account ID", placeholder: "（扫码登录后自动填入）" },
       { env: "WEIXIN_BASE_URL", path: "extra.base_url", label: "Base URL (可选)", placeholder: "（扫码登录后自动填入）" },
     ],
-    toggles: [],
+    toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
     note: "微信个人号通过腾讯 iLink 扫码登录，无需自备 App。点击下方「微信扫码登录」完成关联。",
   },
   wecom: {

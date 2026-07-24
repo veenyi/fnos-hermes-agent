@@ -5782,6 +5782,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<span class="ext-toggle-switch"></span>' +
         '<span class="ext-toggle-label">' + t.label + '</span></label>';
     });
+    (def.behavior||[]).forEach(function(b){
+      var bid = 'chb_' + b.path.replace(/\./g,'_');
+      var cur = (c.config && c.config[b.path] != null) ? String(c.config[b.path]) : '';
+      var type = b.type === 'password' ? 'password' : 'text';
+      var hint = (b.list ? ' <span style="font-size:11px;color:var(--text3)">（多个用逗号分隔）</span>' : '');
+      html += '<div class="form-group"><label>' + b.label + hint + '</label>' +
+        '<input id="' + bid + '" type="' + type + '" placeholder="' + escAttr(b.placeholder||'') + '" value="' + escAttr(cur) + '"></div>';
+    });
     if(def.note && (!def.fields || !def.fields.length) && (!def.toggles || !def.toggles.length)){
       html += '<div class="ext-hint">' + def.note + '</div>';
     }
@@ -5817,7 +5825,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var el = document.getElementById('cht_' + t.path);
       toggles[t.path] = !!(el && el.classList.contains('on'));
     });
-    api('/api/channels/' + id, 'POST', { credentials: credentials, toggles: toggles }).then(function(res){
+    var config = {};
+    (def.behavior||[]).forEach(function(b){
+      var bid = 'chb_' + b.path.replace(/\./g,'_');
+      var el = document.getElementById(bid);
+      var v = el ? el.value : '';
+      if (v && v.trim() !== '') config[b.path] = b.list ? v.split(',').map(function(s){return s.trim();}).filter(Boolean) : v.trim();
+    });
+    api('/api/channels/' + id, 'POST', { credentials: credentials, toggles: toggles, config: config }).then(function(res){
       if(!res || !res.ok) throw new Error((res&&res.error)||'save failed');
       return apiGet('/api/channels');
     }).then(function(res){
