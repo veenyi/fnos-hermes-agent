@@ -723,6 +723,7 @@
     .ext-select{width:100%;max-width:320px;padding:9px 10px;border-radius:8px;border:1px solid var(--border,#2a2f3a);background:var(--bg2,#1b1f27);color:var(--text,#e8eaed);font-size:13px}
     .ext-persona-bar{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border,#2a2f3a);border-radius:999px;font-size:12px;color:var(--text3,#8a909c);background:var(--bg2,#1b1f27);cursor:pointer}
     .ext-persona-bar.active{color:var(--accent,#4f8cff);border-color:var(--accent,#4f8cff)}
+    .ext-persona-bar-ghost{opacity:.6;border-style:dashed}
     .persona-bar-wrap{display:flex;gap:6px;flex-wrap:wrap;padding:0 2px 8px}
 
     /* ── 扩展能力：页签 / 卡片网格 / 内嵌浏览（美化）── */
@@ -761,6 +762,14 @@
     .ext-card-meta{font-size:11px;color:var(--text3,#8a909c)}
     .ext-badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--accent,#4f8cff) 18%,transparent);color:var(--accent,#4f8cff)}
     .ext-badge.muted{background:var(--border,#2a2f3a);color:var(--text3,#8a909c)}
+
+    /* ── 统一状态文字 / 二维码 / 通用工具类（消除散落的硬编码颜色） ── */
+    .t-ok{color:var(--green)}
+    .t-err{color:var(--red)}
+    .t-warn{color:var(--orange)}
+    .t-muted{color:var(--text3)}
+    .qr-img{width:240px;height:240px;background:#fff;border-radius:var(--radius);display:block}
+    .qr-img.sm{width:220px;height:220px}
     .ext-embed{max-height:420px;overflow:auto;border:1px solid var(--border,#2a2f3a);border-radius:10px;background:#fff;margin-top:4px}
     .ext-embed iframe{width:100%;height:420px;border:0;display:block}
     .ext-embed-doc{font-size:13px;color:#222;line-height:1.6;padding:14px}
@@ -1120,6 +1129,22 @@
               <div class="ext-subsection" style="border-top:1px dashed var(--border);margin-top:14px;padding-top:12px">
                 <div class="ext-section-title">🔀 专家团工作流（DAG 编排）</div>
                 <div class="ext-hint">把专家团升级为「工作流」：每个步骤指派一名专家，前一步的输出通过 <code>{{变量}}</code> 流入下一步。点「设为当前工作流并使用」后，在对话中发送消息即按 DAG 顺序串联执行（同一拓扑层并行，跨层顺序）。</div>
+                <div class="ext-subsection" style="background:var(--bg2);border-radius:10px;padding:12px;margin:12px 0">
+                  <div class="ext-section-title" style="font-size:14px">📚 工作流预设案例库（Agency Orchestrator）</div>
+                  <div class="ext-hint">内置 60+ 官方模板：一人公司、产品评审、内容创作、代码评审、投研、法律、学术等。选择后自动填充到上方编辑器。</div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0">
+                    <select id="extWfPresetCat" class="ext-input" style="max-width:140px" onchange="extRenderWorkflowPresets()">
+                      <option value="">全部分类</option>
+                    </select>
+                    <select id="extWfPresetSelect" class="ext-input" style="max-width:280px">
+                      <option value="">选择预设模板…</option>
+                    </select>
+                    <button class="btn btn-sm primary" onclick="extLoadSelectedWorkflowPreset()">加载预设</button>
+                    <span class="ext-hint" id="extWfPresetHint" style="margin:0"></span>
+                  </div>
+                  <div id="extWfPresetGallery" class="ext-grid" style="margin-top:8px"></div>
+                  <div id="extWfPresetInputs" style="margin-top:10px"></div>
+                </div>
                 <div id="extWorkflowBuilder"></div>
               </div>
             </div>
@@ -1174,12 +1199,46 @@
             <!-- 按钮 -->
             <div style="display:flex;gap:8px;margin-top:16px">
               <button class="btn" id="checkUpdateBtn" onclick="checkHermesUpdate()" style="font-size:13px">检查更新</button>
-              <button class="btn" id="doUpdateBtn" onclick="confirmHermesUpdate()" style="display:none;font-size:13px;background:var(--accent);color:#fff;border:none">更新</button>
+              <button class="btn btn-go" id="doUpdateBtn" onclick="confirmHermesUpdate()" style="display:none;font-size:13px">更新</button>
             </div>
             <!-- 更新进度 -->
             <div id="updateProgress" style="display:none;margin-top:16px">
               <div style="font-size:12px;color:var(--text3);margin-bottom:6px" id="updateStatusText">更新中…</div>
               <pre style="background:var(--bg2);border-radius:6px;padding:10px 12px;font-size:11px;max-height:240px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text2);line-height:1.5;font-family:'SF Mono','Cascadia Code','Fira Code',Consolas,monospace" id="updateLogOutput"></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- 应用更新 -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-head">
+            <span class="card-title">应用更新</span>
+            <span class="ext-badge muted" id="appUpdateBadge" style="display:none">有更新</span>
+          </div>
+          <div class="card-body" id="appUpdateCard">
+            <div style="display:flex;align-items:stretch;gap:12px;flex-wrap:wrap">
+              <div style="flex:1;min-width:140px;padding:12px 16px;border-radius:8px;background:var(--bg2);border:1px solid var(--border-subtle)">
+                <div style="font-size:11px;color:var(--text3);margin-bottom:4px;letter-spacing:0.5px">当前应用版本</div>
+                <div id="appUpdateCurrentVer" style="font-size:18px;font-weight:700;letter-spacing:-0.3px">--</div>
+              </div>
+              <div id="appUpdateLatestCard" style="flex:1;min-width:140px;padding:12px 16px;border-radius:8px;background:var(--bg2);border:1px solid var(--border-subtle)">
+                <div style="font-size:11px;color:var(--text3);margin-bottom:4px;letter-spacing:0.5px">最新应用版本</div>
+                <div id="appUpdateLatestVer" style="font-size:18px;font-weight:700;letter-spacing:-0.3px;color:var(--text3)">未检查</div>
+              </div>
+            </div>
+            <div class="ext-hint" style="margin-top:10px">应用包版本对应 GitHub Release 标签 <code>fnos-hermes-agent_vX.Y.Z</code>，与底层 Hermes Agent PyPI 版本不同。</div>
+            <div id="appUpdatePatBox" style="display:none;margin-top:12px">
+              <div class="ext-hint" style="margin-bottom:6px">首次使用「编译并发布」需要 GitHub Personal Access Token（<code>repo</code> + <code>workflow</code> 权限）。Token 仅保存在本机 <code>/var/apps/hermes-agent/var/github_pat</code>，不会上传。</div>
+              <input type="password" id="appUpdatePatInput" class="input" placeholder="ghp_xxxxxxxx" style="max-width:420px">
+              <button class="btn btn-sm" onclick="appUpdateSavePat()" style="margin-left:8px">保存 Token</button>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button class="btn" id="appCheckUpdateBtn" onclick="checkAppUpdate()" style="font-size:13px">检查更新</button>
+              <button class="btn btn-go" id="appDispatchBtn" onclick="appUpdateDispatch()" style="font-size:13px;display:none">编译并发布</button>
+            </div>
+            <div id="appUpdateProgress" style="display:none;margin-top:16px">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:6px" id="appUpdateStatusText">准备中…</div>
+              <pre style="background:var(--bg2);border-radius:6px;padding:10px 12px;font-size:11px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text2);line-height:1.5;font-family:'SF Mono','Cascadia Code','Fira Code',Consolas,monospace" id="appUpdateLogOutput"></pre>
             </div>
           </div>
         </div>
@@ -1349,6 +1408,7 @@
 <div class="img-zoom-backdrop" id="imgZoomBackdrop"><img id="zoomImg" src="" alt=""></div>
 
 <!-- QR code generator (MIT, qrcode-generator@1.4.4) for Telegram/WhatsApp/WeChat pairing -->
+<script src="js/ao_workflow_presets.js"></script>
 <script>
 /**
  * Minified by jsDelivr using Terser v5.37.0.
@@ -1473,9 +1533,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var curEl = document.getElementById('updateCurrentVer');
       if (curEl && (curEl.textContent === '--' || curEl.textContent === '')) {
         apiGet('/api/status').then(function(s) {
-          if (s.gateway && s.gateway.version) curEl.textContent = s.gateway.version;
+          if (s.gateway && s.gateway.version) {
+            var hv = s.gateway.version;
+            if (s.hermes_version_date) { window.__hermesDate = s.hermes_version_date; hv += ' (' + s.hermes_version_date + ')'; }
+            curEl.textContent = hv;
+          }
+          var appCurEl = document.getElementById('appUpdateCurrentVer');
+          if (appCurEl && s.app_version) appCurEl.textContent = s.app_version;
         }).catch(function(){});
       }
+      // 自动检查应用更新
+      setTimeout(checkAppUpdate, 300);
     }
     if(view === 'overview'){
       logStreaming = false;
@@ -1589,7 +1657,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return;
         }
         var html = results.map(function(r){
-          return '• '+escapeHtml(r.label)+' → '+(r.ok?('HTTP '+r.status):('失败 '+(r.error||'')))+'<br>&nbsp;&nbsp;<span style="color:#9aa">'+escapeHtml(r.url)+'</span>';
+          return '• '+escapeHtml(r.label)+' → '+(r.ok?('HTTP '+r.status):('失败 '+(r.error||'')))+'<br>&nbsp;&nbsp;<span class="t-muted">'+escapeHtml(r.url)+'</span>';
         }).join('<br>');
         showFatal('所有 API 路径均不可达', html + '<br><br>说明 fnOS 未把 /api/* 请求转发到本应用，或 monitor 未正常监听。socket 正常时通常是路径前缀问题。');
       });
@@ -1607,7 +1675,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       setSvc(cardDb, pidDb, db, dbPid);
 
       var hermesVersionEl = document.getElementById('hermesVersion');
-      if(hermesVersionEl) hermesVersionEl.textContent = (s.gateway && s.gateway.version) || '--';
+      if(hermesVersionEl){
+        var hv = (s.gateway && s.gateway.version) || '--';
+        if(s.hermes_version_date && hv && hv !== '--') hv += ' (' + s.hermes_version_date + ')';
+        hermesVersionEl.textContent = hv;
+      }
+      var appVersionEl = document.getElementById('appVersion');
+      if(appVersionEl) appVersionEl.textContent = s.app_version || '--';
 
       // Gateway 状态文本
       var gwStatusEl = document.getElementById('gwStatus');
@@ -1861,7 +1935,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         html += '<span class="svc-d-label" style="margin-left:8px">内存</span><span class="svc-d-val" id="siMem">'+mem+'</span>';
         html += '</div>';
         html += '<div class="svc-d-item" style="margin-top:2px">';
-        html += '<span class="svc-d-label">版本</span><span class="svc-d-val" id="hermesVersion">--</span>';
+        html += '<span class="svc-d-label" title="hermes-agent PyPI 包版本（固定，区别于下方应用包版本）">Hermes 版本</span><span class="svc-d-val" id="hermesVersion">--</span>';
+        html += '<span class="svc-d-label" style="margin-left:10px" title="本应用安装包版本（manifest）">应用版本</span><span class="svc-d-val" id="appVersion">--</span>';
         html += '</div>';
         html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px" id="siLogBtns">';
         logs.forEach(function(f){
@@ -1927,7 +2002,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       box.innerHTML = html;
       firstLog = false;
     }).catch(function(){
-      document.getElementById('logBox').innerHTML = '<div style="color:#f85149;font-size:12px;padding:8px">读取失败</div>';
+      document.getElementById('logBox').innerHTML = '<div class="t-err" style="font-size:12px;padding:8px">读取失败</div>';
     });
   }
 
@@ -2232,7 +2307,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
             qrBox.appendChild(canvas);
           } catch(err){
-            qrBox.innerHTML = '<span style="color:#c00;font-size:12px">二维码生成失败: ' + (err && err.message || err) + '</span>';
+            qrBox.innerHTML = '<span class="t-err" style="font-size:12px">二维码生成失败: ' + (err && err.message || err) + '</span>';
           }
         }
       });
@@ -4135,6 +4210,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if(!wf.steps || !wf.steps.length){ var h=document.getElementById('extWfHint'); if(h) h.textContent='请先添加至少一个步骤'; return; }
     var bad = wf.steps.filter(function(s){ return !s.expert || !s.output; });
     if(bad.length){ var h2=document.getElementById('extWfHint'); if(h2) h2.textContent='请为每个步骤选择专家并填写输出变量名'; return; }
+    var missingInputs = (wf.inputs||[]).filter(function(i){ return i.required && !(wf.inputValues && String(wf.inputValues[i.name]||'').trim()); });
+    if(missingInputs.length){ var h2b=document.getElementById('extWfHint'); if(h2b) h2b.textContent='请先填写必填输入变量：'+missingInputs.map(function(i){return i.name;}).join('、'); return; }
     if(window.chatState) chatState.persona = '__workflow__';
     try { localStorage.setItem('hermes_persona', '__workflow__'); } catch(e){}
     settingsState.config.extensions.persona = '__workflow__';
@@ -4149,6 +4226,95 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if(ext.persona === '__workflow__'){ ext.persona = 'default'; if(window.chatState) chatState.persona = 'default'; try{ localStorage.setItem('hermes_persona','default'); }catch(e){} }
     extWfSave();
     settingsRenderExtensions(); renderPersonaBar(); extRenderWorkflowBuilder();
+  }
+
+  // ── 工作流预设案例库（Agency Orchestrator） ──
+  function extWorkflowPresetsList(){ return (window.AO_WORKFLOW_PRESETS || []); }
+  function extRenderWorkflowPresets(){
+    var catSel = document.getElementById('extWfPresetCat');
+    var sel = document.getElementById('extWfPresetSelect');
+    var gallery = document.getElementById('extWfPresetGallery');
+    if(!catSel || !sel) return;
+    var list = extWorkflowPresetsList();
+    if(!list.length){
+      sel.innerHTML = '<option>未加载预设</option>'; gallery.innerHTML = '';
+      if(catSel) catSel.innerHTML = '<option value="">未加载</option>';
+      return;
+    }
+    // categories
+    var cats = {};
+    list.forEach(function(p){ cats[p.category || '通用'] = true; });
+    var curCat = catSel.value || '';
+    var catOptions = '<option value="">全部分类</option>';
+    Object.keys(cats).sort().forEach(function(c){ catOptions += '<option value="'+escapeHtml(c)+'"'+(c===curCat?' selected':'')+'>'+escapeHtml(c)+'</option>'; });
+    catSel.innerHTML = catOptions;
+    // select options
+    var options = '<option value="">选择预设模板…</option>';
+    list.forEach(function(p){
+      if(curCat && p.category !== curCat) return;
+      options += '<option value="'+escapeHtml(p.key)+'">'+escapeHtml((p.category?('['+p.category+'] '):'')+p.name)+'</option>';
+    });
+    sel.innerHTML = options;
+    // featured gallery (top 12 in current category)
+    var shown = list.filter(function(p){ return !curCat || p.category === curCat; }).slice(0, 12);
+    if(gallery){
+      gallery.innerHTML = shown.map(function(p){
+        return '<div class="ext-card" style="padding:10px">'+
+          '<div class="ext-card-title" style="font-size:13px">'+escapeHtml(p.name)+'</div>'+
+          '<div class="ext-card-desc" style="font-size:12px;margin:4px 0">'+escapeHtml(p.description||'')+'</div>'+
+          '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
+            '<span class="ext-badge muted">'+escapeHtml(p.category||'通用')+'</span>'+
+            '<span class="ext-badge muted">'+p.steps.length+' 步</span>'+
+            '<button class="btn btn-sm primary" style="margin-left:auto" onclick="extLoadWorkflowPreset(\''+escapeHtml(p.key)+'\')">加载</button>'+
+          '</div></div>';
+      }).join('');
+    }
+  }
+  function extLoadSelectedWorkflowPreset(){
+    var sel = document.getElementById('extWfPresetSelect');
+    if(!sel || !sel.value){ var h=document.getElementById('extWfPresetHint'); if(h) h.textContent='请先选择一个预设'; return; }
+    extLoadWorkflowPreset(sel.value);
+  }
+  function extLoadWorkflowPreset(key){
+    var list = extWorkflowPresetsList();
+    var preset = list.find(function(p){ return p.key === key; });
+    if(!preset){ var h=document.getElementById('extWfPresetHint'); if(h) h.textContent='预设不存在'; return; }
+    var wf = {
+      name: preset.name,
+      concurrency: preset.concurrency || 2,
+      inputs: (preset.inputs || []).slice(),
+      inputValues: {},
+      steps: (preset.steps || []).map(function(s){
+        return { id: s.id, expert: s.expert, task: s.task, output: s.output, depends_on: (s.depends_on || []).slice() };
+      })
+    };
+    settingsState.config.extensions.workflow = wf;
+    extWfSave();
+    extRenderWorkflowBuilder();
+    var h = document.getElementById('extWfPresetHint');
+    if(h) h.textContent = '已加载「'+preset.name+'」';
+  }
+  function extRenderPresetInputs(){
+    var host = document.getElementById('extWfPresetInputs');
+    if(!host) return;
+    var wf = settingsState.config.extensions.workflow || {};
+    var inputs = wf.inputs || [];
+    if(!inputs.length){ host.innerHTML = ''; return; }
+    var html = '<div class="ext-section-title" style="font-size:13px;margin-bottom:8px">填写输入变量</div><div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">';
+    inputs.forEach(function(inp){
+      var val = escapeHtml((wf.inputValues && wf.inputValues[inp.name]) || '');
+      html += '<div class="ext-wf-field"><label>'+escapeHtml(inp.name)+(inp.required?' <span class="t-err">*</span>':'')+'</label>'+
+        '<input class="ext-input" type="text" value="'+val+'" placeholder="'+escapeHtml(inp.description||'')+'" oninput="extWfPresetInput(\''+escapeHtml(inp.name)+'\',this.value)"></div>';
+    });
+    html += '</div>';
+    host.innerHTML = html;
+  }
+  function extWfPresetInput(name, value){
+    var wf = settingsState.config.extensions.workflow;
+    if(!wf) return;
+    if(!wf.inputValues) wf.inputValues = {};
+    wf.inputValues[name] = value;
+    extWfSave();
   }
 
   function extWfStepCardHtml(s, idx, all){
@@ -4202,6 +4368,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       '</div>';
     html += '<div class="ext-hint" id="extWfHint"></div>';
     host.innerHTML = html;
+    extRenderWorkflowPresets();
+    extRenderPresetInputs();
   }
 
   // ── 拓扑分层 ──
@@ -4322,6 +4490,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     var m = extAgencyMap();
     var ctx = { input: userText };
+    if(wf.inputValues){ Object.keys(wf.inputValues).forEach(function(k){ ctx[k] = wf.inputValues[k]; }); }
     var levels = extTopoLevels(wf.steps);
     var concurrency = Math.max(1, Math.min(8, parseInt(wf.concurrency, 10) || 2));
     // 终稿节点：无其它步骤依赖它的最后一个步骤
@@ -4430,12 +4599,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var p = personas[k];
       return '<span class="ext-persona-bar'+(k===cur?' active':'')+'" title="'+escapeHtml(p.label)+'" onclick="extQuickPersona(\''+k+'\')">'+escapeHtml(p.emoji || '🤖')+' '+escapeHtml(p.label)+'</span>';
     }).join('');
+    // 专家团快捷入口（始终显示；未配置成员时点击跳转配置页）
+    var _team = settingsState.config.extensions && settingsState.config.extensions.team;
+    var _teamReady = _team && _team.length;
+    html += '<span class="ext-persona-bar'+(cur==='__team__'?' active':'')+(_teamReady?'':' ext-persona-bar-ghost')+'" title="专家团（多智能体协作）" onclick="extQuickTeam()">👥 专家团</span>';
     // 工作流快捷入口（存在步骤时显示）
     var _wf = settingsState.config.extensions && settingsState.config.extensions.workflow;
     if (_wf && _wf.steps && _wf.steps.length) {
       html += '<span class="ext-persona-bar'+(cur==='__workflow__'?' active':'')+'" title="执行专家团工作流" onclick="extQuickPersona(\'__workflow__\')">🔀 工作流</span>';
     }
     bar.innerHTML = html;
+  }
+  function extQuickTeam(){
+    var _team = (settingsState.config.extensions && settingsState.config.extensions.team) || [];
+    if (!_team.length) {
+      // 尚未配置专家团：跳转到「扩展能力 → 专家团」引导配置
+      if (window.switchView) switchView('extensions');
+      try { extSwitchTab('team'); } catch(e){}
+      alert('尚未配置专家团。请在「扩展能力 → 专家团」中选择成员并保存，之后即可在对话中一键切换。');
+      return;
+    }
+    extQuickPersona('__team__');
   }
   function extQuickPersona(k){
     if(window.chatState) chatState.persona = k;
@@ -4478,6 +4662,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     settingsSaveConfig();
   };
+
+  // 保存模型配置后，若服务未运行则自动启动（首次配置场景；已运行则为 no-op）
+  function extAutoStartService(){
+    var headers = { 'Content-Type': 'application/json' };
+    if(monitorToken) headers['X-Monitor-Token'] = monitorToken;
+    fetch(apiUrl('/api/start'), { method:'POST', headers: headers, cache:'no-store' })
+      .then(function(r){ return r.json().catch(function(){ return {}; }); })
+      .then(function(j){ if(j && j.ok === false) console.warn('[auto-start] 未启动：', j.error); })
+      .catch(function(e){ console.warn('[auto-start] 失败：', e && e.message); });
+  }
 
   function settingsSaveConfig(){
     // 如果没有 active_provider 但有 providers，自动选第一个
@@ -4990,6 +5184,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     settingsSaveConfig().then(function(){
       settingsCloseModal();
+      extAutoStartService(); // 保存模型后若服务未运行则自动启动
     }).catch(function(){}); // 错误已由 settingsSaveConfig 提示
   };
 
@@ -5137,7 +5332,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     apiGet('/api/hermes/update/check').then(function(data) {
       if (data.error) throw new Error(data.error);
-      if (curEl) curEl.textContent = data.current || '--';
+      if (curEl) {
+        var cv = data.current || '--';
+        if (data.date) window.__hermesDate = data.date;
+        if (window.__hermesDate && cv && cv !== '--') cv += ' (' + window.__hermesDate + ')';
+        curEl.textContent = cv;
+      }
       var latCard = document.getElementById('latestVersionCard');
       if (latEl) {
         if (data.updateAvailable) {
@@ -5238,7 +5438,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else if (data.status === 'done') {
         if (updatePollTimer) { clearInterval(updatePollTimer); updatePollTimer = null; }
         if (statusText) { statusText.textContent = '更新完成！正在重启 Gateway…'; statusText.style.color = 'var(--accent)'; }
-        if (curEl && data.version) curEl.textContent = data.version;
+        if (curEl && data.version) {
+          var uv = data.version;
+          if (window.__hermesDate && uv && uv !== '--') uv += ' (' + window.__hermesDate + ')';
+          curEl.textContent = uv;
+        }
         // 重启 gateway
         apiPost('/api/restart').then(function() {
           setTimeout(function() {
@@ -5263,6 +5467,120 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
   }
 
+  // ── 应用更新（GitHub Releases / Actions）───────────────────────────────────
+  var appUpdatePollTimer = null;
+
+  function checkAppUpdate(){
+    var btn = document.getElementById('appCheckUpdateBtn');
+    var curEl = document.getElementById('appUpdateCurrentVer');
+    var latEl = document.getElementById('appUpdateLatestVer');
+    var badge = document.getElementById('appUpdateBadge');
+    var dispatchBtn = document.getElementById('appDispatchBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '检查中…'; }
+    if (latEl) { latEl.textContent = '检查中…'; latEl.style.color = 'var(--text3)'; }
+    if (badge) badge.style.display = 'none';
+
+    apiGet('/api/app/update/check').then(function(data){
+      if (data.error) throw new Error(data.error);
+      if (curEl) curEl.textContent = data.current || '--';
+      if (latEl) {
+        if (data.latest && data.latest !== 'unknown') {
+          latEl.textContent = 'v' + data.latest;
+          latEl.style.color = data.updateAvailable ? 'var(--red)' : 'var(--green)';
+        } else {
+          latEl.textContent = '未知';
+          latEl.style.color = 'var(--text3)';
+        }
+      }
+      if (badge) badge.style.display = data.updateAvailable ? '' : 'none';
+      if (badge) badge.className = 'ext-badge' + (data.updateAvailable ? '' : ' muted');
+      if (badge) badge.textContent = data.updateAvailable ? '有更新' : '已是最新';
+      if (dispatchBtn) dispatchBtn.style.display = '';
+      if (btn) { btn.disabled = false; btn.textContent = '检查更新'; }
+    }).catch(function(err){
+      if (latEl) { latEl.textContent = '检查失败'; latEl.style.color = 'var(--red)'; }
+      if (btn) { btn.disabled = false; btn.textContent = '检查更新'; }
+      alert('应用更新检查失败：' + (err && err.message || err));
+    });
+  }
+
+  function appUpdateSavePat(){
+    var input = document.getElementById('appUpdatePatInput');
+    var pat = (input && input.value || '').trim();
+    if (!pat) { alert('请输入 GitHub PAT'); return; }
+    api('/api/app/update/token', 'POST', { pat: pat }).then(function(data){
+      if (data.error) throw new Error(data.error);
+      alert('Token 已保存到本机');
+      var box = document.getElementById('appUpdatePatBox');
+      if (box) box.style.display = 'none';
+      var dispatchBtn = document.getElementById('appDispatchBtn');
+      if (dispatchBtn) dispatchBtn.style.display = '';
+    }).catch(function(err){
+      alert('保存 Token 失败：' + (err && err.message || err));
+    });
+  }
+
+  function appUpdateDispatch(){
+    var btn = document.getElementById('appDispatchBtn');
+    var statusText = document.getElementById('appUpdateStatusText');
+    var logOut = document.getElementById('appUpdateLogOutput');
+    var progress = document.getElementById('appUpdateProgress');
+    var patBox = document.getElementById('appUpdatePatBox');
+
+    if (btn) { btn.disabled = true; btn.textContent = '触发中…'; }
+    if (progress) progress.style.display = '';
+    if (statusText) { statusText.textContent = '正在向 GitHub 提交编译请求…'; statusText.style.color = 'var(--text3)'; }
+    if (logOut) logOut.textContent = '';
+
+    api('/api/app/update/dispatch', 'POST', {}).then(function(data){
+      if (data.error || !data.ok) throw new Error(data.error || '触发失败');
+      if (statusText) { statusText.textContent = '已触发 GitHub Actions 构建（版本 ' + (data.version || '') + '），正在轮询状态…'; statusText.style.color = 'var(--accent)'; }
+      if (logOut) logOut.textContent = '仓库：' + (data.repo || '') + '\n版本：' + (data.version || '') + '\n\n构建日志与产物将在 GitHub Actions 完成后写入 Draft Release。';
+      if (btn) { btn.disabled = false; btn.textContent = '编译并发布'; }
+      if (appUpdatePollTimer) clearInterval(appUpdatePollTimer);
+      appUpdatePollTimer = setInterval(appUpdatePollRun, 5000);
+      appUpdatePollRun();
+    }).catch(function(err){
+      var msg = (err && err.message || String(err));
+      if (msg.indexOf('401') !== -1 || msg.indexOf('PAT') !== -1 || msg.indexOf('未配置') !== -1) {
+        if (patBox) patBox.style.display = '';
+      }
+      if (statusText) { statusText.textContent = '触发失败：' + msg; statusText.style.color = 'var(--red)'; }
+      if (btn) { btn.disabled = false; btn.textContent = '编译并发布'; }
+    });
+  }
+
+  function appUpdatePollRun(){
+    var statusText = document.getElementById('appUpdateStatusText');
+    var logOut = document.getElementById('appUpdateLogOutput');
+    apiGet('/api/app/update/run').then(function(data){
+      var run = data && data.run;
+      if (!run) {
+        if (statusText) statusText.textContent = '暂未获取到运行状态';
+        return;
+      }
+      var stateText = run.status;
+      if (run.conclusion) stateText += ' / ' + run.conclusion;
+      if (statusText) statusText.textContent = '构建状态：' + stateText;
+      var lines = [
+        '工作流：' + (run.name || ''),
+        '状态：' + stateText,
+        '链接：' + (run.html_url || ''),
+        '开始：' + (run.created_at || ''),
+      ];
+      if (logOut) logOut.textContent = lines.join('\n');
+      if (run.status === 'completed') {
+        if (appUpdatePollTimer) { clearInterval(appUpdatePollTimer); appUpdatePollTimer = null; }
+        if (run.conclusion === 'success') {
+          if (statusText) { statusText.textContent = '构建成功，请前往 GitHub Draft Release 发布'; statusText.style.color = 'var(--green)'; }
+        } else {
+          if (statusText) { statusText.textContent = '构建结束：' + run.conclusion; statusText.style.color = 'var(--red)'; }
+        }
+      }
+    }).catch(function(err){
+      if (statusText) statusText.textContent = '轮询状态失败：' + (err && err.message || err);
+    });
+  }
 
   // ── 深链解析：URL 参数优先级高于 localStorage ──
   (function(){
@@ -5531,7 +5849,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '<button class="btn btn-sm" onclick="copyText(_chState.wxQr,\'已复制扫码链接\')">复制扫码链接</button>';
       var qrHtml;
       if(src){
-        qrHtml = '<img id="wxQrImg" src="' + src + '" style="width:220px;height:220px;background:#fff;border-radius:8px">';
+        qrHtml = '<img id="wxQrImg" src="' + src + '" class="qr-img sm">';
       } else {
         qrHtml = fallbackHtml;
       }
@@ -5612,7 +5930,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var src = res.qr_payload ? renderQr(res.qr_payload, 6, 6) : '';
       var qrHtml;
       if(src){
-        qrHtml = '<img id="tgQrImg" src="' + src + '" style="width:240px;height:240px;background:#fff;border-radius:8px">';
+        qrHtml = '<img id="tgQrImg" src="' + src + '" class="qr-img">';
       } else {
         qrHtml = '<div class="ext-hint" style="color:var(--red)">本地无法生成二维码，请复制链接在 Telegram 打开。</div>' +
           '<div style="font-size:12px;word-break:break-all;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px;margin:8px 0">' + escAttr(_chState.tgDeepLink) + '</div>' +
@@ -5711,7 +6029,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if(!res || !res.ok) throw new Error(res.error || '启动失败');
       _chState.waPairingId = res.pairing_id;
       if(res.status === 'connected'){
-        if(zone) zone.innerHTML = '<div class="ext-hint" style="color:#3fb950">✅ 该号码已配对，正在保存…</div>';
+        if(zone) zone.innerHTML = '<div class="ext-hint t-ok">✅ 该号码已配对，正在保存…</div>';
         channelsApplyWhatsAppQr(res.pairing_id);
         return;
       }
@@ -5829,6 +6147,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.extRenderWorkflowBuilder = extRenderWorkflowBuilder;
   window.extRunWorkflow = extRunWorkflow;
   window.extWorkflowStepCall = extWorkflowStepCall;
+  window.extLoadWorkflowPreset = extLoadWorkflowPreset;
+  window.extLoadSelectedWorkflowPreset = extLoadSelectedWorkflowPreset;
+  window.extRenderWorkflowPresets = extRenderWorkflowPresets;
+  window.extWfPresetInput = extWfPresetInput;
+  window.checkAppUpdate = checkAppUpdate;
+  window.appUpdateSavePat = appUpdateSavePat;
+  window.appUpdateDispatch = appUpdateDispatch;
 })();
 </script>
 </body>

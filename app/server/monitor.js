@@ -32,7 +32,40 @@ const PID_GATEWAY    = `${VAR_DIR}/gateway.pid`;
 const PID_DASHBOARD  = `${VAR_DIR}/dashboard.pid`;
 const TOKEN_FILE     = `${VAR_DIR}/monitor.token`;
 const VERSION_FILE   = `${VAR_DIR}/hermes_version.txt`;
+const MANIFEST_FILE  = `${APP_DIR}/manifest`;
 const START_TIME     = Date.now();
+
+// 应用包版本（来自 manifest，与应用中心安装包版本一致）。
+// 注意：它和「hermes-agent PyPI 版本」(HERMES_VERSION) 是两个不同概念，UI 必须分开展示，避免混淆。
+function readAppVersion() {
+  try {
+    const txt = readFileSync(MANIFEST_FILE, "utf8");
+    const m = txt.match(/^version\s*=\s*(\S+)/m);
+    if (m) return m[1].trim();
+  } catch {}
+  return "unknown";
+}
+const APP_VERSION = readAppVersion();
+log(`[启动检测] 应用包版本(manifest): ${APP_VERSION}`);
+
+// hermes-agent PyPI 版本对应的发布日期，仅用于 UI 展示区分（例如 v0.19.0 (2026.7.20)）。
+// 默认值取 0.19.0 的发布日期；后台尝试从 PyPI 拉取当前版本的准确日期覆盖之（失败则保留默认值）。
+let HERMES_VERSION_DATE = "2026.7.20";
+(function fetchHermesReleaseDate() {
+  try {
+    const v = HERMES_VERSION.replace(/^v/, "").split(" ")[0];
+    fetch(`https://pypi.org/pypi/hermes-agent/${encodeURIComponent(v)}/json`, {
+      signal: AbortSignal.timeout(8000),
+    }).then((r) => (r.ok ? r.json() : null)).then((data) => {
+      const urls = data && data.urls;
+      if (urls && urls[0] && urls[0].upload_time) {
+        const d = new Date(urls[0].upload_time);
+        HERMES_VERSION_DATE = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+        log(`[启动检测] Hermes 版本发布日期已更新: ${HERMES_VERSION_DATE}`);
+      }
+    }).catch(() => {});
+  } catch {}
+})();
 const CONFIG_VERSION = "1.0";
 
 // 默认上下文窗口（tokens）。无法精确获知模型 tokenizer，这里取常见默认值用于进度条展示。
@@ -417,6 +450,19 @@ const MONITOR_TOKEN = (() => {
   } catch {}
   const t = randomBytes(24).toString("hex");
   writeFileSync(TOKEN_FILE, t, { mode: 0o600 });
+  return t;
+})();
+
+// ─── 仪表盘会话令牌（与仪表盘共享，代理转发时免 401 鉴权）──────────────────
+// monitor 生成并固定写入文件；启动仪表盘时注入 HERMES_DASHBOARD_SESSION_TOKEN，
+// 转发 /proxy/dashboard/* 时携带 X-Hermes-Session-Token，使原生 /api/* 调用免鉴权。
+const DASHBOARD_TOKEN_FILE = `${VAR_DIR}/dashboard.token`;
+const DASHBOARD_SESSION_TOKEN = (() => {
+  try {
+    if (existsSync(DASHBOARD_TOKEN_FILE)) return readFileSync(DASHBOARD_TOKEN_FILE, "utf8").trim();
+  } catch {}
+  const t = randomBytes(24).toString("hex");
+  writeFileSync(DASHBOARD_TOKEN_FILE, t, { mode: 0o600 });
   return t;
 })();
 
@@ -1598,6 +1644,10 @@ function spawnHermes(name, pidPath, args) {
     LITELLM_REQUEST_TIMEOUT: "600",
     REQUEST_TIMEOUT:    "600",
   };
+  if (name === "dashboard") {
+    // 固定仪表盘会话令牌，使 monitor 代理转发时能通过鉴权（见 proxyDashboard）
+    env.HERMES_DASHBOARD_SESSION_TOKEN = DASHBOARD_SESSION_TOKEN;
+  }
 
   const logFd = openSync(logPath, "a");
   const p = spawn(HERMES_BIN, args, {
@@ -1768,6 +1818,9 @@ async function proxyDashboard(req) {
   try {
     const headers = new Headers(req.headers);
     headers.delete("host");
+    // 注入仪表盘会话令牌（与 HERMES_DASHBOARD_SESSION_TOKEN 同源），
+    // 转发到仪表盘的所有 /api/* 请求均带此令牌，免去 401 鉴权。
+    headers.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
     // Node 的全局 fetch 在转发流 body（ReadableStream）时必须显式传 duplex:'half'，
     // 否则报 "RequestInit: duplex option is required when sending a body"。
     const init = {
@@ -2269,6 +2322,8 @@ async function handleFetch(req) {
       socket_path: SOCKET_PATH || null,
       api_server_port: 8642,
       api_server_url: `http://${getLANIP()}:8642`,
+      app_version: APP_VERSION,
+      hermes_version_date: HERMES_VERSION_DATE,
     }), { headers: jsonHeaders() });
   }
 
@@ -2338,7 +2393,7 @@ async function handleFetch(req) {
 
       const latestDisplay = latest !== "unknown" ? `v${latest} ${latestDate}`.trim() : "未知";
       const updateAvailable = latest !== "unknown" && latest !== currentVer;
-      return new Response(JSON.stringify({ current, latest: latestDisplay, updateAvailable }), {
+      return new Response(JSON.stringify({ current, latest: latestDisplay, updateAvailable, date: HERMES_VERSION_DATE }), {
         headers: { "Content-Type": "application/json" },
       });
     } catch (e) {
@@ -2440,6 +2495,126 @@ async function handleFetch(req) {
       exitCode: updateExitCode,
       version: currentVer,
     }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── 应用包更新（GitHub Releases / Actions）────────────────────────────────
+  const GITHUB_REPO = process.env.GITHUB_REPO || "veenyi/fnos-hermes-agent";
+  const GITHUB_PAT_FILE = `${VAR_DIR}/github_pat`;
+
+  function getGitHubPAT() {
+    try {
+      const envPat = process.env.GITHUB_TOKEN || process.env.GITHUB_PAT;
+      if (envPat) return envPat.trim();
+      if (existsSync(GITHUB_PAT_FILE)) return readFileSync(GITHUB_PAT_FILE, "utf8").trim();
+    } catch {}
+    return "";
+  }
+
+  if (path === "/api/app/update/check") {
+    try {
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+        signal: AbortSignal.timeout(15000),
+        headers: { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" },
+      });
+      if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+      const data = await r.json();
+      const tag = String(data.tag_name || "");
+      const latest = tag.replace(/^fnos-hermes-agent_v|^v/, "").trim() || "unknown";
+      const current = APP_VERSION;
+      const updateAvailable = latest !== "unknown" && latest !== current;
+      return new Response(JSON.stringify({
+        current,
+        latest,
+        updateAvailable,
+        html_url: data.html_url || "",
+        published_at: data.published_at || "",
+        body: data.body || "",
+        repo: GITHUB_REPO,
+      }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: e.message || String(e) }), {
+        status: 502, headers: jsonHeaders(),
+      });
+    }
+  }
+
+  if (path === "/api/app/update/token" && req.method === "POST") {
+    try {
+      const body = await req.json();
+      const pat = (body && body.pat || "").trim();
+      if (!pat) {
+        try { unlinkSync(GITHUB_PAT_FILE); } catch {}
+        return new Response(JSON.stringify({ ok: true, saved: false }), { headers: jsonHeaders() });
+      }
+      writeFileSync(GITHUB_PAT_FILE, pat, { mode: 0o600 });
+      return new Response(JSON.stringify({ ok: true, saved: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: e.message || String(e) }), {
+        status: 500, headers: jsonHeaders(),
+      });
+    }
+  }
+
+  if (path === "/api/app/update/dispatch" && req.method === "POST") {
+    try {
+      const pat = getGitHubPAT();
+      if (!pat) {
+        return new Response(JSON.stringify({ ok: false, error: "未配置 GitHub PAT，请先在应用更新卡片中设置" }), {
+          status: 401, headers: jsonHeaders(),
+        });
+      }
+      const version = APP_VERSION;
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/Build_fnos-hermes-agent.yml/dispatches`, {
+        method: "POST",
+        headers: {
+          "Accept": "application/vnd.github+json",
+          "Authorization": `Bearer ${pat}`,
+          "User-Agent": "fnos-hermes-agent",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ref: "main", inputs: { version } }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) {
+        const txt = await r.text();
+        throw new Error(`GitHub dispatch ${r.status}: ${txt}`);
+      }
+      log(`[应用更新] 已触发 GitHub Actions 构建: ${GITHUB_REPO}, 版本 ${version}`);
+      return new Response(JSON.stringify({ ok: true, version, repo: GITHUB_REPO }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message || String(e) }), {
+        status: 502, headers: jsonHeaders(),
+      });
+    }
+  }
+
+  if (path === "/api/app/update/run") {
+    try {
+      const pat = getGitHubPAT();
+      const headers = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
+      if (pat) headers["Authorization"] = `Bearer ${pat}`;
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/runs?branch=main&per_page=1`, {
+        signal: AbortSignal.timeout(15000),
+        headers,
+      });
+      if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+      const data = await r.json();
+      const run = (data.workflow_runs && data.workflow_runs[0]) || null;
+      return new Response(JSON.stringify({
+        run: run ? {
+          id: run.id,
+          status: run.status,
+          conclusion: run.conclusion,
+          html_url: run.html_url,
+          created_at: run.created_at,
+          name: run.name,
+        } : null,
+      }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: e.message || String(e) }), {
+        status: 502, headers: jsonHeaders(),
+      });
+    }
   }
 
   if (path === "/api/start" && req.method === "POST") {
@@ -4877,8 +5052,34 @@ function startServer() {
   server.listen({ path: SOCKET_PATH }, () => {
     try { chmodSync(SOCKET_PATH, 0o777); } catch {}
     log(`Monitor ready — unix:${SOCKET_PATH} (base=${BASE_PATH || "/"}) | dashboard proxied at /proxy/dashboard/`);
+    // 若已存在模型配置，自动启动 Gateway/Dashboard（覆盖安装/升级后无需手动点启动）
+    setTimeout(() => maybeAutoStartServices(), 2500);
   });
   return server;
+}
+
+// 当 providers-state.yaml 中已有真实服务商时，monitor 启动后自动拉起服务
+function maybeAutoStartServices() {
+  try {
+    const statePath = `${VAR_DIR}/providers-state.yaml`;
+    if (!existsSync(statePath)) return;
+    const content = readFileSync(statePath, "utf8");
+    const ids = [...content.matchAll(/^  ([a-zA-Z0-9_-]+):\s*$/gm)].map(m => m[1]);
+    const hasRealProvider = ids.some(id => id !== "hermes");
+    if (!hasRealProvider) {
+      log("Auto-start skipped: no real provider in providers-state.yaml");
+      return;
+    }
+    if (readPid(PID_GATEWAY) || readPid(PID_DASHBOARD)) {
+      log("Auto-start skipped: gateway/dashboard already running");
+      return;
+    }
+    log("Auto-starting gateway & dashboard (provider config detected) ...");
+    spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run"]);
+    spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
+  } catch (err) {
+    log(`Auto-start error: ${err?.message || err}`);
+  }
 }
 
 // 启动前清理可能残留的旧 socket，避免 EADDRINUSE 导致启动失败

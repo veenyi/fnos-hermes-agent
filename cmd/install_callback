@@ -41,6 +41,26 @@ export PIP_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
 export UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
 
 # ---------------------------------------------------------------------------
+# 安装前停止可能运行中的本应用进程，避免文件占用 / 端口冲突（减少用户问题）
+# ---------------------------------------------------------------------------
+stop_running_app() {
+    log_msg ">>> 安装前检查并停止可能运行中的进程 ..."
+    pkill -SIGTERM -f "app/server/monitor.js" 2>/dev/null || true
+    pkill -SIGTERM -f "monitor.js" 2>/dev/null || true
+    pkill -SIGTERM -f "hermes gateway run" 2>/dev/null || true
+    pkill -SIGTERM -f "hermes.*dashboard" 2>/dev/null || true
+    # 等待进程退出，避免立刻覆盖文件造成写入冲突
+    sleep 2
+    # 兜底强杀残留
+    pkill -SIGKILL -f "app/server/monitor.js" 2>/dev/null || true
+    pkill -SIGKILL -f "hermes gateway run" 2>/dev/null || true
+    pkill -SIGKILL -f "hermes.*dashboard" 2>/dev/null || true
+    log_msg "    进程清理完成"
+}
+
+stop_running_app
+
+# ---------------------------------------------------------------------------
 # curl 从阿里云 PyPI 镜像直接下载 uv wheel，unzip 提取二进制
 # ---------------------------------------------------------------------------
 ensure_uv() {

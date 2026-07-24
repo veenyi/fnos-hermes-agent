@@ -40,6 +40,7 @@ SOUL.md → AGENTS.md → 对应 skills 文件
 | `skills/fnos-knowledge/hermes-workflows/SKILL.md` | **通用工作流**：前端渲染、微信绑定、进程管理、uv 包管理、验证习惯、文件管理规范、健康巡检、运行时记忆、删除决策 | **高频操作首选查这里** |
 | `skills/fnos-knowledge/fnos-sysadmin/SKILL.md` | fnOS 系统架构 / 存储 / 用户权限 / CLI / 网络进阶 / 安全 / 备份 / 故障排查 / OpenList 集成 | 系统级任务、深度排查、日常运维 |
 | `skills/fnos-knowledge/fnos-dev-api/SKILL.md` | Docker 管理 / .fpk 开发规范 / WS API 完整指南（认证、文件操作、回收站、监控） | Docker 任务、fpk 开发、API 调用 |
+| `skills/agency-orchestrator/SKILL.md` | **多智能体协作 / 一人公司**：60+ Agency Orchestrator 工作流预设、267 中文专家角色、DAG 编排运行方式 | 用户要运行工作流模板、使用专家团、加载 AO 预设时 |
 
 ---
 
