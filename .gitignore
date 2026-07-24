@@ -1,3 +1,6 @@
+# fnOS Hermes Agent — .gitignore
+# Last updated for release: v0.20.24
+
 # Dependencies
 node_modules/
 
