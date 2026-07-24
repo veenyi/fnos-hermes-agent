@@ -6,6 +6,7 @@ fallback_providers: []
 credential_pool_strategies: {}
 toolsets:
 - hermes-cli
+- delegation
 agent:
   max_turns: 90
   gateway_timeout: 1800
@@ -329,7 +330,9 @@ delegation:
   max_concurrent_children: 3
   max_spawn_depth: 1
   orchestrator_enabled: true
-  subagent_auto_approve: false
+  # API / 网关模式下没有 stdin，子智能体遇到危险命令审批会死锁；
+  # 设为 true 让子智能体自动批准（专家团主要用于知识/分析协作）。
+  subagent_auto_approve: true
 prefill_messages_file: ''
 goals:
   max_turns: 20

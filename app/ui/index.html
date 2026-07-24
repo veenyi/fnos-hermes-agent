@@ -4122,6 +4122,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return '- 【' + p.label + '】(' + p.dept_label + ')：' + (p.desc || '');
     });
     var name = ext.team_name ? ('「' + ext.team_name + '」') : '';
+    var useDelegation = !!(ext.toolsets && ext.toolsets.delegation);
+    if (useDelegation) {
+      // 真多智能体：引导模型用 delegate_task 派生子智能体（hermes-agent 原生 delegation 工具集）
+      return '你是一个多智能体专家团' + name + '编排器（orchestrator）。你必须使用 delegate_task 工具，为用户任务创建子智能体协作完成，而不是自己扮演专家。\n\n'
+        + '可用专家（每位应创建一个 leaf 子智能体，将其专业背景与具体子任务写入子智能体的 system prompt）：\n' + lines.join('\n') + '\n\n'
+        + '执行要求：\n'
+        + '1. 分析用户需求，判断需要哪些专家参与；为每位相关专家调用一次 delegate_task（role=\'leaf\'），把该专家的专业背景（上方对应行）与分配给他的具体子任务写清楚。\n'
+        + '2. 多个无依赖的专家可并行派发（batch 模式），提升效率。\n'
+        + '3. 收齐各子智能体结果后，综合各方视角给出最终答案；跨领域任务必须体现多专家协作，而不是单一视角。\n'
+        + '4. 严禁自己扮演专家口吻——所有专家意见必须来自真实的 delegate_task 子智能体返回。';
+    }
+    // 降级：delegation 未启用时退化为角色扮演
     return '你正在以多智能体专家团' + name + '模式协作。团队由以下专家组成，请根据用户需求判断由哪位专家主导，并在复杂任务中拆分给对应专家协作、最后汇总：\n' + lines.join('\n') + '\n\n当任务明确属于某位专家领域时，以该专家的身份与口吻作答；跨领域任务请综合各方视角。';
   }
 
@@ -4636,7 +4648,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // 专家团快捷入口（始终显示；未配置成员时点击跳转配置页）
     var _team = settingsState.config.extensions && settingsState.config.extensions.team;
     var _teamReady = _team && _team.length;
-    html += '<span class="ext-persona-bar'+(cur==='__team__'?' active':'')+(_teamReady?'':' ext-persona-bar-ghost')+'" title="专家团（多智能体协作）" onclick="extQuickTeam()">👥 专家团</span>';
+    var _delegOn = !!(settingsState.config.extensions && settingsState.config.extensions.toolsets && settingsState.config.extensions.toolsets.delegation);
+    var _teamTitle = _delegOn ? '专家团（真·多智能体：delegate_task 子智能体协作）' : '专家团（多智能体协作，未启用 delegation 时为角色扮演）';
+    html += '<span class="ext-persona-bar'+(cur==='__team__'?' active':'')+(_teamReady?'':' ext-persona-bar-ghost')+'" title="'+_teamTitle+'" onclick="extQuickTeam()">👥 专家团' + (_delegOn ? ' <span style="font-size:10px;opacity:.8">⚡</span>' : '') + '</span>';
     // 工作流快捷入口（存在步骤时显示）
     var _wf = settingsState.config.extensions && settingsState.config.extensions.workflow;
     if (_wf && _wf.steps && _wf.steps.length) {
