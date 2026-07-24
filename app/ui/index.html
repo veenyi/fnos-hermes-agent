@@ -4662,15 +4662,37 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     bar.innerHTML = html;
   }
   function extQuickTeam(){
-    var _team = (settingsState.config.extensions && settingsState.config.extensions.team) || [];
-    if (!_team.length) {
-      // 尚未配置专家团：跳转到「扩展能力 → 专家团」引导配置
-      if (window.switchView) switchView('extensions');
-      try { extSwitchTab('team'); } catch(e){}
-      alert('尚未配置专家团。请在「扩展能力 → 专家团」中选择成员并保存，之后即可在对话中一键切换。');
+    var ext = settingsState.config.extensions || (settingsState.config.extensions = {});
+    var _team = ext.team || [];
+    if (_team.length) {
+      extQuickPersona('__team__');
       return;
     }
-    extQuickPersona('__team__');
+    // 未配置时自动组建默认专家团，保证胶囊始终可激活（长期方案：真多智能体协作入口）
+    extEnsureAgencyLib(function(){
+      var defaultIds = [
+        'agency_strategy_nexus_strategy',
+        'agency_product_product_manager',
+        'agency_engineering_engineering_senior_developer',
+        'agency_engineering_engineering_software_architect',
+        'agency_design_design_ux_architect',
+        'agency_support_support_analytics_reporter'
+      ];
+      var map = extAgencyMap();
+      var ids = defaultIds.filter(function(id){ return !!map[id]; });
+      if (!ids.length && window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length) {
+        ids = window.AGENCY_PERSONAS.slice(0, 6).map(function(p){ return p.id; });
+      }
+      ext.team = ids;
+      ext.team_name = '默认专家团';
+      extQuickPersona('__team__');
+      if (window.settingsSaveConfig) settingsSaveConfig();
+      if (window.settingsRenderExtensions) settingsRenderExtensions();
+      renderPersonaBar();
+      if (window.extRenderTeamCurrent) extRenderTeamCurrent();
+      var h = document.getElementById('extTeamHint');
+      if (h) h.textContent = '已启用默认专家团（'+ids.length+' 位成员），可在「扩展能力 → 专家团」中调整。';
+    });
   }
   function extQuickPersona(k){
     if(window.chatState) chatState.persona = k;
