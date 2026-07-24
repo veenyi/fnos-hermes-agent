@@ -673,7 +673,11 @@
       #viewChat .chat-layout{height:100%}
       .chat-messages{padding:12px}
       .msg-content{max-width:92%}
-      .chat-composer{padding:8px 8px calc(10px + env(safe-area-inset-bottom, 0px));border-top:1px solid var(--border-subtle);background:var(--bg1)}
+      /* 移动端角色/专家团胶囊栏：单行横向滚动，不挤占输入区 */
+      .persona-bar-wrap{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;padding:0 2px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:6px}
+      .persona-bar-wrap::-webkit-scrollbar{display:none}
+      .persona-bar-wrap .ext-persona-bar{flex:0 0 auto;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .chat-composer{padding:6px 8px calc(8px + env(safe-area-inset-bottom, 0px))}
       .chat-composer-inner{max-width:100%;width:92%;border-radius:20px;background:var(--bg2)}
       .chat-input{flex:1;font-size:16px}
       .svcs{grid-template-columns:1fr;grid-template-rows:auto}
@@ -3409,7 +3413,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     vision:"👁️", memory:"🧠", todo:"📝", skills:"📚", clarify:"❓", delegation:"🤝",
   };
   var EXT_PERSONAS = {
-    default:   { emoji:"🤖", label:"默认助手",   prompt:"" },
+    default:   { emoji:"🤖", label:"默认助手",   prompt:"你是用户的默认主力助手。请直接、简洁地回答用户问题，不擅自启用专家团、工作流或多智能体协作模式。仅当用户明确请求组建专家团或执行工作流时，才切换到对应模式。你的回复应保持自然、专注，优先解决用户当前提出的任务。" },
     coder:     { emoji:"💻", label:"程序员",     prompt:"你是一位资深全栈工程师。优先给出可直接运行的代码与命令，注重安全性、可维护性与生产实践；遇到模糊需求先给出最小可行方案再迭代。" },
     researcher:{ emoji:"🔬", label:"研究员",     prompt:"你是一位严谨的研究员。回答须基于证据、引用来源，并明确区分事实、推测与不确定信息；避免臆断。" },
     writer:    { emoji:"✍️", label:"写作助手",   prompt:"你是一位专业的写作助手。擅长结构化、清晰、有感染力的中文表达，依据场景调整语气与篇幅。" },
@@ -3609,6 +3613,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   function extSelectPersona(k){
     var ext = settingsState.config.extensions;
+    // 从专家团/工作流切回普通角色时，彻底清除协作模式状态，确保默认助手是独立主力角色
+    if ((ext.persona === '__team__' || ext.persona === '__workflow__') && k !== '__team__' && k !== '__workflow__') {
+      ext.team = [];
+      ext.team_name = '';
+      if (ext.workflow && ext.workflow.steps) ext.workflow.steps = [];
+      try { localStorage.removeItem('hermes_team'); } catch(e){}
+    }
     ext.persona = k;
     settingsRenderExtensions();
     settingsSaveConfig();
