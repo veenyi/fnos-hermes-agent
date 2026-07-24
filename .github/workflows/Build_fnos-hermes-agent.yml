@@ -98,6 +98,13 @@ jobs:
           TARGET_NAME="fnos-${{ env.APP_NAME }}_v${{ steps.target_version.outputs.target_version }}.fpk"
           
           if [ -f "$SOURCE_FPK" ]; then
+            # 补充 README.md 与 .gitignore 到外层 tar，使每次发布包内文档也同步
+            TMP_DIR=$(mktemp -d)
+            tar -xzf "$SOURCE_FPK" -C "$TMP_DIR"
+            cp README.md .gitignore "$TMP_DIR/"
+            tar -czf "$SOURCE_FPK" -C "$TMP_DIR" .
+            rm -rf "$TMP_DIR"
+            
             mv "$SOURCE_FPK" "$DIST_DIR/$TARGET_NAME"
             SIZE=$(du -h "$DIST_DIR/$TARGET_NAME" | cut -f1)
             echo "打包成功：$TARGET_NAME ($SIZE)"
