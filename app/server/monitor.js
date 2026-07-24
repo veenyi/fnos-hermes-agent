@@ -2915,15 +2915,50 @@ async function handleFetch(req) {
     if (root && existsSync(`${root}/scripts/whatsapp-bridge/bridge.js`)) return `${root}/scripts/whatsapp-bridge`;
     return null;
   }
+  function _findNpmBin(){
+    if (!resolvedNodeBin) return null;
+    // 1) 与 node 同目录的 npm
+    const nodeDir = resolvedNodeBin.replace(/\/[^/]+$/, "");
+    const siblingNpm = nodeDir + "/npm";
+    if (existsSync(siblingNpm)) return siblingNpm;
+    // Windows 开发环境：npm.cmd
+    const siblingNpmCmd = nodeDir.replace(/\\node$/, "\\npm.cmd");
+    if (existsSync(siblingNpmCmd)) return siblingNpmCmd;
+    // 2) PATH 中的 npm
+    try {
+      const r = spawnSync("sh", ["-c", "command -v npm"], { stdout: "pipe", stderr: "pipe" });
+      const out = (r.stdout || "").toString().trim();
+      if (out && existsSync(out)) return out;
+    } catch {}
+    // 3) 常见绝对路径
+    const NPM_CANDIDATES = [
+      "/var/apps/nodejs_v24/target/bin/npm",
+      "/var/apps/nodejs_v22/target/bin/npm",
+      "/var/apps/nodejs_v20/target/bin/npm",
+      "/var/apps/nodejs/target/bin/npm",
+      "/usr/local/bin/npm",
+      "/usr/bin/npm"
+    ];
+    for (const p of NPM_CANDIDATES) if (existsSync(p)) return p;
+    return null;
+  }
   function _ensureWhatsAppBridgeDeps(bridgeDir){
     if (existsSync(`${bridgeDir}/node_modules`)) return true;
-    if (!resolvedNodeBin) return false;
-    const npm = resolvedNodeBin.replace(/\/node$/, "/npm");
-    if (!existsSync(npm)) return false;
+    if (!resolvedNodeBin) throw new Error("未找到 Node.js，无法启动 WhatsApp bridge");
+    const npm = _findNpmBin();
+    if (!npm) throw new Error("npm was not found. WhatsApp setup needs Node.js and npm.");
     try {
-      const result = spawnSync(npm, ["install", "--silent"], { cwd: bridgeDir, stdout: "pipe", stderr: "pipe", timeout: 300000 });
-      return result.exitCode === 0;
-    } catch { return false; }
+      const env = { ...process.env, PATH: (resolvedNodeDir ? resolvedNodeDir + ":" : "") + (process.env.PATH || "") };
+      const result = spawnSync(npm, ["install", "--silent"], { cwd: bridgeDir, env, stdout: "pipe", stderr: "pipe", timeout: 300000 });
+      if (result.exitCode !== 0){
+        const err = (result.stderr || "").toString().trim() || "npm install 返回非零退出码";
+        throw new Error("安装 WhatsApp bridge 依赖失败：" + err);
+      }
+      return true;
+    } catch (e) {
+      if (e && e.message) throw e;
+      throw new Error("安装 WhatsApp bridge 依赖失败，请检查网络");
+    }
   }
   function _spawnWhatsAppPairing(sessionDir, mode){
     const bridgeDir = _findWhatsAppBridgeDir();
