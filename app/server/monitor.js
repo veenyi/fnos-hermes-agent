@@ -2559,11 +2559,20 @@ async function handleFetch(req) {
       const latest = tag.replace(/^fnos-hermes-agent_v|^v/, "").trim() || "unknown";
       const current = APP_VERSION;
       const updateAvailable = latest !== "unknown" && latest !== current;
+
+      // 提取 .fpk 安装包直链，供用户直接下载
+      let download_url = "";
+      if (Array.isArray(data.assets)) {
+        const asset = data.assets.find(a => /\.fpk$/i.test(a.name || ""));
+        if (asset && asset.browser_download_url) download_url = asset.browser_download_url;
+      }
+
       return new Response(JSON.stringify({
         current,
         latest,
         updateAvailable,
         html_url: data.html_url || "",
+        download_url,
         published_at: data.published_at || "",
         body: data.body || "",
         repo: GITHUB_REPO,

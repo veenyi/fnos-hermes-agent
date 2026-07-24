@@ -1229,19 +1229,14 @@
                 <div id="appUpdateLatestVer" style="font-size:18px;font-weight:700;letter-spacing:-0.3px;color:var(--text3)">未检查</div>
               </div>
             </div>
-            <div class="ext-hint" style="margin-top:10px">应用包版本对应 GitHub Release 标签 <code>fnos-hermes-agent_vX.Y.Z</code>，与底层 Hermes Agent PyPI 版本不同。</div>
-            <div id="appUpdatePatBox" style="display:none;margin-top:12px">
-              <div class="ext-hint" style="margin-bottom:6px">首次使用「编译并发布」需要 GitHub Personal Access Token（<code>repo</code> + <code>workflow</code> 权限）。Token 仅保存在本机 <code>/var/apps/hermes-agent/var/github_pat</code>，不会上传。</div>
-              <input type="password" id="appUpdatePatInput" class="input" placeholder="ghp_xxxxxxxx" style="max-width:420px">
-              <button class="btn btn-sm" onclick="appUpdateSavePat()" style="margin-left:8px">保存 Token</button>
-            </div>
+            <div class="ext-hint" style="margin-top:10px">应用包版本对应 GitHub Release 标签 <code>fnos-hermes-agent_vX.Y.Z</code>，与底层 Hermes Agent PyPI 版本不同。检测到新版本时，点击下方按钮前往下载最新安装包（.fpk），在 fnOS 应用中心更新即可。</div>
             <div style="display:flex;gap:8px;margin-top:16px">
               <button class="btn" id="appCheckUpdateBtn" onclick="checkAppUpdate()" style="font-size:13px">检查更新</button>
-              <button class="btn btn-go" id="appDispatchBtn" onclick="appUpdateDispatch()" style="font-size:13px;display:none">编译并发布</button>
+              <a class="btn btn-go" id="appDownloadBtn" href="#" target="_blank" rel="noopener noreferrer" style="font-size:13px;display:none">前往下载最新版</a>
             </div>
-            <div id="appUpdateProgress" style="display:none;margin-top:16px">
-              <div style="font-size:12px;color:var(--text3);margin-bottom:6px" id="appUpdateStatusText">准备中…</div>
-              <pre style="background:var(--bg2);border-radius:6px;padding:10px 12px;font-size:11px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text2);line-height:1.5;font-family:'SF Mono','Cascadia Code','Fira Code',Consolas,monospace" id="appUpdateLogOutput"></pre>
+            <div id="appUpdateNotes" style="display:none;margin-top:14px">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:6px">更新说明</div>
+              <pre style="background:var(--bg2);border-radius:6px;padding:10px 12px;font-size:11px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text2);line-height:1.5;font-family:'SF Mono','Cascadia Code','Fira Code',Consolas,monospace" id="appUpdateNotesBody"></pre>
             </div>
           </div>
         </div>
@@ -1946,9 +1941,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         html += '<span class="svc-d-label">运行</span><span class="svc-d-val" id="siUptime">'+up+'</span>';
         html += '<span class="svc-d-label" style="margin-left:8px">内存</span><span class="svc-d-val" id="siMem">'+mem+'</span>';
         html += '</div>';
-        html += '<div class="svc-d-item" style="margin-top:2px">';
-        html += '<span class="svc-d-label" title="hermes-agent PyPI 包版本（固定，区别于下方应用包版本）">Hermes 版本</span><span class="svc-d-val" id="hermesVersion">--</span>';
-        html += '<span class="svc-d-label" style="margin-left:10px" title="本应用安装包版本（manifest）">应用版本</span><span class="svc-d-val" id="appVersion">--</span>';
+        html += '<div class="svc-d-item" style="margin-top:6px;flex-direction:column;align-items:flex-start;gap:2px">';
+        html += '<div><span class="svc-d-label" title="hermes-agent PyPI 包版本">Hermes 版本</span><span class="svc-d-val" id="hermesVersion">--</span></div>';
+        html += '<div><span class="svc-d-label" title="本应用安装包版本（manifest）">应用版本</span><span class="svc-d-val" id="appVersion">--</span></div>';
         html += '</div>';
         html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px" id="siLogBtns">';
         logs.forEach(function(f){
@@ -5502,18 +5497,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     });
   }
 
-  // ── 应用更新（GitHub Releases / Actions）───────────────────────────────────
-  var appUpdatePollTimer = null;
+  // ── 应用更新（GitHub Releases 检查 / 下载）──────────────────────────────────
 
   function checkAppUpdate(){
     var btn = document.getElementById('appCheckUpdateBtn');
     var curEl = document.getElementById('appUpdateCurrentVer');
     var latEl = document.getElementById('appUpdateLatestVer');
     var badge = document.getElementById('appUpdateBadge');
-    var dispatchBtn = document.getElementById('appDispatchBtn');
+    var dlBtn = document.getElementById('appDownloadBtn');
+    var notesBox = document.getElementById('appUpdateNotes');
     if (btn) { btn.disabled = true; btn.textContent = '检查中…'; }
     if (latEl) { latEl.textContent = '检查中…'; latEl.style.color = 'var(--text3)'; }
     if (badge) badge.style.display = 'none';
+    if (dlBtn) dlBtn.style.display = 'none';
+    if (notesBox) notesBox.style.display = 'none';
 
     apiGet('/api/app/update/check').then(function(data){
       if (data.error) throw new Error(data.error);
@@ -5527,93 +5524,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           latEl.style.color = 'var(--text3)';
         }
       }
-      if (badge) badge.style.display = data.updateAvailable ? '' : 'none';
-      if (badge) badge.className = 'ext-badge' + (data.updateAvailable ? '' : ' muted');
-      if (badge) badge.textContent = data.updateAvailable ? '有更新' : '已是最新';
-      if (dispatchBtn) dispatchBtn.style.display = '';
+      if (badge) {
+        badge.style.display = data.updateAvailable ? '' : 'none';
+        badge.className = 'ext-badge' + (data.updateAvailable ? '' : ' muted');
+        badge.textContent = data.updateAvailable ? '有更新' : '已是最新';
+      }
+      if (data.updateAvailable) {
+        if (dlBtn) {
+          dlBtn.href = data.download_url || data.html_url || '#';
+          dlBtn.style.display = '';
+        }
+        var notesBody = document.getElementById('appUpdateNotesBody');
+        if (notesBody) notesBody.textContent = data.body || '（无更新说明）';
+        if (notesBox) notesBox.style.display = '';
+      }
       if (btn) { btn.disabled = false; btn.textContent = '检查更新'; }
     }).catch(function(err){
       if (latEl) { latEl.textContent = '检查失败'; latEl.style.color = 'var(--red)'; }
       if (btn) { btn.disabled = false; btn.textContent = '检查更新'; }
       alert('应用更新检查失败：' + (err && err.message || err));
-    });
-  }
-
-  function appUpdateSavePat(){
-    var input = document.getElementById('appUpdatePatInput');
-    var pat = (input && input.value || '').trim();
-    if (!pat) { alert('请输入 GitHub PAT'); return; }
-    api('/api/app/update/token', 'POST', { pat: pat }).then(function(data){
-      if (data.error) throw new Error(data.error);
-      alert('Token 已保存到本机');
-      var box = document.getElementById('appUpdatePatBox');
-      if (box) box.style.display = 'none';
-      var dispatchBtn = document.getElementById('appDispatchBtn');
-      if (dispatchBtn) dispatchBtn.style.display = '';
-    }).catch(function(err){
-      alert('保存 Token 失败：' + (err && err.message || err));
-    });
-  }
-
-  function appUpdateDispatch(){
-    var btn = document.getElementById('appDispatchBtn');
-    var statusText = document.getElementById('appUpdateStatusText');
-    var logOut = document.getElementById('appUpdateLogOutput');
-    var progress = document.getElementById('appUpdateProgress');
-    var patBox = document.getElementById('appUpdatePatBox');
-
-    if (btn) { btn.disabled = true; btn.textContent = '触发中…'; }
-    if (progress) progress.style.display = '';
-    if (statusText) { statusText.textContent = '正在向 GitHub 提交编译请求…'; statusText.style.color = 'var(--text3)'; }
-    if (logOut) logOut.textContent = '';
-
-    api('/api/app/update/dispatch', 'POST', {}).then(function(data){
-      if (data.error || !data.ok) throw new Error(data.error || '触发失败');
-      if (statusText) { statusText.textContent = '已触发 GitHub Actions 构建（版本 ' + (data.version || '') + '），正在轮询状态…'; statusText.style.color = 'var(--accent)'; }
-      if (logOut) logOut.textContent = '仓库：' + (data.repo || '') + '\n版本：' + (data.version || '') + '\n\n构建日志与产物将在 GitHub Actions 完成后写入 Draft Release。';
-      if (btn) { btn.disabled = false; btn.textContent = '编译并发布'; }
-      if (appUpdatePollTimer) clearInterval(appUpdatePollTimer);
-      appUpdatePollTimer = setInterval(appUpdatePollRun, 5000);
-      appUpdatePollRun();
-    }).catch(function(err){
-      var msg = (err && err.message || String(err));
-      if (msg.indexOf('401') !== -1 || msg.indexOf('PAT') !== -1 || msg.indexOf('未配置') !== -1) {
-        if (patBox) patBox.style.display = '';
-      }
-      if (statusText) { statusText.textContent = '触发失败：' + msg; statusText.style.color = 'var(--red)'; }
-      if (btn) { btn.disabled = false; btn.textContent = '编译并发布'; }
-    });
-  }
-
-  function appUpdatePollRun(){
-    var statusText = document.getElementById('appUpdateStatusText');
-    var logOut = document.getElementById('appUpdateLogOutput');
-    apiGet('/api/app/update/run').then(function(data){
-      var run = data && data.run;
-      if (!run) {
-        if (statusText) statusText.textContent = '暂未获取到运行状态';
-        return;
-      }
-      var stateText = run.status;
-      if (run.conclusion) stateText += ' / ' + run.conclusion;
-      if (statusText) statusText.textContent = '构建状态：' + stateText;
-      var lines = [
-        '工作流：' + (run.name || ''),
-        '状态：' + stateText,
-        '链接：' + (run.html_url || ''),
-        '开始：' + (run.created_at || ''),
-      ];
-      if (logOut) logOut.textContent = lines.join('\n');
-      if (run.status === 'completed') {
-        if (appUpdatePollTimer) { clearInterval(appUpdatePollTimer); appUpdatePollTimer = null; }
-        if (run.conclusion === 'success') {
-          if (statusText) { statusText.textContent = '构建成功，请前往 GitHub Draft Release 发布'; statusText.style.color = 'var(--green)'; }
-        } else {
-          if (statusText) { statusText.textContent = '构建结束：' + run.conclusion; statusText.style.color = 'var(--red)'; }
-        }
-      }
-    }).catch(function(err){
-      if (statusText) statusText.textContent = '轮询状态失败：' + (err && err.message || err);
     });
   }
 
@@ -6189,8 +6118,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.extWfPresetInput = extWfPresetInput;
   window.extRenderWorkflowPage = extRenderWorkflowPage;
   window.checkAppUpdate = checkAppUpdate;
-  window.appUpdateSavePat = appUpdateSavePat;
-  window.appUpdateDispatch = appUpdateDispatch;
 })();
 </script>
 </body>
