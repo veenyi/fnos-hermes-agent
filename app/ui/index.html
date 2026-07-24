@@ -658,9 +658,12 @@
         flex-shrink: 0; position: static;
         width: 100%; flex-direction: row; height: auto; padding: 6px 12px;
         border-right: none; border-bottom: 1px solid var(--border);
+        overflow-x: auto; overflow-y: hidden;
+        -webkit-overflow-scrolling: touch; scrollbar-width: none;
       }
-      .nav-items{flex-direction:row;gap:6px;flex:1;justify-content:center;width:auto;padding:0}
-      .nav-item{width:auto;padding:0 10px;height:34px}
+      .sidebar::-webkit-scrollbar{display:none}
+      .nav-items{flex-direction:row;gap:6px;flex:0 0 auto;justify-content:flex-start;width:max-content;padding:0}
+      .nav-item{width:auto;padding:0 10px;height:34px;flex-shrink:0}
       .nav-label{font-size:12px}
       .main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px}
       .view{display:none}
