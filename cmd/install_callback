@@ -295,6 +295,40 @@ ensure_tui_bundle() {
 }
 
 # ---------------------------------------------------------------------------
+# 3.7 补齐 WhatsApp bridge 脚本（hermes-agent 0.19.0 wheel 未打包，需本应用提供）
+# ---------------------------------------------------------------------------
+ensure_whatsapp_bridge() {
+    # bridge 脚本随本应用打包在 ${APP_DIR}/server/whatsapp-bridge/
+    local BRIDGE_SRC="${APP_DIR}/server/whatsapp-bridge"
+    if [ ! -d "${BRIDGE_SRC}" ] || [ ! -f "${BRIDGE_SRC}/bridge.js" ]; then
+        log_msg "WARNING: bundled whatsapp-bridge not found at ${BRIDGE_SRC}, skipping"
+        return 0
+    fi
+
+    local HERMES_CLI_DIR
+    HERMES_CLI_DIR=$("${VENV_DIR}/bin/python3" -c "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))" 2>/dev/null)
+    if [ -z "${HERMES_CLI_DIR}" ] || [ ! -d "${HERMES_CLI_DIR}" ]; then
+        log_msg "WARNING: cannot locate hermes_cli package dir, skipping whatsapp-bridge provisioning"
+        return 0
+    fi
+
+    local SP
+    SP=$(dirname "${HERMES_CLI_DIR}")
+    local DST="${SP}/scripts/whatsapp-bridge"
+
+    log_msg ">>> provisioning WhatsApp bridge → ${DST}"
+    mkdir -p "${DST}"
+    cp -r "${BRIDGE_SRC}/." "${DST}/"
+    chmod -R u+rwX "${DST}" 2>/dev/null || true
+
+    if [ -f "${DST}/bridge.js" ] && [ -f "${DST}/package.json" ]; then
+        log_msg "WhatsApp bridge provisioned: ${DST}/bridge.js"
+    else
+        log_msg "WARNING: WhatsApp bridge copy incomplete (bridge.js/package.json missing)"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # 1. 创建数据目录
 # ---------------------------------------------------------------------------
 log_msg "Creating data directories under ${DATA_DIR} ..."
@@ -399,6 +433,11 @@ ensure_node
 # 3.6 补齐 tui_dist/entry.js（对话 TUI 增强，非致命）
 # ---------------------------------------------------------------------------
 ensure_tui_bundle
+
+# ---------------------------------------------------------------------------
+# 3.7 补齐 WhatsApp bridge 脚本（hermes-agent 0.19.0 wheel 未打包，非致命）
+# ---------------------------------------------------------------------------
+ensure_whatsapp_bridge
 
 # ---------------------------------------------------------------------------
 # 4. 部署 prompts

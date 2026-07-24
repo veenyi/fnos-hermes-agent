@@ -721,6 +721,13 @@
     .ext-card-title{font-size:13px;font-weight:600;color:var(--text,#e8eaed);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .ext-card-desc{font-size:12px;color:var(--text3,#8a909c);line-height:1.45;min-height:32px}
     .ext-card-actions{display:flex;gap:6px;margin-top:2px}
+    .ext-card-sub{font-size:11px;color:var(--text3,#8a909c);margin-top:-2px}
+    .ext-dept-chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+    .ext-dept-chip{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--border,#2a2f3a);color:var(--text3,#8a909c);background:var(--bg2,#1b1f27);cursor:pointer;transition:all .15s}
+    .ext-dept-chip:hover{color:var(--text,#e8eaed)}
+    .ext-dept-chip.active{color:var(--accent,#4f8cff);border-color:var(--accent,#4f8cff);background:color-mix(in srgb,var(--accent,#4f8cff) 14%,transparent)}
+    .ext-team-members{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+    .ext-team-current{margin-bottom:12px}
     .ext-input{flex:1;min-width:200px;padding:7px 11px;border-radius:8px;border:1px solid var(--border,#2a2f3a);background:var(--bg2,#ffffff);color:var(--text,rgba(14,14,15,1));font-size:13px;outline:none;transition:border-color .15s}
     [theme-mode="dark"] .ext-input{background:var(--bg2,#1c1c20);color:var(--text,rgba(255,255,255,0.93))}
     .ext-input:focus{border-color:var(--accent,#4f8cff)}
@@ -930,6 +937,8 @@
               <span class="ext-tab" data-tab="workflow" onclick="extSwitchTab('workflow')">🔄 工作流</span>
               <span class="ext-tab" data-tab="memory" onclick="extSwitchTab('memory')">🧠 记忆</span>
               <span class="ext-tab" data-tab="agents" onclick="extSwitchTab('agents')">🎭 多智能体</span>
+              <span class="ext-tab" data-tab="experts" onclick="extSwitchTab('experts')">🧑‍💼 专家</span>
+              <span class="ext-tab" data-tab="team" onclick="extSwitchTab('team')">👥 专家团</span>
             </div>
 
             <!-- 工具 -->
@@ -948,6 +957,7 @@
             <div class="ext-pane" id="extPane-skills">
               <div class="ext-subtabs" id="extSkillTabs">
                 <span class="ext-subtab active" data-st="local" onclick="extSwitchSkillTab('local')">本地已安装</span>
+                <span class="ext-subtab" data-st="native" onclick="extSwitchSkillTab('native')">原生技能</span>
                 <span class="ext-subtab" data-st="store" onclick="extSwitchSkillTab('store')">在线技能商店</span>
                 <span class="ext-subtab" data-st="hub" onclick="extSwitchSkillTab('hub')">SkillHub</span>
               </div>
@@ -959,6 +969,14 @@
                   <span class="ext-hint" id="extLocalHint" style="margin:0"></span>
                 </div>
                 <div class="ext-grid" id="extLocalSkills"></div>
+              </div>
+
+              <div class="ext-subpane" id="extSkill-native">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                  <button class="btn btn-sm" onclick="extLoadNativeSkills()">刷新</button>
+                  <span class="ext-hint" id="extNativeSkillHint" style="margin:0">原生 Hermes 技能（来自 /proxy/dashboard），可开关。</span>
+                </div>
+                <div class="ext-grid" id="extNativeSkills"></div>
               </div>
 
               <div class="ext-subpane" id="extSkill-store">
@@ -1028,6 +1046,32 @@
             <div class="ext-pane" id="extPane-agents">
               <div class="ext-hint">选择对话人格，发送消息时自动注入对应系统指令（LightAgent 多智能体角色）。</div>
               <div class="ext-grid" id="extPersonaGrid"></div>
+            </div>
+
+            <!-- 专家（agency-agents-zh 268 角色） -->
+            <div class="ext-pane" id="extPane-experts">
+              <div class="ext-hint">内置 <b id="extExpertTotal">268</b> 个来自 agency-agents-zh 的 AI 专家角色，按部门筛选 / 搜索，点「使用」即注入该角色系统指令。数据来源于 <a href="https://github.com/jnMetaCode/agency-agents-zh" target="_blank" rel="noopener">jnMetaCode/agency-agents-zh</a>。</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+                <input id="extExpertSearch" class="ext-input" type="text" placeholder="搜索角色名 / 描述，如 前端、股票、法务…" oninput="extRenderExperts()" style="max-width:280px" />
+                <div id="extExpertDepts" class="ext-dept-chips"></div>
+              </div>
+              <div class="ext-grid" id="extExpertGrid"></div>
+            </div>
+
+            <!-- 专家团（多智能体组队） -->
+            <div class="ext-pane" id="extPane-team">
+              <div class="ext-hint">勾选多个专家组成「专家团」，开启后 Hermes 将以多智能体协作模式工作——按成员专长分派子任务并汇总。类似腾讯的多 Agent 组队互动。</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+                <input id="extTeamName" class="ext-input" type="text" placeholder="专家团名称（可选）" style="max-width:220px" />
+                <button class="btn btn-sm" onclick="extBuildTeam()">🚀 组建并使用专家团</button>
+                <button class="btn btn-sm" onclick="extClearTeam()">清除专家团</button>
+                <span class="ext-hint" id="extTeamHint" style="margin:0"></span>
+              </div>
+              <div id="extTeamCurrent" class="ext-team-current"></div>
+              <div class="ext-subsection">
+                <div class="ext-section-title">从专家库选择成员（可多选）</div>
+                <div class="ext-grid" id="extTeamGrid"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -2702,8 +2746,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // 角色 / 人格（多智能体切换）：注入系统指令，用户气泡保持原样
       try {
       var _p = (chatState && chatState.persona) || (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default';
-      var _pobj = extAllPersonas()[_p] || null;
-        var _pfx = (_pobj && _pobj.prompt) ? _pobj.prompt : '';
+      var _pfx = '';
+      if (_p === '__team__') {
+        _pfx = extBuildTeamPrompt();
+      } else {
+        var _pobj = extLookupPersona(_p);
+        _pfx = (_pobj && _pobj.prompt) ? _pobj.prompt : '';
+      }
         if (_pfx) {
           if (typeof sendContent === 'string') {
             sendContent = _pfx + "\n\n" + sendContent;
@@ -3209,18 +3258,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if(!ext.mcp_servers) ext.mcp_servers = [];
     if(!ext.skills_dirs) ext.skills_dirs = [];
     if(!ext.persona) ext.persona = "default";
+    if(!ext.team) ext.team = [];
+    if(ext.team_name === undefined) ext.team_name = "";
     if(!ext.memory) ext.memory = { enabled:true, char_limit:2200 };
 
-    // 工具集卡片网格
+    // 工具集卡片网格（优先原生 25 个，失败回退静态 11 个）
+    if (!_nativeToolsetsLoaded && window._nativeToolsets === undefined) extLoadNativeToolsets();
     var grid = document.getElementById('extToolsetGrid');
-    if(grid) grid.innerHTML = EXT_TOOLSETS.map(function(t){
-      var on = !!ext.toolsets[t.id];
-      return '<div class="ext-card'+(on?' on':'')+'" style="cursor:pointer" onclick="extToggleToolset(\''+t.id+'\')">'+
-        '<div class="ext-card-head"><span class="ext-card-icon">'+(EXT_ICONS[t.id]||"🔧")+'</span>'+
-        '<span class="ext-card-title">'+escapeHtml(t.label)+'</span>'+
-        '<span class="ext-badge '+(on?'':'muted')+'">'+(on?'已启用':'关闭')+'</span></div>'+
-        '<div class="ext-card-desc">'+escapeHtml(t.desc)+'</div></div>';
-    }).join('');
+    if(grid){
+      var nts = window._nativeToolsets;
+      if (nts){
+        if (nts['delegation']) ext.toolsets['delegation'] = !!nts['delegation'].enabled;
+        grid.innerHTML = Object.keys(nts).map(function(k){
+          var t = nts[k];
+          var on = !!t.enabled;
+          var ic = EXT_ICONS[k] || "🔧";
+          return '<div class="ext-card'+(on?' on':'')+'" style="cursor:pointer" onclick="extToggleToolset(\''+k+'\')">'+
+            '<div class="ext-card-head"><span class="ext-card-icon">'+ic+'</span>'+
+            '<span class="ext-card-title">'+escapeHtml(t.label||t.name)+'</span>'+
+            '<span class="ext-badge '+(on?'':'muted')+'">'+(on?'已启用':'关闭')+'</span></div>'+
+            '<div class="ext-card-desc">'+escapeHtml(t.description||'')+'</div></div>';
+        }).join('');
+      } else {
+        grid.innerHTML = EXT_TOOLSETS.map(function(t){
+          var on = !!ext.toolsets[t.id];
+          return '<div class="ext-card'+(on?' on':'')+'" style="cursor:pointer" onclick="extToggleToolset(\''+t.id+'\')">'+
+            '<div class="ext-card-head"><span class="ext-card-icon">'+(EXT_ICONS[t.id]||"🔧")+'</span>'+
+            '<span class="ext-card-title">'+escapeHtml(t.label)+'</span>'+
+            '<span class="ext-badge '+(on?'':'muted')+'">'+(on?'已启用':'关闭')+'</span></div>'+
+            '<div class="ext-card-desc">'+escapeHtml(t.desc)+'</div></div>';
+        }).join('');
+      }
+    }
 
     // MCP 列表（工具页签内）
     var ml = document.getElementById('extMcpList');
@@ -3285,6 +3354,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   function extToggleToolset(id){
+    var nts = window._nativeToolsets;
+    if (nts && nts[id]){
+      var t = nts[id];
+      var newOn = !t.enabled;
+      fetch(apiUrl('/proxy/dashboard/api/tools/toolsets/'+encodeURIComponent(id)), {
+        method:'PUT', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ enabled: newOn })
+      }).then(function(r){ return r.json().catch(function(){ return {}; }); }).then(function(){
+        t.enabled = newOn; nts[id] = t; settingsRenderExtensions(); settingsSaveConfig();
+      }).catch(function(){ t.enabled = newOn; nts[id] = t; settingsRenderExtensions(); settingsSaveConfig(); });
+      return;
+    }
     var ext = settingsState.config.extensions;
     ext.toolsets[id] = !ext.toolsets[id];
     settingsRenderExtensions();
@@ -3311,10 +3392,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var pane = document.getElementById('extPane-'+tab);
     if(pane) pane.classList.add('active');
     if(tab === 'skills' && !window._extLocalLoaded) extLoadLocalSkills();
+    if(tab === 'experts'){ extEnsureAgencyLib(function(){ extRenderExperts(); }); }
+    if(tab === 'team'){ extRenderTeam(); }
   }
   function extSwitchSkillTab(st){
     document.querySelectorAll('#extSkillTabs .ext-subtab').forEach(function(el){ el.classList.toggle('active', el.dataset.st === st); });
-    ['local','store','hub'].forEach(function(s){ var p = document.getElementById('extSkill-'+s); if(p) p.classList.toggle('active', s === st); });
+    ['local','native','store','hub'].forEach(function(s){ var p = document.getElementById('extSkill-'+s); if(p) p.classList.toggle('active', s === st); });
+    if(st === 'local' && !window._extLocalLoaded){ extLoadLocalSkills(); window._extLocalLoaded = true; }
+    if(st === 'native' && !window._extNativeLoaded){ extLoadNativeSkills(); window._extNativeLoaded = true; }
     if(st === 'store'){
       window._extHermesStoreType = window._extHermesStoreType || 'all';
       if(!window._extHermesListLoaded){ extSearchHermesStore(); window._extHermesListLoaded = true; }
@@ -3332,6 +3417,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   // ── 工作流 / 记忆 / 人格 ──
   function extToggleWorkflow(){
+    var nts = window._nativeToolsets;
+    if (nts && nts['delegation']){ extToggleToolset('delegation'); return; }
     var ext = settingsState.config.extensions;
     ext.toolsets['delegation'] = !ext.toolsets['delegation'];
     settingsRenderExtensions();
@@ -3708,6 +3795,222 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // 兼容旧绑定（已无下拉框），统一走卡片选择
     var v = (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default';
     extSelectPersona(v);
+  }
+
+  // ───────────────────────────────────────────────────────────
+  // agency-agents-zh 专家库（懒加载 3.5MB，仅在打开「专家」页时加载）
+  // ───────────────────────────────────────────────────────────
+  var _agencyLibLoading = false;
+  function extEnsureAgencyLib(cb){
+    if (window.AGENCY_PERSONAS){ cb && cb(); return; }
+    if (_agencyLibLoading) return;
+    _agencyLibLoading = true;
+    var s = document.createElement('script');
+    s.src = 'js/personas_library.js';
+    s.onload = function(){ _agencyLibLoading = false; cb && cb(); };
+    s.onerror = function(){ _agencyLibLoading = false; cb && cb(); };
+    document.head.appendChild(s);
+  }
+  function extAgencyMap(){
+    var m = {};
+    if (window.AGENCY_PERSONAS) window.AGENCY_PERSONAS.forEach(function(p){ m[p.id] = p; });
+    return m;
+  }
+  // 解析任意人格 key：内置 / 自定义 / 专家库
+  function extLookupPersona(key){
+    var all = extAllPersonas();
+    if (all[key]) return all[key];
+    var m = extAgencyMap();
+    if (m[key]) return m[key];
+    return null;
+  }
+
+  // ── 专家画廊 ──
+  var _extExpertDept = 'all';
+  function extRenderExperts(){
+    var grid = document.getElementById('extExpertGrid');
+    if (!grid) return;
+    if (!window.AGENCY_PERSONAS){
+      grid.innerHTML = '<div class="ext-empty">专家库加载中…（若长时间无反应，请确认 js/personas_library.js 可访问）</div>';
+      return;
+    }
+    var kw = ((document.getElementById('extExpertSearch') || {}).value || '').trim().toLowerCase();
+    var list = window.AGENCY_PERSONAS.filter(function(p){
+      if (_extExpertDept !== 'all' && p.dept !== _extExpertDept) return false;
+      if (kw){
+        var hay = (p.label + ' ' + p.desc + ' ' + p.dept_label).toLowerCase();
+        if (hay.indexOf(kw) === -1) return false;
+      }
+      return true;
+    });
+    var chips = document.getElementById('extExpertDepts');
+    if (chips){
+      var html = '<span class="ext-dept-chip' + (_extExpertDept==='all'?' active':'') + '" onclick="extExpertSetDept(\'all\')">全部</span>';
+      (window.AGENCY_DEPTS||[]).forEach(function(d){
+        html += '<span class="ext-dept-chip' + (_extExpertDept===d.id?' active':'') + '" onclick="extExpertSetDept(\''+d.id+'\')">'+escapeHtml(d.label)+' '+d.count+'</span>';
+      });
+      chips.innerHTML = html;
+    }
+    var tot = document.getElementById('extExpertTotal');
+    if (tot) tot.textContent = window.AGENCY_PERSONAS.length;
+    if (!list.length){ grid.innerHTML = '<div class="ext-empty">没有匹配的角色</div>'; return; }
+    var cur = (settingsState.config.extensions && settingsState.config.extensions.persona) || (chatState && chatState.persona) || 'default';
+    grid.innerHTML = list.map(function(p){
+      var active = (cur === p.id);
+      return '<div class="ext-card'+(active?' on':'')+'">'+
+        '<div class="ext-card-head"><span class="ext-card-icon">'+(p.emoji||"🤖")+'</span>'+
+        '<span class="ext-card-title">'+escapeHtml(p.label)+'</span>'+
+        '<span class="ext-badge '+(active?'':'muted')+'">'+(active?'使用中':'')+'</span></div>'+
+        '<div class="ext-card-sub">'+escapeHtml(p.dept_label)+'</div>'+
+        '<div class="ext-card-desc">'+(p.desc?escapeHtml(p.desc):'')+'</div>'+
+        '<div class="ext-card-actions">'+
+          '<button class="btn btn-sm" onclick="extUseAgency(\''+p.id+'\')">'+(active?'使用中':'使用')+'</button>'+
+          '<button class="btn btn-sm" onclick="extFavAgency(\''+p.id+'\')">收藏</button>'+
+        '</div></div>';
+    }).join('');
+  }
+  function extExpertSetDept(d){ _extExpertDept = d; extRenderExperts(); }
+  function extUseAgency(id){
+    if (window.chatState) chatState.persona = id;
+    try { localStorage.setItem('hermes_persona', id); } catch(e){}
+    if (settingsState.config.extensions) settingsState.config.extensions.persona = id;
+    settingsSaveConfig();
+    settingsRenderExtensions(); renderPersonaBar(); extRenderExperts();
+  }
+  function extFavAgency(id){
+    var p = extAgencyMap()[id]; if (!p) return;
+    var ext = settingsState.config.extensions;
+    ext.personas = ext.personas || {};
+    ext.personas[id] = { label:p.label, emoji:p.emoji, prompt:p.prompt };
+    settingsSaveConfig();
+    settingsRenderExtensions(); renderPersonaBar();
+  }
+
+  // ── 专家团（多智能体组队）──
+  function extRenderTeam(){
+    var grid = document.getElementById('extTeamGrid');
+    if (grid){
+      if (!window.AGENCY_PERSONAS){
+        grid.innerHTML = '<div class="ext-empty">专家库加载中…</div>';
+        extEnsureAgencyLib(function(){ extRenderTeam(); });
+      } else {
+        var sel = (settingsState.config.extensions && settingsState.config.extensions.team) || [];
+        grid.innerHTML = window.AGENCY_PERSONAS.map(function(p){
+          var on = sel.indexOf(p.id) !== -1;
+          return '<div class="ext-card'+(on?' on':'')+'" style="cursor:pointer" onclick="extToggleTeamMember(\''+p.id+'\')">'+
+            '<div class="ext-card-head"><span class="ext-card-icon">'+(p.emoji||"🤖")+'</span>'+
+            '<span class="ext-card-title">'+escapeHtml(p.label)+'</span>'+
+            '<span class="ext-badge '+(on?'':'muted')+'">'+(on?'已选':'选')+'</span></div>'+
+            '<div class="ext-card-sub">'+escapeHtml(p.dept_label)+'</div></div>';
+        }).join('');
+      }
+    }
+    extRenderTeamCurrent();
+  }
+  function extToggleTeamMember(id){
+    var ext = settingsState.config.extensions;
+    ext.team = ext.team || [];
+    var i = ext.team.indexOf(id);
+    if (i === -1) ext.team.push(id); else ext.team.splice(i, 1);
+    extRenderTeam();
+  }
+  function extRenderTeamCurrent(){
+    var box = document.getElementById('extTeamCurrent');
+    if (!box) return;
+    var ext = settingsState.config.extensions;
+    var sel = ext.team || [];
+    var nm = document.getElementById('extTeamName');
+    if (nm && !nm.value) nm.value = ext.team_name || '';
+    if (!sel.length){ box.innerHTML = '<div class="ext-empty">尚未选择成员。在下方勾选专家后点「组建并使用专家团」。</div>'; return; }
+    var m = extAgencyMap();
+    box.innerHTML = '<div class="ext-team-members">当前成员（'+sel.length+(ext.team_name?' · '+escapeHtml(ext.team_name):'')+'）：'+
+      sel.map(function(id){ var p=m[id]; return '<span class="ext-persona-bar'+(ext.persona==='__team__'?' active':'')+'">'+escapeHtml((p&&p.emoji)||'🤖')+' '+(p?escapeHtml(p.label):id)+'</span>'; }).join('')+'</div>';
+  }
+  function extBuildTeam(){
+    var ext = settingsState.config.extensions;
+    ext.team = ext.team || [];
+    var nm = document.getElementById('extTeamName');
+    ext.team_name = nm ? nm.value.trim() : '';
+    if (!ext.team.length){ var h=document.getElementById('extTeamHint'); if(h) h.textContent='请先勾选至少一名成员'; return; }
+    if (window.chatState) chatState.persona = '__team__';
+    try { localStorage.setItem('hermes_persona', '__team__'); } catch(e){}
+    ext.persona = '__team__';
+    settingsSaveConfig();
+    settingsRenderExtensions(); renderPersonaBar(); extRenderTeamCurrent();
+    var h = document.getElementById('extTeamHint'); if (h) h.textContent = '专家团已启用，发送消息将以多智能体模式协作。';
+  }
+  function extClearTeam(){
+    var ext = settingsState.config.extensions;
+    ext.team = [];
+    if (ext.persona === '__team__'){ ext.persona = 'default'; if (window.chatState) chatState.persona = 'default'; }
+    settingsSaveConfig();
+    settingsRenderExtensions(); renderPersonaBar(); extRenderTeam();
+  }
+  function extBuildTeamPrompt(){
+    var ext = settingsState.config.extensions || {};
+    var sel = ext.team || [];
+    if (!sel.length) return '';
+    var m = extAgencyMap();
+    var lines = sel.map(function(id){
+      var p = m[id];
+      if (!p) return '- ' + id;
+      return '- 【' + p.label + '】(' + p.dept_label + ')：' + (p.desc || '');
+    });
+    var name = ext.team_name ? ('「' + ext.team_name + '」') : '';
+    return '你正在以多智能体专家团' + name + '模式协作。团队由以下专家组成，请根据用户需求判断由哪位专家主导，并在复杂任务中拆分给对应专家协作、最后汇总：\n' + lines.join('\n') + '\n\n当任务明确属于某位专家领域时，以该专家的身份与口吻作答；跨领域任务请综合各方视角。';
+  }
+
+  // ── 原生 Hermes 技能（/proxy/dashboard/api/skills）──
+  function extLoadNativeSkills(){
+    var box = document.getElementById('extNativeSkills');
+    if (!box) return;
+    box.innerHTML = '<div class="ext-empty">加载中…</div>';
+    fetch(apiUrl('/proxy/dashboard/api/skills'), { cache:'no-store' })
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(list){
+        window._nativeSkills = list || [];
+        if (!list || !list.length){ box.innerHTML = '<div class="ext-empty">未获取到原生技能（请确认仪表盘已启动）。</div>'; return; }
+        box.innerHTML = list.map(function(s){
+          var on = !!s.enabled;
+          var nm = (s.name||'').replace(/'/g, "\\'");
+          return '<div class="ext-card'+(on?' on':'')+'">'+
+            '<div class="ext-card-head"><span class="ext-card-icon">📦</span>'+
+            '<span class="ext-card-title">'+escapeHtml(s.name||'')+'</span>'+
+            '<span class="ext-badge '+(on?'':'muted')+'">'+(on?'已启用':'关闭')+'</span></div>'+
+            (s.category?'<div class="ext-card-sub">'+escapeHtml(s.category)+'</div>':'')+
+            '<div class="ext-card-desc">'+(s.description?escapeHtml(s.description):'')+'</div>'+
+            '<div class="ext-card-actions"><button class="btn btn-sm" onclick="extToggleNativeSkill(\''+nm+'\')">'+(on?'关闭':'启用')+'</button></div></div>';
+        }).join('');
+      })
+      .catch(function(e){ box.innerHTML = '<div class="ext-empty">加载失败：'+(e&&e.message||e)+'（请先在「概览」启动仪表盘）</div>'; });
+  }
+  function extToggleNativeSkill(name){
+    var list = window._nativeSkills || [];
+    var s = null;
+    for (var i=0;i<list.length;i++){ if (list[i].name===name){ s=list[i]; break; } }
+    if (!s) return;
+    var newOn = !s.enabled;
+    fetch(apiUrl('/proxy/dashboard/api/skills/toggle'), {
+      method:'PUT', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ name:name, enabled:newOn })
+    }).then(function(r){ return r.json().catch(function(){ return {}; }); }).then(function(){
+      s.enabled = newOn; window._nativeSkills = list; extLoadNativeSkills();
+    }).catch(function(){ s.enabled = newOn; window._nativeSkills = list; extLoadNativeSkills(); });
+  }
+
+  // ── 原生工具集（/proxy/dashboard/api/tools/toolsets）──
+  var _nativeToolsetsLoaded = false;
+  function extLoadNativeToolsets(){
+    if (_nativeToolsetsLoaded) return;
+    fetch(apiUrl('/proxy/dashboard/api/tools/toolsets'), { cache:'no-store' })
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(list){
+        window._nativeToolsets = {};
+        (list||[]).forEach(function(t){ if (t && t.name) window._nativeToolsets[t.name] = t; });
+        _nativeToolsetsLoaded = true;
+        settingsRenderExtensions();
+      })
+      .catch(function(e){ window._nativeToolsets = null; settingsRenderExtensions(); });
   }
 
   // 聊天工具栏角色快速切换条（内置 + 自定义）

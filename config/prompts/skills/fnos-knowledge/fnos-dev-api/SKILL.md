@@ -93,7 +93,7 @@ manifest 是 INI 格式纯文本文件，放在应用包根目录，无扩展名
 ```ini
 appname               = hermes-agent
 version               = 0.18.0-720
-install_dep_apps      = bunjs
+install_dep_apps      = nodejs
 display_name          = "Hermes Agent"
 desc                  = "Hermes Agent 开源 AI Agent..."
 platform              = all
@@ -108,7 +108,7 @@ micro_app             = true
 checksum              =
 ```
 
-> 注：`platform = all` 表示同时支持 x86 和 ARM（仅当包内不含架构特定二进制时使用）。本仓库通过依赖 `bunjs` 获取运行时，自身无原生二进制，因此使用 `all`。
+> 注：`platform = all` 表示同时支持 x86 和 ARM（仅当包内不含架构特定二进制时使用）。本仓库通过依赖 `nodejs` 获取运行时，自身无原生二进制，因此使用 `all`。
 
 ## 三、安装后目录结构与 Symlink
 

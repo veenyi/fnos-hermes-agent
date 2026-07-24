@@ -104,6 +104,39 @@ ensure_uv() {
 }
 
 # ---------------------------------------------------------------------------
+# 补齐 WhatsApp bridge 脚本（hermes-agent 0.19.0 wheel 未打包，需本应用提供）
+# ---------------------------------------------------------------------------
+ensure_whatsapp_bridge() {
+    local BRIDGE_SRC="${APP_DIR}/server/whatsapp-bridge"
+    if [ ! -d "${BRIDGE_SRC}" ] || [ ! -f "${BRIDGE_SRC}/bridge.js" ]; then
+        log_msg "WARNING: bundled whatsapp-bridge not found at ${BRIDGE_SRC}, skipping"
+        return 0
+    fi
+
+    local HERMES_CLI_DIR
+    HERMES_CLI_DIR=$("${VENV_DIR}/bin/python3" -c "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))" 2>/dev/null)
+    if [ -z "${HERMES_CLI_DIR}" ] || [ ! -d "${HERMES_CLI_DIR}" ]; then
+        log_msg "WARNING: cannot locate hermes_cli package dir, skipping whatsapp-bridge provisioning"
+        return 0
+    fi
+
+    local SP
+    SP=$(dirname "${HERMES_CLI_DIR}")
+    local DST="${SP}/scripts/whatsapp-bridge"
+
+    log_msg ">>> provisioning WhatsApp bridge → ${DST}"
+    mkdir -p "${DST}"
+    cp -r "${BRIDGE_SRC}/." "${DST}/"
+    chmod -R u+rwX "${DST}" 2>/dev/null || true
+
+    if [ -f "${DST}/bridge.js" ] && [ -f "${DST}/package.json" ]; then
+        log_msg "WhatsApp bridge provisioned: ${DST}/bridge.js"
+    else
+        log_msg "WARNING: WhatsApp bridge copy incomplete (bridge.js/package.json missing)"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # 1. 读取目标版本号（从 hermes-version.env，manifest 不部署到设备）
 # ---------------------------------------------------------------------------
 if [ ! -f "${APP_DIR}/config/bootstrap/hermes-version.env" ]; then
@@ -197,6 +230,9 @@ if [ ! -f "${HERMES}" ]; then
 fi
 
 log_msg "hermes binary verified"
+
+# 补齐 WhatsApp bridge（非致命）
+ensure_whatsapp_bridge
 
 ACTUAL_VER=$("$UV" pip show --python "${VENV_DIR}/bin/python3" hermes-agent 2>/dev/null | grep -i '^version' | awk '{print $2}' || echo "unknown")
 log_msg "hermes upgraded: ${ACTUAL_VER}"

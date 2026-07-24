@@ -21,3 +21,6 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Temp clone of upstream role repo (regenerated via gen_personas.py)
+_agency_clone/

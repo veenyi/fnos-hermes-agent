@@ -1,9 +1,16 @@
-// Hermes Agent 监控服务 — 基于 Bun 的 HTTP 服务（Unix Socket / TCP）
-import { spawn, spawnSync } from "bun";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync } from "fs";
+// Hermes Agent 监控服务 — 基于 Node.js 的 HTTP 服务（Unix Socket），WebSocket 由 ws 库提供
+import { spawn, spawnSync } from "child_process";
+import { createRequire } from "module";
+import { Readable } from "stream";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync } from "fs";
 import { randomBytes } from "crypto";
 import { networkInterfaces } from "os";
 import { PROVIDER_PRESETS, PROVIDER_MODELS, PROVIDER_API_KEYS, PROVIDER_CLASSES, PROVIDER_HERMES_IDS } from "./provider-config.js";
+
+// 加载 vendor 目录内置的 ws 库（Node.js 无内置 WebSocket 服务器）
+const _require = createRequire(import.meta.url);
+const wsLib = _require("./_vendor/ws/index.js");
+const { WebSocketServer, WebSocket } = wsLib;
 
 // 自定义 provider 环境变量名：剥离 id 中 "custom-" 前缀后规范化大写
 function customEnvKey(id) {
@@ -245,13 +252,26 @@ const CHANNEL_DEFS = {
 
 // ─── Node.js 运行时探测（hermes TUI 需要 node；版本在安装期由 install_callback 固定） ───
 
+// 解析 Node 二进制：① 打包内置路径 → ② 系统 nodejs 运行时（fnOS 应用中心） → ③ PATH 探测
+function _findNodeInPath() {
+  try {
+    const r = spawnSync("sh", ["-c", "command -v node"], { stdout: "pipe", stderr: "pipe" });
+    const out = (r.stdout || "").toString().trim();
+    if (out && existsSync(out) && (statSync(out).mode & 0o111) !== 0) return out;
+  } catch {}
+  return null;
+}
 const NODE_CANDIDATES = [
   `${APP_DIR}/runtime/node/bin/node`,            // ① 打包内置（最高优先）
   `${DATA_DIR}/node/bin/node`,                   // ② 安装期 ensure_node 下载并固定的路径
+  "/var/apps/nodejs_v24/target/bin/node",        // ③ fnOS 应用中心 Node.js v24
+  "/var/apps/nodejs_v22/target/bin/node",        // ④ fnOS 应用中心 Node.js v22
+  "/var/apps/nodejs_v20/target/bin/node",        // ⑤ fnOS 应用中心 Node.js v20
+  "/var/apps/nodejs/target/bin/node",            // ⑥ 通用 nodejs 路径
 ];
 const resolvedNodeBin = NODE_CANDIDATES.find(p => {
   try { return existsSync(p) && (statSync(p).mode & 0o111) !== 0; } catch { return false; }
-}) || null;
+}) || _findNodeInPath();
 const resolvedNodeDir = resolvedNodeBin ? resolvedNodeBin.replace(/\/[^/]+$/, "") : null;
 
 // ─── 通讯平台 QR 扫码登录相关常量 ────────────────────────────────────────
@@ -294,8 +314,8 @@ try {
   const tuiEntry = `${TUI_DIR}/dist/entry.js`;
   if (!existsSync(tuiEntry)) {
     // 动态探测 hermes_cli 的 tui_dist/entry.js（不硬编码 python 版本）
-    const pyResult = spawnSync(
-      [`${VENV_BIN}/python3`, "-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
+      const pyResult = spawnSync(
+      `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
       { stdout: "pipe", stderr: "pipe" }
     );
     const hermesCli = pyResult.stdout?.toString().trim();
@@ -319,7 +339,7 @@ function pidAliveSync(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 try {
-  const { spawnSync } = require("bun");
+  // spawnSync 已在顶部从 child_process 导入
   spawnSync(["pkill", "-SIGKILL", "-f", "hermes.*(gateway|dashboard)"]);
 } catch {}
 for (const pidFile of [PID_GATEWAY, PID_DASHBOARD]) {
@@ -353,8 +373,8 @@ try {
   }
   // 缓存没有时才执行 hermes --version（可能耗时数秒）
   if (HERMES_VERSION === "unknown") {
-    const { spawnSync } = require("bun");
-    const verResult = spawnSync([HERMES_BIN, "--version"], { stdout: "pipe", stderr: "pipe" });
+    // spawnSync 已在顶部从 child_process 导入
+    const verResult = spawnSync(HERMES_BIN, ["--version"], { stdout: "pipe", stderr: "pipe" });
     const verOut = ((verResult.stdout ? verResult.stdout.toString() : "").trim())
                 || ((verResult.stderr ? verResult.stderr.toString() : "").trim());
     if (verOut) {
@@ -365,8 +385,8 @@ try {
   // 后台异步刷新版本（解决升级后缓存文件仍是旧版本号的问题）
   setTimeout(() => {
     try {
-      const { spawnSync } = require("bun");
-      const r = spawnSync([HERMES_BIN, "--version"], { stdout: "pipe", stderr: "pipe" });
+      // spawnSync 已在顶部从 child_process 导入
+      const r = spawnSync(HERMES_BIN, ["--version"], { stdout: "pipe", stderr: "pipe" });
       const out = ((r.stdout ? r.stdout.toString() : "").trim())
                || ((r.stderr ? r.stderr.toString() : "").trim());
       if (out) {
@@ -562,7 +582,6 @@ function sessionFile(id) {
 }
 function listSessions() {
   try {
-    const { readdirSync } = require("fs");
     const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith(".json"));
     return files.map(f => {
       try {
@@ -1329,67 +1348,59 @@ async function runChatWS(ws, sessionId, message) {
   cleanup();
 }
 
-const wsHandler = {
-  open(ws) {
-    // Dashboard WS 反代
-    if (ws.data.type === "dashboard-proxy") {
-      const { targetUrl } = ws.data;
-      log(`[WS-PROXY] open → ${targetUrl}`);
-      try {
-        // 显式传 Host header 匹配上游 loopback 校验（_is_accepted_host）
-        const upstream = new WebSocket(targetUrl, {
-          headers: {
-            "Host": `${DASHBOARD_BIND}:${DASHBOARD_PORT}`,
-          },
-        });
-        ws.data.upstream = upstream;
-        upstream.addEventListener("open", () => {
-          log(`[WS-PROXY] upstream connected`);
-        });
-        upstream.addEventListener("message", (event) => {
-          try { ws.send(event.data); } catch {}
-        });
-        upstream.addEventListener("close", (event) => {
-          try { ws.close(event.code, event.reason); } catch {}
-          log(`[WS-PROXY] upstream closed code=${event.code}`);
-        });
-        upstream.addEventListener("error", () => {
-          try { ws.close(1006, "upstream error"); } catch {}
-        });
-      } catch (e) {
-        log(`[WS-PROXY] upstream connect failed: ${e?.message || e}`);
-        try { ws.close(1006, "upstream connect failed"); } catch {}
-      }
-      return;
+// WebSocket 连接建立后的事件处理（替换 Bun 的 wsHandler.open/message/close）
+function attachWsHandlers(ws) {
+  // Dashboard WS 反代
+  if (ws.data.type === "dashboard-proxy") {
+    const { targetUrl } = ws.data;
+    log(`[WS-PROXY] open → ${targetUrl}`);
+    try {
+      // 显式传 Host header 匹配上游 loopback 校验（_is_accepted_host）
+      const upstream = new WebSocket(targetUrl, {
+        headers: { "Host": `${DASHBOARD_BIND}:${DASHBOARD_PORT}` },
+      });
+      ws.data.upstream = upstream;
+      upstream.on("open", () => log(`[WS-PROXY] upstream connected`));
+      upstream.on("message", (data) => { try { ws.send(data); } catch {} });
+      upstream.on("close", (code, reason) => {
+        try { ws.close(code, reason.toString()); } catch {}
+        log(`[WS-PROXY] upstream closed code=${code}`);
+      });
+      upstream.on("error", () => { try { ws.close(1006, "upstream error"); } catch {} });
+    } catch (e) {
+      log(`[WS-PROXY] upstream connect failed: ${e?.message || e}`);
+      try { ws.close(1006, "upstream connect failed"); } catch {}
     }
-    // 聊天 WS
-    const { sessionId, message } = ws.data;
-    log(`[WS] open session=${sessionId}`);
-    runChatWS(ws, sessionId, message).catch(err => {
-      log(`[WS] runChatWS error: ${err?.message || err}`);
-      try { ws.send(JSON.stringify({ error: err?.message || "internal error" })); } catch {}
-      try { ws.send(JSON.stringify({ done: true })); } catch {}
-    });
-  },
-  message(ws, msg) {
+    return;
+  }
+  // 聊天 WS
+  const { sessionId, message } = ws.data;
+  log(`[WS] open session=${sessionId}`);
+  runChatWS(ws, sessionId, message).catch(err => {
+    log(`[WS] runChatWS error: ${err?.message || err}`);
+    try { ws.send(JSON.stringify({ error: err?.message || "internal error" })); } catch {}
+    try { ws.send(JSON.stringify({ done: true })); } catch {}
+  });
+
+  ws.on("message", (data) => {
     // Dashboard WS 反代：客户端 → 上游
     if (ws.data.type === "dashboard-proxy") {
-      if (ws.data.upstream && ws.data.upstream.readyState === 1) {
-        try { ws.data.upstream.send(msg); } catch {}
+      if (ws.data.upstream && ws.data.upstream.readyState === WebSocket.OPEN) {
+        try { ws.data.upstream.send(data); } catch {}
       }
       return;
     }
     // Chat WS：前端可发送 {"stop":true} 主动中断
     try {
-      const data = typeof msg === "string" ? JSON.parse(msg) : {};
-      if (data.stop && ws.data.stopCtrl) ws.data.stopCtrl.abort();
+      const msg = data.toString();
+      const d = JSON.parse(msg);
+      if (d.stop && ws.data.stopCtrl) ws.data.stopCtrl.abort();
     } catch {}
-  },
-  close(ws) {
+  });
+
+  ws.on("close", () => {
     if (ws.data.type === "dashboard-proxy") {
-      if (ws.data.upstream) {
-        try { ws.data.upstream.close(); } catch {}
-      }
+      if (ws.data.upstream) { try { ws.data.upstream.close(); } catch {} }
       log(`[WS-PROXY] client closed`);
       return;
     }
@@ -1397,8 +1408,8 @@ const wsHandler = {
     log(`[WS] close session=${sessionId}`);
     wsClients.delete(sessionId);
     if (stopCtrl) stopCtrl.abort();
-  },
-};
+  });
+}
 
 function beijingTime() {
   const d = new Date(Date.now() + 8 * 3600000);
@@ -1518,8 +1529,7 @@ async function stopPid(pidPath) {
 
 async function forceKillHermes() {
   try {
-    const proc = spawn(["pkill", "-SIGKILL", "-f", "hermes.*(gateway|dashboard)"]);
-    await proc.exited;
+    spawnSync("pkill", ["-SIGKILL", "-f", "hermes.*(gateway|dashboard)"]);
   } catch {}
   try { unlinkSync(PID_GATEWAY); } catch {}
   try { unlinkSync(PID_DASHBOARD); } catch {}
@@ -1588,12 +1598,10 @@ function spawnHermes(name, pidPath, args) {
     REQUEST_TIMEOUT:    "600",
   };
 
-  const p = spawn({
-    cmd:    [HERMES_BIN, ...args],
+  const logFd = openSync(logPath, "a");
+  const p = spawn(HERMES_BIN, args, {
     env,
-    stdout: Bun.file(logPath),
-    stderr: Bun.file(logPath),
-    stdin:  "ignore",
+    stdio: ["ignore", logFd, logFd],
   });
 
   p.unref();
@@ -1759,12 +1767,18 @@ async function proxyDashboard(req) {
   try {
     const headers = new Headers(req.headers);
     headers.delete("host");
-    const upstream = await fetch(target, {
-      method:  req.method,
+    // Node 的全局 fetch 在转发流 body（ReadableStream）时必须显式传 duplex:'half'，
+    // 否则报 "RequestInit: duplex option is required when sending a body"。
+    const init = {
+      method: req.method,
       headers,
-      body:    req.method !== "GET" && req.method !== "HEAD" ? req.body : undefined,
-      signal:  AbortSignal.timeout(10000),
-    });
+      signal: AbortSignal.timeout(10000),
+    };
+    if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
+      init.body = req.body;
+      init.duplex = "half";
+    }
+    const upstream = await fetch(target, init);
 
     const respHeaders = new Headers(upstream.headers);
 
@@ -2144,7 +2158,8 @@ function createLogStream(req, lastOffset) {
 // ─── 静态文件服务 ─────────────────────────────────────────────────────
 function serveFile(filePath, contentType) {
   if (!existsSync(filePath)) return new Response("Not Found", { status: 404 });
-  return new Response(Bun.file(filePath), {
+  const stream = Readable.toWeb(createReadStream(filePath));
+  return new Response(stream, {
     headers: { "Content-Type": contentType },
   });
 }
@@ -2265,8 +2280,8 @@ async function handleFetch(req) {
       // 每次检查都重新运行 hermes --version，确保版本准确（不依赖缓存）
       let current = HERMES_VERSION;
       try {
-        const { spawnSync } = require("bun");
-        const vr = spawnSync([HERMES_BIN, "--version"], { stdout: "pipe", stderr: "pipe" });
+        // spawnSync 已在顶部从 child_process 导入
+        const vr = spawnSync(HERMES_BIN, ["--version"], { stdout: "pipe", stderr: "pipe" });
         const vOut = ((vr.stdout ? vr.stdout.toString() : "").trim())
                   || ((vr.stderr ? vr.stderr.toString() : "").trim());
         if (vOut) {
@@ -2351,18 +2366,16 @@ async function handleFetch(req) {
     };
 
     try {
-      const proc = spawn({
-        cmd: [UV_BIN_PATH, "pip", "install", "--python", `${DATA_DIR}/venv/bin/python3`, "--upgrade", "--no-cache", "hermes-agent[all]"],
-        env,
-        stdout: "pipe",
-        stderr: "pipe",
-        stdin: "ignore",
-      });
+      const proc = spawn(
+        UV_BIN_PATH,
+        ["pip", "install", "--python", `${DATA_DIR}/venv/bin/python3`, "--upgrade", "--no-cache", "hermes-agent[all]"],
+        { env, stdio: ["ignore", "pipe", "pipe"] }
+      );
       updateProc = proc;
 
       const decoder = new TextDecoder();
       const collectStream = async (stream, isErr) => {
-        const reader = stream.getReader();
+        const reader = Readable.toWeb(stream).getReader();
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -2381,7 +2394,7 @@ async function handleFetch(req) {
       collectStream(proc.stdout, false);
       collectStream(proc.stderr, true);
 
-      proc.exited.then((code) => {
+      proc.on("exit", (code) => {
         updateExitCode = code;
         updateState = code === 0 ? "done" : "error";
         if (code === 0) {
@@ -2409,8 +2422,8 @@ async function handleFetch(req) {
     let currentVer = HERMES_VERSION;
     if (updateState === "done") {
       try {
-        const { spawnSync } = require("bun");
-        const verResult = spawnSync([HERMES_BIN, "--version"], { stdout: "pipe", stderr: "pipe" });
+        // spawnSync 已在顶部从 child_process 导入
+        const verResult = spawnSync(HERMES_BIN, ["--version"], { stdout: "pipe", stderr: "pipe" });
         const verOut = ((verResult.stdout ? verResult.stdout.toString() : "").trim())
                     || ((verResult.stderr ? verResult.stderr.toString() : "").trim());
         if (verOut) {
@@ -2483,8 +2496,7 @@ async function handleFetch(req) {
     await stopPid(PID_DASHBOARD);
     // 强制杀掉残留的 dashboard 进程（PID 文件可能已失效）
     try {
-      const proc = spawn(["pkill", "-SIGKILL", "-f", "hermes.*dashboard"]);
-      await proc.exited;
+      spawnSync("pkill", ["-SIGKILL", "-f", "hermes.*dashboard"]);
     } catch {}
     if (dbAlive) log("Dashboard stopped (pid=" + dbAlive + ")");
     return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
@@ -2681,6 +2693,22 @@ async function handleFetch(req) {
     return m ? m[1] : "";
   }
 
+  // 从 config.yaml 顶层「列表」块提取条目数组（如 toolsets:）
+  function _extractYamlList(content, key){
+    const block = _yamlBlockOf(content, key);
+    if (!block) return [];
+    const out = [];
+    block.split("\n").forEach(function(line){
+      const m = line.match(/^\s*-\s+(.+)$/);
+      if (m){
+        let v = m[1].trim();
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+        out.push(v);
+      }
+    });
+    return out;
+  }
+
   // 写 / 替换 config.yaml 顶层「扁平映射」块（如 memory: 下直接是标量）
   function _setYamlFlatMap(content, key, obj){
     const items = Object.keys(obj).filter(k => obj[k] !== undefined && obj[k] !== null && obj[k] !== "");
@@ -2710,8 +2738,7 @@ async function handleFetch(req) {
   // 调用 hermes skills list --source all 解析已安装技能（Name | Category | Source | Trust | Status）
   function _listHermesSkills(){
     try {
-      const { spawnSync } = require("bun");
-      const r = spawnSync([HERMES_BIN, "skills", "list", "--source", "all"], {
+      const r = spawnSync(HERMES_BIN, ["skills", "list", "--source", "all"], {
         stdout: "pipe", stderr: "pipe",
         env: { ...process.env, HOME: DATA_DIR, HERMES_HOME: DATA_DIR }
       });
@@ -2875,7 +2902,7 @@ async function handleFetch(req) {
   function _findHermesRoot(){
     try {
       const pyResult = spawnSync(
-        [`${VENV_BIN}/python3`, "-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
+        `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(os.path.dirname(hermes_cli.__file__)))"],
         { stdout: "pipe", stderr: "pipe" }
       );
       const root = (pyResult.stdout ? pyResult.stdout.toString() : "").trim();
@@ -2894,7 +2921,7 @@ async function handleFetch(req) {
     const npm = resolvedNodeBin.replace(/\/node$/, "/npm");
     if (!existsSync(npm)) return false;
     try {
-      const result = spawnSync([npm, "install", "--silent"], { cwd: bridgeDir, stdout: "pipe", stderr: "pipe", timeout: 300000 });
+      const result = spawnSync(npm, ["install", "--silent"], { cwd: bridgeDir, stdout: "pipe", stderr: "pipe", timeout: 300000 });
       return result.exitCode === 0;
     } catch { return false; }
   }
@@ -2906,8 +2933,9 @@ async function handleFetch(req) {
     try { mkdirSync(sessionDir, { recursive: true }); } catch {}
     const env = { ...process.env, WHATSAPP_MODE: mode || "self-chat", WHATSAPP_DM_POLICY: "pairing" };
     return spawn(
-      [resolvedNodeBin, `${bridgeDir}/bridge.js`, "--pair-only", "--pair-json", "--session", sessionDir],
-      { cwd: bridgeDir, stdout: "pipe", stderr: "stdout", env }
+      resolvedNodeBin,
+      [`${bridgeDir}/bridge.js`, "--pair-only", "--pair-json", "--session", sessionDir],
+      { cwd: bridgeDir, stdio: ["ignore", "pipe", "pipe"], env }
     );
   }
   function _terminateProc(proc){
@@ -2918,7 +2946,7 @@ async function handleFetch(req) {
   function _watchWhatsAppPairing(pairing_id, proc){
     if (!proc || !proc.stdout) return;
     try {
-      const reader = proc.stdout.getReader ? proc.stdout.getReader() : null;
+      const reader = proc.stdout ? Readable.toWeb(proc.stdout).getReader() : null;
       if (!reader) return;
       const decoder = new TextDecoder();
       let buf = "";
@@ -2954,7 +2982,7 @@ async function handleFetch(req) {
           }
         } catch {}
         // 进程结束处理
-        try { await proc.exited; } catch {}
+        try { await new Promise((resolve) => proc.on("exit", resolve)); } catch {}
         const rec = _whatsappPairings.get(pairing_id);
         if (!rec || rec.proc !== proc) return;
         if (!["connected", "error", "expired", "cancelled"].includes(rec.status)) {
@@ -4033,13 +4061,16 @@ async function handleFetch(req) {
           const yamlPath2 = `${DATA_DIR}/config.yaml`;
           if (existsSync(yamlPath2)) {
             let y2 = readFileSync(yamlPath2, "utf8");
-            // toolsets：基础 hermes-cli 必留，叠加用户开启项
+            // toolsets：基础 hermes-cli 必留；保留原生/其他来源已有的工具集，避免覆盖
+            // （用户在 /proxy/dashboard 开启的 25 个工具集应被保留，而非被这 11 项列表覆盖）
             const BASE_TS = ["hermes-cli"];
             const TOGGLE_TS = ["code_execution","terminal","file","web","browser","vision","memory","todo","skills","clarify","delegation"];
-            const enabledTs = BASE_TS.slice();
+            const knownTs = new Set([...BASE_TS, ...TOGGLE_TS]);
+            let mergedTs = _extractYamlList(y2, "toolsets").filter(t => !knownTs.has(t));
             const tsMap = body.extensions.toolsets || {};
-            TOGGLE_TS.forEach(n => { if (tsMap[n]) enabledTs.push(n); });
-            y2 = _setYamlListBlock(y2, "toolsets", enabledTs);
+            TOGGLE_TS.forEach(n => { if (tsMap[n] && mergedTs.indexOf(n) === -1) mergedTs.push(n); });
+            BASE_TS.forEach(b => { if (mergedTs.indexOf(b) === -1) mergedTs.unshift(b); });
+            y2 = _setYamlListBlock(y2, "toolsets", mergedTs);
             // mcp_servers
             const mcpObj = {};
             (body.extensions.mcp_servers || []).forEach(s => {
@@ -4672,59 +4703,121 @@ process.on("unhandledRejection", (err) => {
 });
 
 // ─── HTTP/WS 服务（unix socket），支持 socket 文件丢失后自愈重建 ───
+import http from "http";
+
 let server = null;
+let wss = null;
+
+// 将 Node IncomingMessage 适配为 Web Request，复用 handleFetch 逻辑
+function toWebRequest(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      const body = Buffer.concat(chunks);
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (Array.isArray(v)) v.forEach((x) => headers.append(k, x));
+        else if (v != null) headers.append(k, v);
+      }
+      const request = new Request("http://localhost" + req.url, {
+        method: req.method,
+        headers,
+        body: body.length ? body : undefined,
+        signal: req.destroyed ? AbortSignal.abort() : (req.signal || undefined),
+      });
+      resolve(request);
+    });
+    req.on("error", () => {
+      const request = new Request("http://localhost" + req.url, {
+        method: req.method, headers: new Headers(), signal: AbortSignal.abort(),
+      });
+      resolve(request);
+    });
+  });
+}
+
+// 将 Web Response 写回 Node ServerResponse
+async function writeWebResponse(res, response) {
+  res.statusCode = response.status;
+  response.headers.forEach((value, key) => { res.setHeader(key, value); });
+  if (response.body) {
+    const reader = response.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value));
+    }
+  }
+  res.end();
+}
+
 function startServer() {
-  server = Bun.serve({
-  fetch(req, server) {
-    const url = new URL(req.url);
+  // 启动前清理可能残留的旧 socket，避免 EADDRINUSE
+  try { unlinkSync(SOCKET_PATH); } catch {}
+
+  server = http.createServer(async (req, res) => {
+    try {
+      const request = await toWebRequest(req);
+      const response = await handleFetch(request);
+      await writeWebResponse(res, response);
+    } catch (err) {
+      log(`Server error: ${err?.message || err}\n${err?.stack || ""}`);
+      if (!res.headersSent) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Internal error" }));
+      } else { try { res.end(); } catch {} }
+    }
+  });
+
+  wss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (req, socket, head) => {
+    const url = new URL(req.url, "http://localhost");
     const wsPath = url.pathname.replace(/^\/app\/[^/]+/, "") || "/";
-    // WebSocket 升级：/api/chat/ws?session_id=xxx&token=xxx
+    // 聊天 WS：/api/chat/ws?session_id=xxx&token=xxx
     if (wsPath === "/api/chat/ws") {
       const token = url.searchParams.get("token") || "";
       if (MONITOR_TOKEN && token !== MONITOR_TOKEN) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); socket.destroy(); return;
       }
       const sessionId = url.searchParams.get("session_id") || "";
       const message = wsMessageQueue.get(sessionId);
       if (!sessionId || !message) {
-        return new Response(JSON.stringify({ error: "no pending message for session" }), { status: 400 });
+        socket.write("HTTP/1.1 400 Bad Request\r\n\r\n"); socket.destroy(); return;
       }
       wsMessageQueue.delete(sessionId);
-      const upgraded = server.upgrade(req, { data: { sessionId, message, stopCtrl: null } });
-      if (!upgraded) return new Response("WebSocket upgrade failed", { status: 500 });
-      return; // 已升级
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        ws.data = { sessionId, message, stopCtrl: null };
+        attachWsHandlers(ws);
+      });
+      return;
     }
     // Dashboard WebSocket 反代：/proxy/dashboard/api/(ws|events|pty)
     if (wsPath.startsWith("/proxy/dashboard/api/ws") ||
         wsPath.startsWith("/proxy/dashboard/api/events") ||
         wsPath.startsWith("/proxy/dashboard/api/pty")) {
       if (!readPid(PID_DASHBOARD)) {
-        return new Response(JSON.stringify({ error: "Dashboard is not running" }), {
-          status: 503,
-          headers: { "Content-Type": "application/json" },
-        });
+        socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n"); socket.destroy(); return;
       }
       const subPath = wsPath.replace(/^\/proxy\/dashboard/, "");
       const targetUrl = `ws://${DASHBOARD_BIND}:${DASHBOARD_PORT}${subPath}${url.search}`;
-      const upgraded = server.upgrade(req, { data: { type: "dashboard-proxy", targetUrl } });
-      if (!upgraded) return new Response("WebSocket upgrade failed", { status: 500 });
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        ws.data = { type: "dashboard-proxy", targetUrl };
+        attachWsHandlers(ws);
+      });
       return;
     }
-    return handleFetch(req);
-  },
-  websocket: wsHandler,
-  error(err) {
-    log(`Server error: ${err?.message || err}`);
-    return new Response(JSON.stringify({ error: "Internal error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  },
-  unix: SOCKET_PATH,
-  idleTimeout: 255,
+    // 其他升级请求直接拒绝
+    socket.destroy();
   });
-  try { chmodSync(SOCKET_PATH, 0o777); } catch {}
-  log(`Monitor ready — unix:${SOCKET_PATH} (base=${BASE_PATH || "/"}) | dashboard proxied at /proxy/dashboard/`);
+
+  server.on("error", (err) => { log(`Server error: ${err?.message || err}`); });
+
+  server.listen({ path: SOCKET_PATH }, () => {
+    try { chmodSync(SOCKET_PATH, 0o777); } catch {}
+    log(`Monitor ready — unix:${SOCKET_PATH} (base=${BASE_PATH || "/"}) | dashboard proxied at /proxy/dashboard/`);
+  });
   return server;
 }
 
@@ -4740,7 +4833,8 @@ setInterval(() => {
   try {
     if (!existsSync(SOCKET_PATH)) {
       log(`[self-heal] 检测到 socket 文件丢失 (${SOCKET_PATH})，正在重建监听…`);
-      try { if (server) server.stop(); } catch (e) {}
+      try { if (server) server.close(); } catch (e) {}
+      try { if (wss) wss.close(); } catch (e) {}
       try { unlinkSync(SOCKET_PATH); } catch (e) {}
       try { mkdirSync(_sockDir, { recursive: true }); } catch (e) {}
       startServer();

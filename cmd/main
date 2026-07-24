@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Hermes Agent — 生命周期管理
-# start:  启动 Bun monitor（后台运行，写 PID 文件）
+# start:  启动 Node.js monitor（后台运行，写 PID 文件）
 # stop:   发送 SIGTERM，等待优雅关闭，超时 SIGKILL
 # status: 查询进程状态
 #
@@ -12,7 +12,8 @@ TRIM_PKGVAR="${TRIM_PKGVAR:-/var/apps/hermes-agent/var}"
 
 LOG_FILE="${TRIM_PKGVAR}/info.log"
 PID_FILE="${TRIM_PKGVAR}/app.pid"
-export PATH=/var/apps/bunjs/target/bin:$PATH
+# 优先使用 v24（manifest install_dep_apps=nodejs_v24），并向后兼容其他常见 Node 安装路径
+export PATH=/var/apps/nodejs_v24/target/bin:/var/apps/nodejs_v22/target/bin:/var/apps/nodejs_v20/target/bin:/var/apps/nodejs/target/bin:$PATH
 DATA_DIR="${TRIM_PKGHOME}/data"
 VAR_DIR="${TRIM_PKGVAR}"
 MONITOR_SCRIPT="${TRIM_APPDEST}/server/monitor.js"
@@ -22,7 +23,7 @@ log_msg() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> ${LOG_FILE}; }
 
 start_process() {
     if status; then return 0; fi
-    if ! command -v bun >/dev/null 2>&1; then log_msg "bun not found"; return 1; fi
+    if ! command -v node >/dev/null 2>&1; then log_msg "node not found"; return 1; fi
 
     # 确保 socket 目录存在且可写
     local SOCK_DIR="$(dirname "${SOCKET_PATH}")"
@@ -36,7 +37,7 @@ start_process() {
     log_msg "TRIM_APPDEST=${TRIM_APPDEST}"
     rm -f "${SOCKET_PATH}"
 
-    HOME="${DATA_DIR}" HERMES_HOME="${DATA_DIR}" APP_DIR="${TRIM_APPDEST}" DATA_DIR="${DATA_DIR}" VAR_DIR="${VAR_DIR}" MONITOR_SOCKET_PATH="${SOCKET_PATH}" BASE_PATH="/app/hermes-agent" PATH="${DATA_DIR}/venv/bin:/var/apps/bunjs/target/bin:/usr/local/bin:/usr/bin:/bin" bun "${MONITOR_SCRIPT}" >> ${LOG_FILE} 2>&1 &
+    HOME="${DATA_DIR}" HERMES_HOME="${DATA_DIR}" APP_DIR="${TRIM_APPDEST}" DATA_DIR="${DATA_DIR}" VAR_DIR="${VAR_DIR}" MONITOR_SOCKET_PATH="${SOCKET_PATH}" BASE_PATH="/app/hermes-agent" PATH="${DATA_DIR}/venv/bin:/var/apps/nodejs_v24/target/bin:/var/apps/nodejs_v22/target/bin:/var/apps/nodejs_v20/target/bin:/var/apps/nodejs/target/bin:/usr/local/bin:/usr/bin:/bin" node "${MONITOR_SCRIPT}" >> ${LOG_FILE} 2>&1 &
     printf "%s" "$!" > ${PID_FILE}
 
     # 等待 socket 创建（最多 5 秒）

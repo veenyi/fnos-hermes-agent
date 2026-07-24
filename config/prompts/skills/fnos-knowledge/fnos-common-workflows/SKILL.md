@@ -320,7 +320,7 @@ ls -ld /var/apps/<app>/target/ # 运行路径
 ss -tlnp | grep <port>
 
 # 看进程
-ps aux | grep -E 'hermes|bun|dashboard'
+ps aux | grep -E 'hermes|node|dashboard'
 
 # 实际响应测试
 curl -sk https://localhost:5667/     # WEB UI
