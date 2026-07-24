@@ -4235,8 +4235,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if(!wf.steps || !wf.steps.length){ var h=document.getElementById('extWfHint'); if(h) h.textContent='请先添加至少一个步骤'; return; }
     var bad = wf.steps.filter(function(s){ return !s.expert || !s.output; });
     if(bad.length){ var h2=document.getElementById('extWfHint'); if(h2) h2.textContent='请为每个步骤选择专家并填写输出变量名'; return; }
+    // 不再强制要求预填输入变量：未填写的变量会在执行时自动采用会话窗口发送的内容
     var missingInputs = (wf.inputs||[]).filter(function(i){ return i.required && !(wf.inputValues && String(wf.inputValues[i.name]||'').trim()); });
-    if(missingInputs.length){ var h2b=document.getElementById('extWfHint'); if(h2b) h2b.textContent='请先填写必填输入变量：'+missingInputs.map(function(i){return i.name;}).join('、'); return; }
+    if(missingInputs.length){ var h2b=document.getElementById('extWfHint'); if(h2b) h2b.textContent='提示：未填写的必填变量（'+missingInputs.map(function(i){return i.name;}).join('、')+'）将自动采用会话窗口发送的内容。'; }
     if(window.chatState) chatState.persona = '__workflow__';
     try { localStorage.setItem('hermes_persona', '__workflow__'); } catch(e){}
     settingsState.config.extensions.persona = '__workflow__';
@@ -4347,7 +4348,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var wf = settingsState.config.extensions.workflow || {};
     var inputs = wf.inputs || [];
     if(!inputs.length){ host.innerHTML = ''; return; }
-    var html = '<div class="ext-section-title" style="font-size:13px;margin-bottom:8px">填写输入变量</div><div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">';
+    var html = '<div class="ext-section-title" style="font-size:13px;margin-bottom:8px">输入变量（可选·不填则使用会话窗口内容）</div><div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">';
     inputs.forEach(function(inp){
       var val = escapeHtml((wf.inputValues && wf.inputValues[inp.name]) || '');
       html += '<div class="ext-wf-field"><label>'+escapeHtml(inp.name)+(inp.required?' <span class="t-err">*</span>':'')+'</label>'+
@@ -4542,7 +4543,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     var m = extAgencyMap();
     var ctx = { input: userText };
-    if(wf.inputValues){ Object.keys(wf.inputValues).forEach(function(k){ ctx[k] = wf.inputValues[k]; }); }
+    // 未预设的输入变量（idea 等）一律回退到会话窗口发送的内容——做到“以对话驱动工作流，无需预填”
+    (wf.inputs || []).forEach(function(inp){
+      var v = wf.inputValues && wf.inputValues[inp.name];
+      ctx[inp.name] = (v != null && String(v).trim() !== '') ? v : userText;
+    });
     var levels = extTopoLevels(wf.steps);
     var concurrency = Math.max(1, Math.min(8, parseInt(wf.concurrency, 10) || 2));
     // 终稿节点：无其它步骤依赖它的最后一个步骤
