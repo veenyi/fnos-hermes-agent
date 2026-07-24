@@ -5,6 +5,7 @@ import { Readable } from "stream";
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync } from "fs";
 import { randomBytes } from "crypto";
 import { networkInterfaces } from "os";
+import { resolve as resolvePath } from "path";
 import { PROVIDER_PRESETS, PROVIDER_MODELS, PROVIDER_API_KEYS, PROVIDER_CLASSES, PROVIDER_HERMES_IDS } from "./provider-config.js";
 
 // 加载 vendor 目录内置的 ws 库（Node.js 无内置 WebSocket 服务器）
@@ -2917,39 +2918,62 @@ async function handleFetch(req) {
   }
   function _findNpmBin(){
     if (!resolvedNodeBin) return null;
-    // 1) 与 node 同目录的 npm
-    const nodeDir = resolvedNodeBin.replace(/\/[^/]+$/, "");
+    const nodeDir = resolvedNodeBin.replace(/[\\/][^\\/]+$/, "");
+    const checked = [];
+    // 1) 与 node 同目录的可执行 npm（Linux/macOS 官方发行版）
     const siblingNpm = nodeDir + "/npm";
-    if (existsSync(siblingNpm)) return siblingNpm;
-    // Windows 开发环境：npm.cmd
-    const siblingNpmCmd = nodeDir.replace(/\\node$/, "\\npm.cmd");
-    if (existsSync(siblingNpmCmd)) return siblingNpmCmd;
-    // 2) PATH 中的 npm
+    checked.push(siblingNpm);
+    if (existsSync(siblingNpm)) return { npm: siblingNpm, isScript: false, node: resolvedNodeBin };
+    // Windows 开发环境：npm.cmd / npm.ps1
+    if (process.platform === "win32") {
+      const baseDir = nodeDir.replace(/[\\/]node$/, "");
+      const siblingNpmCmd = baseDir + "/npm.cmd";
+      checked.push(siblingNpmCmd);
+      if (existsSync(siblingNpmCmd)) return { npm: siblingNpmCmd, isScript: false, node: resolvedNodeBin };
+      const siblingNpmPs1 = baseDir + "/npm.ps1";
+      checked.push(siblingNpmPs1);
+      if (existsSync(siblingNpmPs1)) return { npm: siblingNpmPs1, isScript: false, node: resolvedNodeBin };
+    }
+    // 2) Node.js 发行版自带的 npm-cli.js（最可靠 fallback，很多打包环境只放 node，不放 npm 可执行文件）
+    const npmCliScript = resolvePath(nodeDir, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js");
+    checked.push(npmCliScript);
+    if (existsSync(npmCliScript)) return { npm: npmCliScript, isScript: true, node: resolvedNodeBin };
+    // 3) PATH 中的 npm
     try {
       const r = spawnSync("sh", ["-c", "command -v npm"], { stdout: "pipe", stderr: "pipe" });
       const out = (r.stdout || "").toString().trim();
-      if (out && existsSync(out)) return out;
+      if (out && existsSync(out)) return { npm: out, isScript: false, node: resolvedNodeBin };
     } catch {}
-    // 3) 常见绝对路径
+    // 4) 常见绝对路径
     const NPM_CANDIDATES = [
       "/var/apps/nodejs_v24/target/bin/npm",
       "/var/apps/nodejs_v22/target/bin/npm",
       "/var/apps/nodejs_v20/target/bin/npm",
       "/var/apps/nodejs/target/bin/npm",
       "/usr/local/bin/npm",
-      "/usr/bin/npm"
+      "/usr/bin/npm",
+      "/opt/bin/npm"
     ];
-    for (const p of NPM_CANDIDATES) if (existsSync(p)) return p;
+    for (const p of NPM_CANDIDATES) {
+      checked.push(p);
+      if (existsSync(p)) return { npm: p, isScript: false, node: resolvedNodeBin };
+    }
+    log(`[whatsapp] npm not found; resolvedNodeBin=${resolvedNodeBin}; checked=${checked.join(", ")}`);
     return null;
   }
   function _ensureWhatsAppBridgeDeps(bridgeDir){
     if (existsSync(`${bridgeDir}/node_modules`)) return true;
     if (!resolvedNodeBin) throw new Error("未找到 Node.js，无法启动 WhatsApp bridge");
-    const npm = _findNpmBin();
-    if (!npm) throw new Error("npm was not found. WhatsApp setup needs Node.js and npm.");
+    const npmInfo = _findNpmBin();
+    if (!npmInfo) {
+      throw new Error("npm was not found. WhatsApp setup needs Node.js and npm. (node路径: " + (resolvedNodeBin || "null") + ")");
+    }
     try {
       const env = { ...process.env, PATH: (resolvedNodeDir ? resolvedNodeDir + ":" : "") + (process.env.PATH || "") };
-      const result = spawnSync(npm, ["install", "--silent"], { cwd: bridgeDir, env, stdout: "pipe", stderr: "pipe", timeout: 300000 });
+      const args = ["install", "--silent"];
+      const result = npmInfo.isScript
+        ? spawnSync(npmInfo.node, [npmInfo.npm, ...args], { cwd: bridgeDir, env, stdout: "pipe", stderr: "pipe", timeout: 300000 })
+        : spawnSync(npmInfo.npm, args, { cwd: bridgeDir, env, stdout: "pipe", stderr: "pipe", timeout: 300000 });
       if (result.exitCode !== 0){
         const err = (result.stderr || "").toString().trim() || "npm install 返回非零退出码";
         throw new Error("安装 WhatsApp bridge 依赖失败：" + err);
