@@ -246,6 +246,30 @@
     .card-head .btn{padding:4px 12px;font-size:12px;flex-shrink:0;white-space:nowrap}
     .card-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+    /* ─── 平台频道筛选标签（形状统一 · 仅颜色区分） ─── */
+    .ch-filter-btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      height:32px;padding:0 16px;border-radius:16px;
+      font-family:inherit;font-size:14px;font-weight:500;line-height:1.2;
+      background:#F5F6F8;color:#4B5563;border:1px solid #E5E7EB;
+      cursor:pointer;white-space:nowrap;
+      transition:background .15s,color .15s,border-color .15s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .ch-filter-btn:hover:not(.active){background:#eef0f3;border-color:#d8dbe0}
+    .ch-filter-btn.active{
+      background:#3B82F6;color:#FFFFFF;border-color:#3B82F6;
+    }
+    .ch-filter-btn:active{transform:scale(.97)}
+    /* 深色模式：保持形状一致，仅切换配色 */
+    [theme-mode="dark"] .ch-filter-btn{
+      background:#232329;color:rgba(255,255,255,0.6);border-color:rgba(255,255,255,0.12);
+    }
+    [theme-mode="dark"] .ch-filter-btn:hover:not(.active){background:#2a2a31;border-color:rgba(255,255,255,0.18)}
+    [theme-mode="dark"] .ch-filter-btn.active{
+      background:var(--accent);color:#fff;border-color:var(--accent);
+    }
+
     /* ─── 日志框（终端深色） ─── */
     .log-box{background:#1a1b23;border:1px solid #2a2b35;border-radius:8px;height:300px;
       overflow-y:auto;font-family:"SF Mono","Cascadia Code","Fira Code",Consolas,monospace;
@@ -1115,7 +1139,7 @@
           </div>
           <div class="card-body">
             <div class="ext-hint">将 Hermes 接入各类即时通讯平台。凭证写入 <code>~/.hermes/.env</code>，行为配置写入 <code>config.yaml</code> 的 <code>platforms</code> 段（与 hermes-studio 一致）。保存后需<b>重启网关</b>方能生效。</div>
-            <div id="chFilterBar" style="display:flex;gap:8px;margin:4px 0 14px;flex-wrap:wrap">
+            <div id="chFilterBar" style="display:flex;gap:8px;margin:4px 0 16px;flex-wrap:wrap;align-items:center;justify-content:flex-start">
               <button class="ch-filter-btn active" data-f="all" onclick="channelsSetFilter('all')">全部</button>
               <button class="ch-filter-btn" data-f="configured" onclick="channelsSetFilter('configured')">已配置</button>
               <button class="ch-filter-btn" data-f="unconfigured" onclick="channelsSetFilter('unconfigured')">未配置</button>
@@ -5354,11 +5378,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     _chState.filter = f;
     var btns = document.querySelectorAll('#chFilterBar .ch-filter-btn');
     btns.forEach(function(b){
-      var on = b.getAttribute('data-f') === f;
-      b.classList.toggle('active', on);
-      b.style.background = on ? 'var(--accent)' : 'var(--bg2)';
-      b.style.color = on ? '#fff' : 'var(--text2)';
-      b.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+      b.classList.toggle('active', b.getAttribute('data-f') === f);
     });
     renderChannels();
   };
