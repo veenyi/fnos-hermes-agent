@@ -1065,7 +1065,7 @@
               </div>
             </div>
 
-            <!-- 工作流 -->
+            <!-- 工作流（多智能体 DAG 编排中心） -->
             <div class="ext-pane" id="extPane-workflow">
               <div class="ext-hint">工作流由「任务委派」工具集驱动的多智能体编排能力。启用后，Hermes 可将复杂任务拆解为子任务并分派给子智能体执行（对应 LightAgent 的 multi-agent flow）。</div>
               <div class="ext-flow">
@@ -1081,6 +1081,30 @@
                 <span class="ext-toggle-switch"></span>
                 <span class="ext-toggle-label">启用任务委派 / 工作流编排<span class="ext-toggle-desc">依赖「任务委派」工具集</span></span>
               </label>
+
+              <div class="ext-subsection" style="border-top:1px dashed var(--border);margin-top:18px;padding-top:14px">
+                <div class="ext-section-title">📚 工作流预设案例库（Agency Orchestrator）</div>
+                <div class="ext-hint">内置 60+ 官方模板：一人公司、产品评审、内容创作、代码评审、投研、法律、学术等。选择后自动填充到下方编辑器。</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0">
+                  <select id="extWfPresetCat" class="ext-input" style="max-width:140px" onchange="extRenderWorkflowPresets()">
+                    <option value="">全部分类</option>
+                  </select>
+                  <select id="extWfPresetSelect" class="ext-input" style="max-width:280px">
+                    <option value="">选择预设模板…</option>
+                  </select>
+                  <button class="btn btn-sm primary" onclick="extLoadSelectedWorkflowPreset()">加载预设</button>
+                  <button class="btn btn-sm" onclick="extReloadWorkflowPresets()">🔄 重载预设</button>
+                  <span class="ext-hint" id="extWfPresetHint" style="margin:0"></span>
+                </div>
+                <div id="extWfPresetGallery" class="ext-grid" style="margin-top:8px"></div>
+                <div id="extWfPresetInputs" style="margin-top:10px"></div>
+              </div>
+
+              <div class="ext-subsection" style="border-top:1px dashed var(--border);margin-top:18px;padding-top:14px">
+                <div class="ext-section-title">🔀 工作流编排器（DAG）</div>
+                <div class="ext-hint">每个步骤指派一名专家，前一步的输出通过 <code>{{变量}}</code> 流入下一步。点「设为当前工作流并使用」后，在对话中发送消息即按 DAG 顺序串联执行（同一拓扑层并行，跨层顺序）。</div>
+                <div id="extWorkflowBuilder"></div>
+              </div>
             </div>
 
             <!-- 记忆 -->
@@ -1125,27 +1149,6 @@
                 <div class="ext-subsection">
                 <div class="ext-section-title">从专家库选择成员（可多选）</div>
                 <div class="ext-grid" id="extTeamGrid"></div>
-              </div>
-              <div class="ext-subsection" style="border-top:1px dashed var(--border);margin-top:14px;padding-top:12px">
-                <div class="ext-section-title">🔀 专家团工作流（DAG 编排）</div>
-                <div class="ext-hint">把专家团升级为「工作流」：每个步骤指派一名专家，前一步的输出通过 <code>{{变量}}</code> 流入下一步。点「设为当前工作流并使用」后，在对话中发送消息即按 DAG 顺序串联执行（同一拓扑层并行，跨层顺序）。</div>
-                <div class="ext-subsection" style="background:var(--bg2);border-radius:10px;padding:12px;margin:12px 0">
-                  <div class="ext-section-title" style="font-size:14px">📚 工作流预设案例库（Agency Orchestrator）</div>
-                  <div class="ext-hint">内置 60+ 官方模板：一人公司、产品评审、内容创作、代码评审、投研、法律、学术等。选择后自动填充到上方编辑器。</div>
-                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0">
-                    <select id="extWfPresetCat" class="ext-input" style="max-width:140px" onchange="extRenderWorkflowPresets()">
-                      <option value="">全部分类</option>
-                    </select>
-                    <select id="extWfPresetSelect" class="ext-input" style="max-width:280px">
-                      <option value="">选择预设模板…</option>
-                    </select>
-                    <button class="btn btn-sm primary" onclick="extLoadSelectedWorkflowPreset()">加载预设</button>
-                    <span class="ext-hint" id="extWfPresetHint" style="margin:0"></span>
-                  </div>
-                  <div id="extWfPresetGallery" class="ext-grid" style="margin-top:8px"></div>
-                  <div id="extWfPresetInputs" style="margin-top:10px"></div>
-                </div>
-                <div id="extWorkflowBuilder"></div>
               </div>
             </div>
           </div>
@@ -3413,7 +3416,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if(!ext.team) ext.team = [];
     if(ext.team_name === undefined) ext.team_name = "";
     if(!ext.memory) ext.memory = { enabled:true, char_limit:2200 };
-    if(!ext.workflow) ext.workflow = { name:'我的专家团工作流', concurrency:2, steps:[] };
+    if(!ext.workflow) ext.workflow = { name:'我的工作流', concurrency:2, steps:[] };
     if(!ext.workflow.steps) ext.workflow.steps = [];
     if(ext.workflow.concurrency === undefined) ext.workflow.concurrency = 2;
 
@@ -3551,6 +3554,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if(tab === 'skills' && !window._extLocalLoaded) extLoadLocalSkills();
     if(tab === 'experts'){ extEnsureAgencyLib(function(){ extRenderExperts(); }); }
     if(tab === 'team'){ extRenderTeam(); }
+    if(tab === 'workflow'){ extRenderWorkflowPage(); }
   }
   function extSwitchSkillTab(st){
     document.querySelectorAll('#extSkillTabs .ext-subtab').forEach(function(el){ el.classList.toggle('active', el.dataset.st === st); });
@@ -4063,7 +4067,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
     extRenderTeamCurrent();
-    extRenderWorkflowBuilder();
   }
   function extToggleTeamMember(id){
     var ext = settingsState.config.extensions;
@@ -4222,7 +4225,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   function extClearWorkflow(){
     var ext = settingsState.config.extensions;
-    ext.workflow = { name:'我的专家团工作流', concurrency:2, steps:[] };
+    ext.workflow = { name:'我的工作流', concurrency:2, steps:[] };
     if(ext.persona === '__workflow__'){ ext.persona = 'default'; if(window.chatState) chatState.persona = 'default'; try{ localStorage.setItem('hermes_persona','default'); }catch(e){} }
     extWfSave();
     settingsRenderExtensions(); renderPersonaBar(); extRenderWorkflowBuilder();
@@ -4230,17 +4233,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   // ── 工作流预设案例库（Agency Orchestrator） ──
   function extWorkflowPresetsList(){ return (window.AO_WORKFLOW_PRESETS || []); }
+  function extEnsureWorkflowPresetsLib(cb){
+    if(window.AO_WORKFLOW_PRESETS && window.AO_WORKFLOW_PRESETS.length){ cb && cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'js/ao_workflow_presets.js?v=' + Date.now();
+    s.onload = function(){ cb && cb(); };
+    s.onerror = function(){ cb && cb(); };
+    document.head.appendChild(s);
+  }
   function extRenderWorkflowPresets(){
     var catSel = document.getElementById('extWfPresetCat');
     var sel = document.getElementById('extWfPresetSelect');
     var gallery = document.getElementById('extWfPresetGallery');
+    var hint = document.getElementById('extWfPresetHint');
     if(!catSel || !sel) return;
     var list = extWorkflowPresetsList();
     if(!list.length){
-      sel.innerHTML = '<option>未加载预设</option>'; gallery.innerHTML = '';
-      if(catSel) catSel.innerHTML = '<option value="">未加载</option>';
+      sel.innerHTML = '<option>未加载预设</option>';
+      if(gallery) gallery.innerHTML = '';
+      catSel.innerHTML = '<option value="">未加载</option>';
+      if(hint) hint.innerHTML = '<span class="t-err">预设库未加载，请点「重载预设」或检查 js/ao_workflow_presets.js 是否存在。</span>';
       return;
     }
+    if(hint) hint.textContent = '已加载 ' + list.length + ' 个模板';
     // categories
     var cats = {};
     list.forEach(function(p){ cats[p.category || '通用'] = true; });
@@ -4259,16 +4274,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var shown = list.filter(function(p){ return !curCat || p.category === curCat; }).slice(0, 12);
     if(gallery){
       gallery.innerHTML = shown.map(function(p){
+        var pk = (p.key||'').replace(/'/g, "\\'");
         return '<div class="ext-card" style="padding:10px">'+
           '<div class="ext-card-title" style="font-size:13px">'+escapeHtml(p.name)+'</div>'+
           '<div class="ext-card-desc" style="font-size:12px;margin:4px 0">'+escapeHtml(p.description||'')+'</div>'+
           '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
             '<span class="ext-badge muted">'+escapeHtml(p.category||'通用')+'</span>'+
             '<span class="ext-badge muted">'+p.steps.length+' 步</span>'+
-            '<button class="btn btn-sm primary" style="margin-left:auto" onclick="extLoadWorkflowPreset(\''+escapeHtml(p.key)+'\')">加载</button>'+
+            '<button class="btn btn-sm primary" style="margin-left:auto" onclick="extLoadWorkflowPreset(\''+pk+'\')">加载</button>'+
           '</div></div>';
       }).join('');
     }
+  }
+  function extReloadWorkflowPresets(){
+    var hint = document.getElementById('extWfPresetHint');
+    if(hint) hint.textContent = '正在重载预设库…';
+    extEnsureWorkflowPresetsLib(function(){
+      extRenderWorkflowPresets();
+      var h = document.getElementById('extWfPresetHint');
+      if(h) h.textContent = window.AO_WORKFLOW_PRESETS && window.AO_WORKFLOW_PRESETS.length ? '预设库重载完成' : '预设库仍为空';
+    });
   }
   function extLoadSelectedWorkflowPreset(){
     var sel = document.getElementById('extWfPresetSelect');
@@ -4346,11 +4371,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         '</div>'+
       '</div>';
   }
+  function extRenderWorkflowPage(){
+    extEnsureWorkflowPresetsLib(function(){
+      extRenderWorkflowBuilder();
+    });
+  }
   function extRenderWorkflowBuilder(){
     var host = document.getElementById('extWorkflowBuilder');
     if(!host) return;
     var ext = settingsState.config.extensions;
-    var wf = ext.workflow = ext.workflow || { name:'我的专家团工作流', concurrency:2, steps:[] };
+    var wf = ext.workflow = ext.workflow || { name:'我的工作流', concurrency:2, steps:[] };
     if(!wf.steps) wf.steps = [];
     if(wf.concurrency === undefined) wf.concurrency = 2;
     var html = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
@@ -6150,7 +6180,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.extLoadWorkflowPreset = extLoadWorkflowPreset;
   window.extLoadSelectedWorkflowPreset = extLoadSelectedWorkflowPreset;
   window.extRenderWorkflowPresets = extRenderWorkflowPresets;
+  window.extReloadWorkflowPresets = extReloadWorkflowPresets;
   window.extWfPresetInput = extWfPresetInput;
+  window.extRenderWorkflowPage = extRenderWorkflowPage;
   window.checkAppUpdate = checkAppUpdate;
   window.appUpdateSavePat = appUpdateSavePat;
   window.appUpdateDispatch = appUpdateDispatch;
