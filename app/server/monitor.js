@@ -38,11 +38,29 @@ const START_TIME     = Date.now();
 // 应用包版本（来自 manifest，与应用中心安装包版本一致）。
 // 注意：它和「hermes-agent PyPI 版本」(HERMES_VERSION) 是两个不同概念，UI 必须分开展示，避免混淆。
 function readAppVersion() {
+  const candidates = [
+    MANIFEST_FILE,
+    "/var/apps/hermes-agent/manifest",
+    `${process.cwd()}/manifest`,
+  ];
+  // 尝试从 monitor.js 位置向上推导（兼容 ESM 与不同安装路径）
   try {
-    const txt = readFileSync(MANIFEST_FILE, "utf8");
-    const m = txt.match(/^version\s*=\s*(\S+)/m);
-    if (m) return m[1].trim();
+    const { fileURLToPath } = require("url");
+    const { dirname, join } = require("path");
+    const here = dirname(fileURLToPath(import.meta.url));
+    candidates.push(join(here, "../../manifest"));
+    candidates.push(join(here, "../manifest"));
   } catch {}
+  for (const fp of candidates) {
+    try {
+      const txt = readFileSync(fp, "utf8");
+      const m = txt.match(/^version\s*=\s*(\S+)/m);
+      if (m) {
+        const v = m[1].trim();
+        if (v && v !== "unknown") return v;
+      }
+    } catch {}
+  }
   return "unknown";
 }
 const APP_VERSION = readAppVersion();
@@ -2512,12 +2530,31 @@ async function handleFetch(req) {
 
   if (path === "/api/app/update/check") {
     try {
-      const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      const pat = getGitHubPAT();
+      const headers = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
+      if (pat) headers["Authorization"] = `Bearer ${pat}`;
+
+      // 优先用 /releases?per_page=1：有 PAT 时能看到 draft，无 PAT 也能取到最新已发布版本
+      let r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=1`, {
         signal: AbortSignal.timeout(15000),
-        headers: { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" },
+        headers,
       });
-      if (!r.ok) throw new Error(`GitHub API ${r.status}`);
-      const data = await r.json();
+      let data;
+      if (r.ok) {
+        const list = await r.json();
+        data = (Array.isArray(list) && list[0]) || null;
+      }
+      // 兜底：未认证或没有 release 时尝试 /releases/latest
+      if (!data) {
+        r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+          signal: AbortSignal.timeout(15000),
+          headers,
+        });
+        if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+        data = await r.json();
+      }
+      if (!data || !data.tag_name) throw new Error("GitHub API 未返回 release 信息");
+
       const tag = String(data.tag_name || "");
       const latest = tag.replace(/^fnos-hermes-agent_v|^v/, "").trim() || "unknown";
       const current = APP_VERSION;

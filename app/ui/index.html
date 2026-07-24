@@ -1537,12 +1537,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (curEl && (curEl.textContent === '--' || curEl.textContent === '')) {
         apiGet('/api/status').then(function(s) {
           if (s.gateway && s.gateway.version) {
-            var hv = s.gateway.version;
-            if (s.hermes_version_date) { window.__hermesDate = s.hermes_version_date; hv += ' (' + s.hermes_version_date + ')'; }
-            curEl.textContent = hv;
+            if (s.hermes_version_date) window.__hermesDate = s.hermes_version_date;
+            curEl.textContent = fmtHermesVer(s.gateway.version, window.__hermesDate);
           }
           var appCurEl = document.getElementById('appUpdateCurrentVer');
-          if (appCurEl && s.app_version) appCurEl.textContent = s.app_version;
+          if (appCurEl) {
+            var av = s.app_version;
+            if (av && av !== 'unknown') appCurEl.textContent = av;
+            else appCurEl.innerHTML = '<span class="t-err">unknown</span><div style="font-size:11px;font-weight:400;color:var(--text3);margin-top:2px">未能读取 manifest，请检查 /var/apps/hermes-agent/manifest 是否存在</div>';
+          }
         }).catch(function(){});
       }
       // 自动检查应用更新
@@ -1624,6 +1627,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
     });
   }
+  function fmtHermesVer(ver, date){
+    if (!ver || ver === '--') return ver;
+    // 若版本字符串已包含日期（如 v0.19.0 (2026.7.20)），不再追加
+    if (/\(\d{4}\.\d{1,2}\.\d{1,2}\)/.test(ver)) return ver;
+    if (date && ver.indexOf(date) === -1) return ver + ' (' + date + ')';
+    return ver;
+  }
   function showFatal(title, detailHtml){
     var el = document.getElementById('loading');
     if(!el) return;
@@ -1679,9 +1689,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       var hermesVersionEl = document.getElementById('hermesVersion');
       if(hermesVersionEl){
-        var hv = (s.gateway && s.gateway.version) || '--';
-        if(s.hermes_version_date && hv && hv !== '--') hv += ' (' + s.hermes_version_date + ')';
-        hermesVersionEl.textContent = hv;
+        if(s.hermes_version_date) window.__hermesDate = s.hermes_version_date;
+        hermesVersionEl.textContent = fmtHermesVer((s.gateway && s.gateway.version) || '--', window.__hermesDate);
       }
       var appVersionEl = document.getElementById('appVersion');
       if(appVersionEl) appVersionEl.textContent = s.app_version || '--';
@@ -5363,10 +5372,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     apiGet('/api/hermes/update/check').then(function(data) {
       if (data.error) throw new Error(data.error);
       if (curEl) {
-        var cv = data.current || '--';
         if (data.date) window.__hermesDate = data.date;
-        if (window.__hermesDate && cv && cv !== '--') cv += ' (' + window.__hermesDate + ')';
-        curEl.textContent = cv;
+        curEl.textContent = fmtHermesVer(data.current, window.__hermesDate);
       }
       var latCard = document.getElementById('latestVersionCard');
       if (latEl) {
@@ -5469,9 +5476,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (updatePollTimer) { clearInterval(updatePollTimer); updatePollTimer = null; }
         if (statusText) { statusText.textContent = '更新完成！正在重启 Gateway…'; statusText.style.color = 'var(--accent)'; }
         if (curEl && data.version) {
-          var uv = data.version;
-          if (window.__hermesDate && uv && uv !== '--') uv += ' (' + window.__hermesDate + ')';
-          curEl.textContent = uv;
+          curEl.textContent = fmtHermesVer(data.version, window.__hermesDate);
         }
         // 重启 gateway
         apiPost('/api/restart').then(function() {

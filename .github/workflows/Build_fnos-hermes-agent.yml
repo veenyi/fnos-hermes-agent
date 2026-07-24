@@ -119,8 +119,8 @@ jobs:
 
           echo "Release notes 已生成"
 
-      # 10. 创建 Draft Release
-      - name: Create Draft Release
+      # 10. 创建正式 Release（直接发布，无需手动确认）
+      - name: Create Release
         id: create_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -129,16 +129,15 @@ jobs:
           FPK_NAME="fnos-${{ env.APP_NAME }}_v${VERSION}.fpk"
           RELEASE_TAG="fnos-hermes-agent_v${VERSION}"
           DIST_DIR="dist"
-          
-          echo "创建 Draft Release: $RELEASE_TAG"
-          
+
+          echo "创建 Release: $RELEASE_TAG"
+
           gh release create "$RELEASE_TAG" \
             "$DIST_DIR/$FPK_NAME" \
-            --draft \
             --title "$RELEASE_TAG" \
             --notes-file release_body.md || exit 1
-          
-          echo "Draft Release 已创建"
+
+          echo "Release 已发布"
           echo "release_url=https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG" >> $GITHUB_OUTPUT
 
       # 11. 构建摘要
@@ -150,4 +149,4 @@ jobs:
           echo "|------|------|-----------|------|" >> $GITHUB_STEP_SUMMARY
           echo "| fnOS Hermes Agent | v${{ steps.target_version.outputs.target_version }} | fnos-hermes-agent_v${{ steps.target_version.outputs.target_version }}.fpk | ${{ steps.build.outputs.size }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**[Draft Release](https://github.com/${{ github.repository }}/releases)** — 请确认后发布" >> $GITHUB_STEP_SUMMARY
+          echo "**[Release](https://github.com/${{ github.repository }}/releases)** — 已发布" >> $GITHUB_STEP_SUMMARY
