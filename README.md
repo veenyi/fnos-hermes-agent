@@ -46,7 +46,7 @@ Hermes Agent 是专为适配飞牛 NAS（fnOS）的 AI 助手应用，通过原�
 ### 环境要求
 
 - 可用存储空间：约 1GB（含 Python 依赖包和缓存）
-- 依赖项：`nodejs_v24`（安装时自动处理，不再依赖 Bun）
+- 依赖项：`nodejs_v24`（安装时自动处理）
 
 ### 安装步骤
 
@@ -124,7 +124,6 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 
 ## 版本迭代
 
-> 应用版本（manifest）与底层 `hermes-agent` PyPI 版本相互独立。当前底层运行时常量钉在 `hermes-agent 0.19.0`。
 
 ### v0.20.x
 
@@ -188,13 +187,19 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 完整 Release 与下载地址：https://github.com/veenyi/fnos-hermes-agent/releases
 
 ## 截图
-
-![](/preview/home.png)
-![](/preview/monitor.png)
-![](/preview/chat.png)
-![](/preview/list-model.png)
-![](/preview/updote.png)
-![](/preview/dashboard-chat.png)
+<img width="1098" height="832" alt="5ad86464b6910676a50ae202a0cdbd28" src="https://github.com/user-attachments/assets/fc1c7b48-77de-46bb-86d2-9d9e23e72398" />
+<img width="1099" height="831" alt="9a862f453e1ac8cf33c2d979d07b1a10" src="https://github.com/user-attachments/assets/756cbabf-865f-4f40-88e6-f50359baca4f" />
+<img width="1102" height="832" alt="53878252b96d68b3b7e5858e4d938afd" src="https://github.com/user-attachments/assets/33a1769c-56c7-4314-a013-c52ecfe2f340" />
+<img width="1099" height="829" alt="2ec18542d2f550efd260466009623e56" src="https://github.com/user-attachments/assets/7932248d-1ba5-4c13-b811-1e9b73d5c98e" />
+<img width="1099" height="830" alt="a8c6098e0b1f053011487caf7d352150" src="https://github.com/user-attachments/assets/b044e2bf-b715-4267-a626-c6759d57ecb2" />
+<img width="1096" height="832" alt="deb9616704431f2756310fc5502a5f7f" src="https://github.com/user-attachments/assets/576abe10-b267-4601-9bfa-8cf5a272aa59" />
+<img width="1102" height="832" alt="adedf2602e0161f468b1827db2be5c2d" src="https://github.com/user-attachments/assets/c4b429a3-ccf8-4550-a92e-c8ff5f0bdb3a" />
+<img width="1099" height="833" alt="669cc02310649eef3b3a8eb1e13c3ddc" src="https://github.com/user-attachments/assets/e1778334-6c8c-4ab4-bbf1-0307b77734cc" />
+<img width="1103" height="834" alt="16986a5dff2427117d4008f8b58607fa" src="https://github.com/user-attachments/assets/17ac05be-468c-4b08-8ae1-5bf447a9f491" />
+<img width="1101" height="833" alt="15db62cecaa622926b0e7b24bb8422af" src="https://github.com/user-attachments/assets/8117d22d-0fd2-4edf-96fa-69cf490586bc" />
+<img width="1101" height="833" alt="af729b7a01cbadb312aaf42956053a1c" src="https://github.com/user-attachments/assets/265088e3-55a8-4015-8a0f-813b8eda3cc8" />
+<img width="1100" height="831" alt="d5ba91ec2beef32846699194b36b6d83" src="https://github.com/user-attachments/assets/1052a78d-9ea9-430b-9a68-eac9bd3aa3e1" />
+<img width="1099" height="834" alt="e85c20a56b1a70563cea9aa30bfad774" src="https://github.com/user-attachments/assets/bc307965-572a-4459-a350-55ed56604fc9" />
 
 ### QQ 交流群
 ![](/preview/qq.png)
