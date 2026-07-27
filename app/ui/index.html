@@ -699,9 +699,16 @@
       .mobile-nav-btn{flex:1;padding:8px 0;border:none;border-radius:6px;background:transparent;color:var(--text2);font-size:13px;cursor:pointer;text-align:center;transition:background .15s,color .15s}
       .mobile-nav-btn.active{background:var(--accent-bg);color:var(--accent);font-weight:600}
       .mobile-nav-btn:active{background:var(--bg3)}
-      /* 添加模型弹窗：小屏减少顶部间距 */
-      #providerModal{padding-top:13vh}
-      #providerModal .modal{max-height:94vh}
+      /* 添加模型弹窗：小屏可滚动且底部按钮固定可见 */
+      #providerModal{padding-top:5vh;align-items:flex-start}
+      #providerModal .modal{
+        width:100%;max-width:100%;margin-top:auto;margin-bottom:auto;
+        max-height:calc(100dvh - 10vh);border-radius:12px;
+        display:flex;flex-direction:column;overflow:hidden
+      }
+      #providerModal .modal form{display:flex;flex-direction:column;flex:1;min-height:0}
+      #providerModal .modal-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+      #providerModal .modal-foot{flex-shrink:0}
       /* 对话激活时：隐藏横向侧边栏，聊天全屏展开 */
       body:has(#viewChat.active) > .app-layout > .sidebar{display:none}
       #viewChat.active{top:0 !important;height:100dvh !important}
