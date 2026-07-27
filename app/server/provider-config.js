@@ -27,13 +27,6 @@ export const PROVIDER_PRESETS = {
   "alibaba-coding-plan": { name: "Alibaba Cloud (Coding Plan)", base_url: "https://coding-intl.dashscope.aliyuncs.com/v1" },
   "xiaomi":              { name: "Xiaomi MiMo",                base_url: "https://api.xiaomimimo.com/v1" },
   "tencent-tokenhub":    { name: "Tencent TokenHub",           base_url: "https://tokenhub.tencentmaas.com/v1" },
-  // ── 扩展商（OpenAI 兼容，呼应 LightAgent 的广泛兼容）──
-  "groq":            { name: "Groq",            base_url: "https://api.groq.com/openai/v1" },
-  "deepinfra":       { name: "DeepInfra",       base_url: "https://api.deepinfra.com/v1/openai" },
-  "together":        { name: "Together AI",     base_url: "https://api.together.xyz/v1" },
-  "atlas":           { name: "Atlas Cloud",     base_url: "https://api.atlascloud.ai/v1" },
-  "fireworks":       { name: "Fireworks AI",    base_url: "https://api.fireworks.ai/inference/v1" },
-  "perplexity":      { name: "Perplexity",      base_url: "https://api.perplexity.ai" },
 };
 
 // ── 每个供应商的可用模型列表（只保留当前主力型号）──────────────────────
@@ -110,12 +103,6 @@ export const PROVIDER_MODELS = {
   "tencent-tokenhub": [
     "hy3-preview",
   ],
-  "groq":       ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
-  "deepinfra":  ["meta-llama/Llama-3.3-70B-Instruct", "Qwen/Qwen2.5-72B-Instruct", "mistralai/Mixtral-8x7B-Instruct-v0.1"],
-  "together":   ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Qwen/Qwen2.5-72B-Instruct", "deepseek-ai/DeepSeek-V3"],
-  "atlas":      ["claude-sonnet-4", "gpt-4.1", "openai/gpt-4.1"],
-  "fireworks":  ["accounts/fireworks/models/llama-v3p3-70b-instruct", "accounts/fireworks/models/mixtral-8x7b-instruct"],
-  "perplexity": ["sonar", "sonar-pro", "llama-3.1-sonar-large-128k-online"],
 };
 
 // ── 供应商 → 环境变量名映射 ─────────────────────────────────────────
@@ -134,12 +121,6 @@ export const PROVIDER_API_KEYS = {
   "gmi": "GMI_API_KEY",             "kilocode": "KILOCODE_API_KEY",
   "alibaba-coding-plan": "ALIBABA_CODING_PLAN_API_KEY",
   "xiaomi": "XIAOMI_API_KEY",       "tencent-tokenhub": "TOKENHUB_API_KEY",
-  "groq": "GROQ_API_KEY",
-  "deepinfra": "DEEPINFRA_API_KEY",
-  "together": "TOGETHER_API_KEY",
-  "atlas": "ATLASCLOUD_API_KEY",
-  "fireworks": "FIREWORKS_API_KEY",
-  "perplexity": "PERPLEXITY_API_KEY",
 };
 
 // ── A/B 分类（Sam 任务16 决策表）─────────────────────────────────────
@@ -160,8 +141,6 @@ export const PROVIDER_CLASSES = {
   "stepfun": "A",        "arcee": "A",          "gmi": "A",
   "kilocode": "A",       "alibaba-coding-plan": "A",  "xiaomi": "A",
   "tencent-tokenhub": "A",
-  "groq": "A",        "deepinfra": "A",    "together": "A",
-  "atlas": "A",       "fireworks": "A",    "perplexity": "A",
 };
 
 // ── provider id → Hermes 内部 provider id 映射 ───────────────────────

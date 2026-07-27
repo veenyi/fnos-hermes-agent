@@ -5,8 +5,10 @@ import { Readable } from "stream";
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync } from "fs";
 import { randomBytes } from "crypto";
 import { networkInterfaces } from "os";
-import { resolve as resolvePath } from "path";
+import { resolve as resolvePath, dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { PROVIDER_PRESETS, PROVIDER_MODELS, PROVIDER_API_KEYS, PROVIDER_CLASSES, PROVIDER_HERMES_IDS } from "./provider-config.js";
+import { handleCustomRoute } from "./custom_routes.js";
 
 // 加载 vendor 目录内置的 ws 库（Node.js 无内置 WebSocket 服务器）
 const _require = createRequire(import.meta.url);
@@ -45,8 +47,6 @@ function readAppVersion() {
   ];
   // 尝试从 monitor.js 位置向上推导（兼容 ESM 与不同安装路径）
   try {
-    const { fileURLToPath } = require("url");
-    const { dirname, join } = require("path");
     const here = dirname(fileURLToPath(import.meta.url));
     candidates.push(join(here, "../../manifest"));
     candidates.push(join(here, "../manifest"));
@@ -570,9 +570,18 @@ function initChatData() {
     }
   }
   if (needsReset) {
-    writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig(), null, 2));
-    try { chmodSync(CONFIG_FILE, 0o600); } catch {}
-    log("Config reset to defaults (version mismatch or corrupted)");
+    try {
+      // 若文件已存在但不可写（权限漂移），尝试放宽再写入
+      if (existsSync(CONFIG_FILE)) {
+        try { chmodSync(CONFIG_FILE, 0o600); } catch {}
+      }
+      writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig(), null, 2));
+      try { chmodSync(CONFIG_FILE, 0o600); } catch {}
+      log("Config reset to defaults (version mismatch or corrupted)");
+    } catch (e) {
+      // 权限不足时不应导致 monitor 崩溃；后续 chat 功能可能受限，但 UI/status 仍可服务
+      log(`initChatData warning: unable to write ${CONFIG_FILE}: ${e.message}`);
+    }
   }
 }
 
@@ -1450,45 +1459,151 @@ async function runChatWS(ws, sessionId, message) {
   cleanup();
 }
 
-// WebSocket 连接建立后的事件处理（替换 Bun 的 wsHandler.open/message/close）
-function attachWsHandlers(ws) {
-  // Dashboard WS 反代
-  if (ws.data.type === "dashboard-proxy") {
-    const { targetUrl } = ws.data;
-    log(`[WS-PROXY] open → ${targetUrl}`);
+// Dashboard WS 反代：带自动重连的 upstream 连接管理
+function setupDashboardProxy(ws) {
+  const { targetUrl } = ws.data;
+  ws.data.sendQueue = [];
+  ws.data.reconnectAttempts = 0;
+  ws.data.reconnectTimer = null;
+  ws.data.closing = false;
+
+  function cleanup() {
+    ws.data.closing = true;
+    if (ws.data.reconnectTimer) { clearTimeout(ws.data.reconnectTimer); ws.data.reconnectTimer = null; }
+    if (ws.data.kaTimer) { clearInterval(ws.data.kaTimer); ws.data.kaTimer = null; }
+    if (ws.data.upstream) { try { ws.data.upstream.terminate(); } catch {} ws.data.upstream = null; }
+  }
+
+  function flushQueue() {
+    const q = ws.data.sendQueue || [];
+    ws.data.sendQueue = [];
+    const up = ws.data.upstream;
+    if (up && up.readyState === WebSocket.OPEN) {
+      for (const data of q) {
+        try { up.send(data); } catch {}
+      }
+    }
+  }
+
+  function scheduleReconnect() {
+    if (ws.data.closing || ws.readyState !== WebSocket.OPEN) return;
+    const attempt = ws.data.reconnectAttempts;
+    if (attempt >= 10) {
+      log(`[WS-PROXY] upstream reconnect exhausted, closing client`);
+      cleanup();
+      try { ws.close(1011, "upstream reconnect exhausted"); } catch {}
+      return;
+    }
+    const delay = Math.min(1000 * Math.pow(2, attempt), 30000);
+    ws.data.reconnectAttempts = attempt + 1;
+    log(`[WS-PROXY] upstream abnormal close, reconnect in ${delay}ms (attempt ${ws.data.reconnectAttempts})`);
+    ws.data.reconnectTimer = setTimeout(() => connectUpstream(), delay);
+  }
+
+  function connectUpstream() {
+    if (ws.data.closing || ws.readyState !== WebSocket.OPEN) return;
     try {
-      // 显式传 Host header 匹配上游 loopback 校验（_is_accepted_host）
       const upstream = new WebSocket(targetUrl, {
         headers: { "Host": `${DASHBOARD_BIND}:${DASHBOARD_PORT}` },
       });
       ws.data.upstream = upstream;
-      upstream.on("open", () => log(`[WS-PROXY] upstream connected`));
-      upstream.on("message", (data) => { try { ws.send(data); } catch {} });
-      upstream.on("close", (code, reason) => {
-        try { ws.close(code, reason.toString()); } catch {}
-        log(`[WS-PROXY] upstream closed code=${code}`);
+      upstream.on("open", () => {
+        ws.data.reconnectAttempts = 0;
+        log(`[WS-PROXY] upstream connected`);
+        flushQueue();
       });
-      upstream.on("error", () => { try { ws.close(1006, "upstream error"); } catch {} });
+      upstream.on("message", (data) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        const path = ws.data.targetUrl?.replace(/\?.*$/, "") || "unknown";
+        const isJsonPath = path.endsWith("/api/ws") || path.endsWith("/api/events");
+        try {
+          if (isJsonPath) {
+            // 同样转成文本帧，保证浏览器 FJ/VJ 客户端收到的是可 JSON.parse 的文本。
+            const payload = Buffer.isBuffer(data) ? data.toString("utf8") : (typeof data === "string" ? data : String(data));
+            ws.send(payload, { binary: false });
+          } else {
+            ws.send(data);
+          }
+        } catch {}
+      });
+      upstream.on("close", (code, reason) => {
+        log(`[WS-PROXY] upstream closed code=${code}`);
+        if (ws.data.closing || ws.readyState !== WebSocket.OPEN) return;
+        if (code === 4409) {
+          // 4409 = WS_CLOSE_SUPERSEDED：另一个 WebSocket Attach 到同一 PTY session。
+          // 直接重新 Attach，不要让浏览器感知断开，彻底避免重连风暴。
+          log(`[WS-PROXY] upstream superseded, re-attach to ${targetUrl}`);
+          connectUpstream();
+          return;
+        }
+        if (code === 1006) {
+          scheduleReconnect();
+          return;
+        }
+        // 其他正常/错误关闭码透传给浏览器
+        cleanup();
+        try { ws.close(code, reason?.toString ? reason.toString() : reason); } catch {}
+      });
+      upstream.on("error", (err) => {
+        log(`[WS-PROXY] upstream error: ${err?.message || err}`);
+      });
     } catch (e) {
       log(`[WS-PROXY] upstream connect failed: ${e?.message || e}`);
-      try { ws.close(1006, "upstream connect failed"); } catch {}
+      scheduleReconnect();
     }
-    return;
   }
-  // 聊天 WS
-  const { sessionId, message } = ws.data;
-  log(`[WS] open session=${sessionId}`);
-  runChatWS(ws, sessionId, message).catch(err => {
-    log(`[WS] runChatWS error: ${err?.message || err}`);
-    try { ws.send(JSON.stringify({ error: err?.message || "internal error" })); } catch {}
-    try { ws.send(JSON.stringify({ done: true })); } catch {}
-  });
 
-  ws.on("message", (data) => {
-    // Dashboard WS 反代：客户端 → 上游
+  const kaTimer = setInterval(() => {
+    try { if (ws.readyState === WebSocket.OPEN) ws.ping(); } catch {}
+    const up = ws.data.upstream;
+    if (up && up.readyState === WebSocket.OPEN) { try { up.ping(); } catch {} }
+  }, 30000);
+  ws.data.kaTimer = kaTimer;
+
+  log(`[WS-PROXY] open → ${targetUrl}`);
+  connectUpstream();
+}
+
+// WebSocket 连接建立后的事件处理（替换 Bun 的 wsHandler.open/message/close）
+function attachWsHandlers(ws) {
+  // Dashboard WS 反代
+  if (ws.data.type === "dashboard-proxy") {
+    setupDashboardProxy(ws);
+  } else {
+    // 聊天 WS
+    const { sessionId, message } = ws.data;
+    log(`[WS] open session=${sessionId}`);
+    runChatWS(ws, sessionId, message).catch(err => {
+      log(`[WS] runChatWS error: ${err?.message || err}`);
+      try { ws.send(JSON.stringify({ error: err?.message || "internal error" })); } catch {}
+      try { ws.send(JSON.stringify({ done: true })); } catch {}
+    });
+  }
+
+  ws.on("message", (data, isBinary) => {
     if (ws.data.type === "dashboard-proxy") {
-      if (ws.data.upstream && ws.data.upstream.readyState === WebSocket.OPEN) {
-        try { ws.data.upstream.send(data); } catch {}
+      const up = ws.data.upstream;
+      const path = ws.data.targetUrl?.replace(/\?.*$/, "") || "unknown";
+      // gateway 的 /api/ws（JSON-RPC 边车）与 /api/events（事件订阅）都用 receive_text() 收 JSON。
+      // ws 库默认把收到的消息以 Buffer 形式回调，若原样 up.send(Buffer) 会被当成 binary 帧转发，
+      // 触发 gateway KeyError:'text' 并导致前端 FJ 客户端显示 "WebSocket closed"。
+      // 因此这两条路径一律把 Buffer 转成 UTF-8 文本、并以 text 帧上行；其它路径（如 /api/pty）保持原样。
+      const isJsonPath = path.endsWith("/api/ws") || path.endsWith("/api/events");
+      if (isJsonPath) {
+        const payload = Buffer.isBuffer(data) ? data.toString("utf8") : (typeof data === "string" ? data : String(data));
+        if (up && up.readyState === WebSocket.OPEN) {
+          try { up.send(payload, { binary: false }); } catch {}
+        } else if (!ws.data.closing) {
+          ws.data.sendQueue = ws.data.sendQueue || [];
+          ws.data.sendQueue.push(payload);
+        }
+        return;
+      }
+      if (up && up.readyState === WebSocket.OPEN) {
+        try { up.send(data); } catch {}
+      } else if (!ws.data.closing) {
+        ws.data.sendQueue = ws.data.sendQueue || [];
+        ws.data.sendQueue.push(data);
       }
       return;
     }
@@ -1502,7 +1617,10 @@ function attachWsHandlers(ws) {
 
   ws.on("close", () => {
     if (ws.data.type === "dashboard-proxy") {
-      if (ws.data.upstream) { try { ws.data.upstream.close(); } catch {} }
+      ws.data.closing = true;
+      if (ws.data.reconnectTimer) { clearTimeout(ws.data.reconnectTimer); ws.data.reconnectTimer = null; }
+      if (ws.data.kaTimer) { clearInterval(ws.data.kaTimer); ws.data.kaTimer = null; }
+      if (ws.data.upstream) { try { ws.data.upstream.terminate(); } catch {} }
       log(`[WS-PROXY] client closed`);
       return;
     }
@@ -1573,7 +1691,7 @@ function isPortListening(port) {
   return false;
 }
 
-function findPidByCmd(pattern) {
+function findPidByCmd(pattern, binPath) {
   try {
     const dirs = readdirSync("/proc").filter(d => /^\d+$/.test(d));
     for (const dir of dirs) {
@@ -1582,6 +1700,8 @@ function findPidByCmd(pattern) {
       try {
         const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8")
           .replace(/\0/g, " ").trim();
+        // binPath 非空时仅匹配本包 venv 的 hermes（如 HERMES_BIN），避免误判系统其它 hermes
+        if (binPath && !cmdline.includes(binPath)) continue;
         if (cmdline.includes(pattern)) return pid;
       } catch {}
     }
@@ -1592,6 +1712,8 @@ function findPidByCmd(pattern) {
 // 定位常驻网关进程：官方 Dashboard 以 `gateway restart` 拉起的常驻网关，
 // 其命令行不含 `gateway run`，而 monitor 自己拉起的是 `gateway run`，
 // 两种都需识别，否则 Dashboard 重启后 monitor 面板看不到网关进程。
+// 关键：必须限定为本包 venv 的 HERMES_BIN，否则会误把系统其它 hermes
+// （如 /opt/hermes 的 s6 服务）当作自身网关，导致永不拉起自己的 gateway。
 function findGatewayPid() {
   try {
     const dirs = readdirSync("/proc").filter(d => /^\d+$/.test(d));
@@ -1601,7 +1723,7 @@ function findGatewayPid() {
       try {
         const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8")
           .replace(/\0/g, " ").trim();
-        if (/hermes/.test(cmdline) && /gateway\s+(run|restart)/.test(cmdline)) return pid;
+        if (cmdline.includes(HERMES_BIN) && /gateway\s+(run|restart)/.test(cmdline)) return pid;
       } catch {}
     }
     return null;
@@ -1654,7 +1776,7 @@ function getHermesTotalMemoryKB() {
       if (!pid || pid === process.pid) continue;
       try {
         const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8").replace(/\0/g, " ").trim();
-        if (cmdline.includes("hermes")) total += getProcessRssKB(pid);
+        if (cmdline.includes(HERMES_BIN)) total += getProcessRssKB(pid);
       } catch {}
     }
   } catch {}
@@ -1718,7 +1840,7 @@ function spawnHermes(name, pidPath, args) {
   const cmdPattern = name === "gateway" ? "hermes gateway run" : "hermes dashboard";
   setTimeout(() => {
     if (pidAlive(p.pid)) return;
-    const real = findPidByCmd(cmdPattern);
+    const real = findPidByCmd(cmdPattern, HERMES_BIN);
     if (real && real !== p.pid) {
       writeFileSync(pidPath, String(real));
       spawnTimes.set(pidPath, Date.now());
@@ -1779,7 +1901,7 @@ async function getStatus() {
     }
   }
   if (!dp) {
-    const foundDb = findPidByCmd("hermes dashboard");
+    const foundDb = findPidByCmd("hermes dashboard", HERMES_BIN);
     if (foundDb) {
       writeFileSync(PID_DASHBOARD, String(foundDb), "utf8");
       log(`Dashboard 运行中 pid=${foundDb}`);
@@ -2174,7 +2296,55 @@ async function proxyDashboard(req) {
 })();
 <\/script>`;
 
-      html = html.replace("</head>", inject + "\n</head>");
+      // ── 中文语言运行时汉化（仅 zh/zh-hant 生效，不影响其他语言切换）──
+      const injectZh = `<script>
+(function(){
+  try{
+    var DICT={
+      'Files':'文件','Channels':'通讯','Webhooks':'回调参数','Pairing':'配对','System':'系统',
+      'KANBAN':'看板','Kanban':'看板','achievements':'成就','Achievements':'成就',
+      'Model Context Length':'模型上下文长度','Fallback Providers':'备用提供商',
+      'Max Concurrent Sessions':'最大并发会话','Max Live Sessions':'最大活跃会话',
+      'Context File Max Chars':'上下文文件最大字符数','File Read Max Chars':'文件读取最大字符数',
+      'Save':'保存','Cancel':'取消','Add':'添加','Delete':'删除','Edit':'编辑','Apply':'应用',
+      'Reset':'重置','Test':'测试','Enabled':'已启用','Disabled':'已禁用','Running':'运行中',
+      'Stopped':'已停止','Active':'启用','Inactive':'停用','Connected':'已连接','Disconnected':'未连接',
+      'Loading':'加载中','Search':'搜索','Settings':'设置','Language':'语言','Update':'更新',
+      'Restart':'重启','Install':'安装','Uninstall':'卸载','Stop':'停止','Start':'启动',
+      'General':'常规','Advanced':'高级','About':'关于'
+    };
+    var SKIP={INPUT:1,TEXTAREA:1,SCRIPT:1,STYLE:1,CODE:1,PRE:1};
+    function getLoc(){try{return localStorage.getItem('hermes-locale')||'en';}catch(e){return 'en';}}
+    function translate(root){
+      if(!root)return;
+      var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null,false),n;
+      while((n=w.nextNode())){
+        var t=n.nodeValue; if(!t)continue;
+        var k=t.trim(); if(!k||!DICT[k]||k===DICT[k])continue;
+        var p=n.parentNode; if(!p||p.nodeType!==1)continue;
+        if(SKIP[p.tagName]||p.isContentEditable)continue;
+        n.nodeValue=t.replace(k,DICT[k]);
+      }
+    }
+    function run(){ if(getLoc()!=='zh'&&getLoc()!=='zh-hant')return; try{translate(document.body);}catch(e){} }
+    var obs;
+    function start(){
+      if(obs)return;
+      obs=new MutationObserver(function(){
+        if(obs)obs.disconnect();
+        try{run();}catch(e){}
+        if(obs)obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+      });
+      obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+    }
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){run();start();});}
+    else{run();start();}
+    window.addEventListener('storage',function(e){if(e.key==='hermes-locale')run();});
+  }catch(e){}
+})();
+<\/script>`;
+
+      html = html.replace("</head>", inject + "\n" + injectZh + "\n</head>");
 
       respHeaders.delete("content-length");
       respHeaders.delete("content-encoding");
@@ -4285,34 +4455,34 @@ async function handleFetch(req) {
         return risky ? JSON.stringify(s) : s;
       };
 
-      // ── 构建 providers: 段（A/B 分类，详见 provider-config.js 的 PROVIDER_CLASSES）iranee ──
-      //   A 类内置商仅写 model 段，端点与原生协议交给 Hermes 内置 PROVIDER_REGISTRY；
-      //   B 类内置商（siliconflow / mistral / ollama-cloud）与所有非预设 custom-* 必须写 providers 段。
+      // ── 构建 providers: 段（v0.20.33 修复）──
+      // Hermes 0.18.x/0.19.0 选 provider 依赖 providers: 列表，仅写 model.provider 会报
+      // "No inference provider configured"。因此除本地 hermes 代理外，A/B/custom 全部写 providers: 段。
       const customEntries = Object.entries(allProvConfig)
         .sort(([a], [b]) => {
           if (a === providerId) return -1;
           if (b === providerId) return 1;
           return a.localeCompare(b);
         })
-        .filter(([id]) => !PROVIDER_PRESETS[id] || PROVIDER_CLASSES[id] === "B")
+        .filter(([id]) => id !== "hermes")
         .map(([id, pcfg]) => {
-          const baseUrl = String(pcfg.base_url || "").trim();
+          const preset = PROVIDER_PRESETS[id];
+          let baseUrl = String(pcfg.base_url || "").trim();
+          if (!baseUrl && preset && preset.base_url) baseUrl = preset.base_url;
           if (!baseUrl) {
             log(`跳过 provider "${id}"：缺少 base_url，未写入 config.yaml providers 段`);
             return null;
           }
-          // 本地模型（local-* 动态 id）：本地 OpenAI 兼容服务无需鉴权，
-          // 仅写 base_url + default_model，完全省略 api_key（Hermes config.py 支持缺省，
-          // runtime_provider.py 会自动兜底 "no-key-required" 占位）。iranee
+          // 段名用 PROVIDER_HERMES_IDS 映射（openai→openai-api），与 model.provider 对齐
+          const hermesId = PROVIDER_HERMES_IDS[id] || id;
+          // 本地模型（local-* 动态 id）：本地 OpenAI 兼容服务无需鉴权
           if (String(id).indexOf("local-") === 0) {
-            return `  ${id}:\n` +
+            return `  ${hermesId}:\n` +
                    `    base_url: ${yamlScalar(baseUrl)}\n` +
                    `    default_model: ${yamlScalar(pcfg.model || "auto")}`;
           }
-          // env 名：B 类预设用 PROVIDER_API_KEYS[id]，custom-* 用 customEnvKey(id)
           const envVar = PROVIDER_API_KEYS[id] || customEnvKey(id);
-          // 用户实机验证格式：base_url + api_key（${ENV} 插值）+ default_model，省略 api_mode
-          return `  ${id}:\n` +
+          return `  ${hermesId}:\n` +
                  `    base_url: ${yamlScalar(baseUrl)}\n` +
                  `    api_key: \${${envVar}}\n` +
                  `    default_model: ${yamlScalar(pcfg.model || "auto")}`;
@@ -4333,8 +4503,7 @@ async function handleFetch(req) {
         }
 
         // 同步 providers: 段——兼容模板里的 `providers: {}` 空映射与已存在的多行块两种形态，
-        // 避免产生重复的 providers 顶层键。无 B/custom 条目时整段省略 providers 节，
-        // A 类 active 且无自定义商时 config.yaml 只保留 model 段（贴合用户实机验证格式）。iranee
+        // 避免产生重复的 providers 顶层键。无非 hermes 条目时整段删除 providers 节。
         const _NL = String.fromCharCode(10);
         const _TAB = String.fromCharCode(9);
         const _yl = ymlContent.split(_NL);
@@ -5077,6 +5246,11 @@ function startServer() {
   server = http.createServer(async (req, res) => {
     try {
       const request = await toWebRequest(req);
+      const customResponse = await handleCustomRoute(request);
+      if (customResponse instanceof Response) {
+        await writeWebResponse(res, customResponse);
+        return;
+      }
       const response = await handleFetch(request);
       await writeWebResponse(res, response);
     } catch (err) {
@@ -5111,20 +5285,25 @@ function startServer() {
       });
       return;
     }
-    // Dashboard WebSocket 反代：/proxy/dashboard/api/(ws|events|pty)
-    if (wsPath.startsWith("/proxy/dashboard/api/ws") ||
-        wsPath.startsWith("/proxy/dashboard/api/events") ||
-        wsPath.startsWith("/proxy/dashboard/api/pty")) {
-      if (!readPid(PID_DASHBOARD)) {
-        socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n"); socket.destroy(); return;
+    // Dashboard WebSocket 反代：/proxy/dashboard/* 以及 /proxy/hermes-agent/*
+    // 0.19.0 使用 /api/ws|events|pty，但若 hermes 回退到新版可能出现 /stream 等路径；
+    // 同时 fnOS 反向代理可能保留 /proxy/hermes-agent 前缀。这里泛化匹配，避免
+    // 因硬编码路径导致 WebSocket 升级被直接 destroy。
+    const dashboardProxyPrefixes = ["/proxy/dashboard", "/proxy/hermes-agent"];
+    for (const prefix of dashboardProxyPrefixes) {
+      if (wsPath.startsWith(prefix + "/")) {
+        if (!readPid(PID_DASHBOARD)) {
+          socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n"); socket.destroy(); return;
+        }
+        const subPath = wsPath.slice(prefix.length);
+        const targetUrl = `ws://${DASHBOARD_BIND}:${DASHBOARD_PORT}${subPath}${url.search}`;
+        log(`[WS-UPGRADE] ${wsPath} -> ${targetUrl}`);
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          ws.data = { type: "dashboard-proxy", targetUrl };
+          attachWsHandlers(ws);
+        });
+        return;
       }
-      const subPath = wsPath.replace(/^\/proxy\/dashboard/, "");
-      const targetUrl = `ws://${DASHBOARD_BIND}:${DASHBOARD_PORT}${subPath}${url.search}`;
-      wss.handleUpgrade(req, socket, head, (ws) => {
-        ws.data = { type: "dashboard-proxy", targetUrl };
-        attachWsHandlers(ws);
-      });
-      return;
     }
     // 其他升级请求直接拒绝
     socket.destroy();

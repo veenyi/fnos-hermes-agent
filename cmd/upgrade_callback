@@ -33,26 +33,6 @@ export PIP_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
 export UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
 
 # ---------------------------------------------------------------------------
-# 更新前停止进程服务，再覆盖安装；安装完毕后由 fnOS 重启服务（自动启动回去）
-# ---------------------------------------------------------------------------
-stop_running_app() {
-    log_msg ">>> 更新前检查并停止可能运行中的进程 ..."
-    pkill -SIGTERM -f "app/server/monitor.js" 2>/dev/null || true
-    pkill -SIGTERM -f "monitor.js" 2>/dev/null || true
-    pkill -SIGTERM -f "hermes gateway run" 2>/dev/null || true
-    pkill -SIGTERM -f "hermes.*dashboard" 2>/dev/null || true
-    # 等待进程退出，避免立刻覆盖文件造成写入冲突
-    sleep 2
-    # 兜底强杀残留
-    pkill -SIGKILL -f "app/server/monitor.js" 2>/dev/null || true
-    pkill -SIGKILL -f "hermes gateway run" 2>/dev/null || true
-    pkill -SIGKILL -f "hermes.*dashboard" 2>/dev/null || true
-    log_msg "    进程清理完成"
-}
-
-stop_running_app
-
-# ---------------------------------------------------------------------------
 # curl 从阿里云 PyPI 镜像直接下载 uv wheel，unzip 提取二进制
 # ---------------------------------------------------------------------------
 ensure_uv() {
@@ -121,113 +101,6 @@ ensure_uv() {
     fi
 
     log_msg "uv version: $("${UV}" --version 2>&1 || echo 'FAILED')"
-}
-
-# ---------------------------------------------------------------------------
-# 补齐 WhatsApp bridge 脚本（hermes-agent 0.19.0 wheel 未打包，需本应用提供）
-# ---------------------------------------------------------------------------
-ensure_whatsapp_bridge() {
-    local BRIDGE_SRC="${APP_DIR}/server/whatsapp-bridge"
-    if [ ! -d "${BRIDGE_SRC}" ] || [ ! -f "${BRIDGE_SRC}/bridge.js" ]; then
-        log_msg "WARNING: bundled whatsapp-bridge not found at ${BRIDGE_SRC}, skipping"
-        return 0
-    fi
-
-    local HERMES_CLI_DIR
-    HERMES_CLI_DIR=$("${VENV_DIR}/bin/python3" -c "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))" 2>/dev/null)
-    if [ -z "${HERMES_CLI_DIR}" ] || [ ! -d "${HERMES_CLI_DIR}" ]; then
-        log_msg "WARNING: cannot locate hermes_cli package dir, skipping whatsapp-bridge provisioning"
-        return 0
-    fi
-
-    local SP
-    SP=$(dirname "${HERMES_CLI_DIR}")
-    local DST="${SP}/scripts/whatsapp-bridge"
-
-    log_msg ">>> provisioning WhatsApp bridge → ${DST}"
-    mkdir -p "${DST}"
-    cp -r "${BRIDGE_SRC}/." "${DST}/"
-    chmod -R u+rwX "${DST}" 2>/dev/null || true
-
-    if [ -f "${DST}/bridge.js" ] && [ -f "${DST}/package.json" ]; then
-        log_msg "WhatsApp bridge provisioned: ${DST}/bridge.js"
-    else
-        log_msg "WARNING: WhatsApp bridge copy incomplete (bridge.js/package.json missing)"
-    fi
-}
-
-# ---------------------------------------------------------------------------
-# 修复 dashboard/chat TUI 在桌面 IME 下输入文字消失的问题
-# ---------------------------------------------------------------------------
-# hermes-agent 0.19.0 web bundle 的 pty-mobile-input 对桌面浏览器的
-# compositionend/insertCompositionText 也会启用 mobile-replacement 归一化，
-# 导致中文/日文 IME 输入时被误判为整行替换，文字消失。这里对已知 0.19.0
-# 打包后的 minified 函数做一次幂等补丁，仅当精确匹配原函数时才替换。
-patch_hermes_web_mobile_input() {
-    local HERMES_CLI_DIR
-    HERMES_CLI_DIR=$("${VENV_DIR}/bin/python3" -c "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))" 2>/dev/null)
-    if [ -z "${HERMES_CLI_DIR}" ] || [ ! -d "${HERMES_CLI_DIR}" ]; then
-        log_msg "WARNING: cannot locate hermes_cli package dir, skipping mobile-input patch"
-        return 0
-    fi
-
-    local JS_FILE
-    JS_FILE=$(find "${HERMES_CLI_DIR}/web_dist/assets" -maxdepth 1 -type f -name 'index-*.js' -print -quit 2>/dev/null)
-    if [ -z "${JS_FILE}" ] || [ ! -f "${JS_FILE}" ]; then
-        log_msg "WARNING: hermes web bundle not found, skipping mobile-input patch"
-        return 0
-    fi
-
-    # 0.19.0 wheel 中 shouldTreatInputAsMobileReplacement 的 minified 形态
-    local OLD_FN='function sY(e,t,n){return e===`insertReplacementText`||e===`insertFromComposition`||e===`insertCompositionText`?!0:n&&e===`insertText`&&(t?.length??0)>1}'
-    local NEW_FN='function sY(e,t,n){if(!n)return!1;if(e===`insertReplacementText`||e===`insertFromComposition`||e===`insertCompositionText`)return!0;return e===`insertText`&&(t?.length??0)>1}'
-
-    # ChatPage 的 compositionend 监听（minified 箭头函数 n）。原版无条件置位 350ms
-    # 替换窗口，导致桌面 IME 每次候选提交都会误入整行替换、已输入文字被删。改为仅当
-    # isMobileLike（闭包变量 e）为真时才置位。e 与该作用域内 isMobileLike 同一变量。
-    local OLD_CE='n=()=>{w.current=Date.now()+350}'
-    local NEW_CE='n=()=>{e&&(w.current=Date.now()+350)}'
-
-    if ! grep -Fq "${OLD_FN}" "${JS_FILE}" && ! grep -Fq "${OLD_CE}" "${JS_FILE}"; then
-        if grep -Fq "${NEW_FN}" "${JS_FILE}" && grep -Fq "${NEW_CE}" "${JS_FILE}"; then
-            log_msg "hermes web mobile-input already patched: ${JS_FILE}"
-        else
-            log_msg "WARNING: hermes web mobile-input patch pattern not found (bundle may have changed): ${JS_FILE}"
-        fi
-        return 0
-    fi
-
-    local RESULT
-    RESULT=$("${VENV_DIR}/bin/python3" - <<PY
-old_fn = '''${OLD_FN}'''
-new_fn = '''${NEW_FN}'''
-old_ce = '''${OLD_CE}'''
-new_ce = '''${NEW_CE}'''
-path = '''${JS_FILE}'''
-with open(path, 'r', encoding='utf-8') as f:
-    s = f.read()
-applied = 0
-if old_fn in s:
-    s = s.replace(old_fn, new_fn)
-    applied += 1
-if old_ce in s:
-    s = s.replace(old_ce, new_ce)
-    applied += 1
-with open(path, 'w', encoding='utf-8') as f:
-    f.write(s)
-print(applied)
-PY
-    )
-
-    if [ "${RESULT}" = "2" ]; then
-        log_msg "patched hermes web mobile-input normalization (2 sites): ${JS_FILE}"
-    elif [ "${RESULT}" = "1" ]; then
-        log_msg "patched hermes web mobile-input normalization (1 site): ${JS_FILE}"
-    elif [ "${RESULT}" = "0" ]; then
-        log_msg "WARNING: hermes web mobile-input patch did not apply: ${JS_FILE}"
-    else
-        log_msg "WARNING: hermes web mobile-input patch unexpected result (${RESULT}): ${JS_FILE}"
-    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -311,10 +184,10 @@ UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
 
 # 覆盖安装可能失败 → 清 hermes 相关的 site-packages 再试
 if [ ! -f "${HERMES}" ]; then
-    log_msg ">>> 指定版本安装失败，尝试安装最新版 hermes-agent[all] ..."
+    log_msg ">>> 首次安装失败，清理后重试 ..."
     rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
     UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
-        "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]" \
+        "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
         2>>"${LOG_FILE}" || true
 
     if [ ! -f "${HERMES}" ]; then
@@ -324,12 +197,6 @@ if [ ! -f "${HERMES}" ]; then
 fi
 
 log_msg "hermes binary verified"
-
-# 补齐 WhatsApp bridge（非致命）
-ensure_whatsapp_bridge
-
-# 修复 dashboard/chat TUI 桌面 IME 输入文字消失（非致命）
-patch_hermes_web_mobile_input
 
 ACTUAL_VER=$("$UV" pip show --python "${VENV_DIR}/bin/python3" hermes-agent 2>/dev/null | grep -i '^version' | awk '{print $2}' || echo "unknown")
 log_msg "hermes upgraded: ${ACTUAL_VER}"

@@ -61,13 +61,14 @@ jobs:
           curl -fsSL "$FNPACK_URL" -o fnpack
           chmod +x fnpack
           mv fnpack /usr/local/bin/
+          fnpack --version
           echo "fnpack 已安装并可用"
 
       # 6. 更新 manifest 版本号
       - name: Update manifest version
         run: |
           VERSION="${{ steps.target_version.outputs.target_version }}"
-          sed -i "s/^version[[:space:]]*=.*/version = $VERSION/" ${{ env.MANIFEST_FILE }} || exit 1
+          sed -i "s/^version.*=/version       = $VERSION/" ${{ env.MANIFEST_FILE }} || exit 1
           echo "Updated manifest:"
           grep "^version" ${{ env.MANIFEST_FILE }}
 
@@ -98,13 +99,6 @@ jobs:
           TARGET_NAME="fnos-${{ env.APP_NAME }}_v${{ steps.target_version.outputs.target_version }}.fpk"
           
           if [ -f "$SOURCE_FPK" ]; then
-            # 补充 README.md 与 .gitignore 到外层 tar，使每次发布包内文档也同步
-            TMP_DIR=$(mktemp -d)
-            tar -xzf "$SOURCE_FPK" -C "$TMP_DIR"
-            cp README.md .gitignore "$TMP_DIR/"
-            tar -czf "$SOURCE_FPK" --transform='s,^\./,,' -C "$TMP_DIR" .
-            rm -rf "$TMP_DIR"
-            
             mv "$SOURCE_FPK" "$DIST_DIR/$TARGET_NAME"
             SIZE=$(du -h "$DIST_DIR/$TARGET_NAME" | cut -f1)
             echo "打包成功：$TARGET_NAME ($SIZE)"
@@ -126,8 +120,8 @@ jobs:
 
           echo "Release notes 已生成"
 
-      # 10. 创建正式 Release（直接发布，无需手动确认）
-      - name: Create Release
+      # 10. 创建 Draft Release
+      - name: Create Draft Release
         id: create_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -136,15 +130,16 @@ jobs:
           FPK_NAME="fnos-${{ env.APP_NAME }}_v${VERSION}.fpk"
           RELEASE_TAG="fnos-hermes-agent_v${VERSION}"
           DIST_DIR="dist"
-
-          echo "创建 Release: $RELEASE_TAG"
-
+          
+          echo "创建 Draft Release: $RELEASE_TAG"
+          
           gh release create "$RELEASE_TAG" \
             "$DIST_DIR/$FPK_NAME" \
+            --draft \
             --title "$RELEASE_TAG" \
             --notes-file release_body.md || exit 1
-
-          echo "Release 已发布"
+          
+          echo "Draft Release 已创建"
           echo "release_url=https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG" >> $GITHUB_OUTPUT
 
       # 11. 构建摘要
@@ -156,4 +151,4 @@ jobs:
           echo "|------|------|-----------|------|" >> $GITHUB_STEP_SUMMARY
           echo "| fnOS Hermes Agent | v${{ steps.target_version.outputs.target_version }} | fnos-hermes-agent_v${{ steps.target_version.outputs.target_version }}.fpk | ${{ steps.build.outputs.size }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**[Release](https://github.com/${{ github.repository }}/releases)** — 已发布" >> $GITHUB_STEP_SUMMARY
+          echo "**[Draft Release](https://github.com/${{ github.repository }}/releases)** — 请确认后发布" >> $GITHUB_STEP_SUMMARY

@@ -3176,73 +3176,89 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         xhr.send(JSON.stringify({ session_id: sessionId, message: sendContent }));
       }
 
-      // ── 尝试 WebSocket，失败则降级到 XHR ──
-      try {
-        // 1) POST 消息入队
-        var sendResp = await fetch(apiUrl('/api/chat/ws-send'), {
+      // ── WebSocket（带自动重连/恢复）；彻底失败才降级 XHR ──
+      var wsMaxRetries = 3;
+      var wsAttempt = 0;
+      var gotDone = false;
+
+      function attemptWS() {
+        wsAttempt++;
+        fetch(apiUrl('/api/chat/ws-send'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': monitorToken || '' },
           body: JSON.stringify({ session_id: sessionId, message: sendContent }),
-        });
-        if (!sendResp.ok) throw new Error('ws-send HTTP ' + sendResp.status);
-
-        // 2) 建 WS 连接
-        var wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        var wsUrl = wsProto + '//' + window.location.host + apiUrl('/api/chat/ws')
-                  + '?session_id=' + encodeURIComponent(sessionId)
-                  + '&token=' + encodeURIComponent(monitorToken || '');
-
-        var ws = new WebSocket(wsUrl);
-        var wsDone = false;
-        var wsTimer = setTimeout(function() {
-          // 3秒内未收到任何消息，判定 WS 不可用，降级
-          if (!wsDone && fullText === '') {
-            try { ws.close(); } catch(e) {}
-            startXhrFallback();
-          }
-        }, 3000);
-
-        chatState.abortCtrl = { abort: function(){
-          try { ws.send(JSON.stringify({ stop: true })); } catch(e) {}
-          try { ws.close(); } catch(e) {}
-        }};
-
-        ws.onmessage = function(ev) {
-          try {
-            var parsed = JSON.parse(ev.data);
-            // 收到任何合法消息即证明 WS 存活，取消降级定时器
-            clearTimeout(wsTimer);
-            onMsg(parsed, function(isErr) {
-              if (wsDone) return;
-              wsDone = true;
-              clearTimeout(wsTimer);
+        }).then(function() {
+          var wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          var wsUrl = wsProto + '//' + window.location.host + apiUrl('/api/chat/ws')
+                    + '?session_id=' + encodeURIComponent(sessionId)
+                    + '&token=' + encodeURIComponent(monitorToken || '');
+          var ws = new WebSocket(wsUrl);
+          var wsLocalDone = false;
+          // 5s 内未收到任何消息才判定不可用（放宽阈值，避免慢模型首 token 误判）
+          var wsTimer = setTimeout(function() {
+            if (!wsLocalDone && !gotDone && fullText === '') {
               try { ws.close(); } catch(e) {}
-              onFinish(isErr);
-            });
-          } catch(e) {}
-        };
-        ws.onerror = function() {
-          clearTimeout(wsTimer);
-          if (!wsDone && fullText === '') {
-            wsDone = true;
-            startXhrFallback();
-          }
-        };
-        ws.onclose = function() {
-          clearTimeout(wsTimer);
-          // WS 关闭但没收到 done 且没内容 → 降级
-          if (!wsDone && fullText === '') {
-            wsDone = true;
-            startXhrFallback();
-          } else if (!wsDone) {
-            wsDone = true;
-            onFinish(false);
-          }
-        };
-      } catch(e) {
-        // fetch ws-send 或 WebSocket 构造失败 → 直接 XHR
-        startXhrFallback();
+              if (wsAttempt <= wsMaxRetries) attemptWS();
+              else startXhrFallback();
+            }
+          }, 5000);
+
+          chatState.abortCtrl = { abort: function(){
+            try { ws.send(JSON.stringify({ stop: true })); } catch(e) {}
+            try { ws.close(); } catch(e) {}
+          }};
+
+          ws.onmessage = function(ev) {
+            try {
+              var parsed = JSON.parse(ev.data);
+              clearTimeout(wsTimer);
+              onMsg(parsed, function(isErr) {
+                if (wsLocalDone || gotDone) return;
+                wsLocalDone = true; gotDone = true;
+                clearTimeout(wsTimer);
+                try { ws.close(); } catch(e) {}
+                onFinish(isErr);
+              });
+            } catch(e) {}
+          };
+          ws.onerror = function() { clearTimeout(wsTimer); };
+          ws.onclose = function() {
+            clearTimeout(wsTimer);
+            if (wsLocalDone || gotDone) return; // 正常结束
+            // 异常关闭（对话中断）——不再静默截断
+            if (fullText === '') {
+              // 尚未收到任何内容 → 自动重连
+              if (wsAttempt <= wsMaxRetries) {
+                if (statusText) statusText.textContent = '连接中断，正在重试 (' + wsAttempt + '/' + wsMaxRetries + ')…';
+                setTimeout(attemptWS, 600);
+              } else {
+                gotDone = true; startXhrFallback();
+              }
+            } else {
+              // 已有部分内容 → 保留已生成文本并提示可恢复
+              gotDone = true;
+              if (statusText) statusText.textContent = '⚠ 对话中断';
+              try {
+                var ib = document.createElement('div');
+                ib.className = 'tool-approve-bar';
+                ib.style.marginTop = '8px';
+                ib.innerHTML = '<button class="tool-approve-btn approve">↻ 重新生成</button>';
+                ib.querySelector('.approve').onclick = function() {
+                  var ci = document.getElementById('chatInput');
+                  if (ci) { ci.value = sendContent; chatSend(); }
+                };
+                contentEl.appendChild(ib);
+              } catch(e) {}
+              onFinish(false);
+            }
+          };
+        }).catch(function() {
+          if (gotDone) return;
+          if (wsAttempt <= wsMaxRetries) attemptWS();
+          else { gotDone = true; startXhrFallback(); }
+        });
       }
+      attemptWS();
     };
 
     if(!chatState.currentId){
