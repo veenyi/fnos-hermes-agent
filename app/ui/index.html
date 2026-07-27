@@ -3427,6 +3427,53 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   var EXT_ICONS = {
     code_execution:"🐍", terminal:"⌨️", file:"📁", web:"🌐", browser:"🧭",
     vision:"👁️", memory:"🧠", todo:"📝", skills:"📚", clarify:"❓", delegation:"🤝",
+    video:"🎬", image_generation:"🎨", schedule:"⏰", computer_use:"🖥️", browser_vision:"👁️‍🗨️",
+    close_terminal:"🛑", read_terminal:"📺", web_api_key:"🔑", kanban:"📋", kanban_orchestrator:"🗂️",
+  };
+  // 原生工具集 API 返回英文 label/description，中文环境下做映射（key 同时支持 name 与 label）
+  var EXT_I18N = {
+    "code_execution":          { label:"代码执行 (Python)", desc:"执行 Python 代码" },
+    "Code Execution":          { label:"代码执行 (Python)", desc:"执行 Python 代码" },
+    "terminal":                { label:"终端 / 进程",       desc:"运行 shell 命令" },
+    "Terminal & Processes":    { label:"终端 / 进程",       desc:"运行 shell 命令" },
+    "file":                    { label:"文件操作",         desc:"读写 / 搜索文件" },
+    "File Operations":         { label:"文件操作",         desc:"读写 / 搜索文件" },
+    "web":                     { label:"联网搜索",         desc:"Web 搜索与抓取" },
+    "Web Search & Scraping":   { label:"联网搜索",         desc:"Web 搜索与抓取" },
+    "browser":                 { label:"浏览器自动化",     desc:"网页导航与操作" },
+    "Browser Automation":      { label:"浏览器自动化",     desc:"网页导航与操作" },
+    "vision":                  { label:"视觉 / 图像分析",  desc:"图像理解" },
+    "Vision / Image Analysis": { label:"视觉 / 图像分析",  desc:"图像理解" },
+    "memory":                  { label:"记忆",             desc:"跨会话记忆" },
+    "Memory":                  { label:"记忆",             desc:"跨会话记忆" },
+    "todo":                    { label:"任务规划",         desc:"TODO 清单" },
+    "Task Planning":           { label:"任务规划",         desc:"TODO 清单" },
+    "skills":                  { label:"技能",             desc:"技能列表 / 管理" },
+    "Skills":                  { label:"技能",             desc:"技能列表 / 管理" },
+    "clarify":                 { label:"澄清提问",         desc:"主动澄清需求" },
+    "Clarify Question":        { label:"澄清提问",         desc:"主动澄清需求" },
+    "delegation":              { label:"任务委派",         desc:"多智能体委派" },
+    "Task Delegation":         { label:"任务委派",         desc:"多智能体委派" },
+    "video":                   { label:"视频分析",         desc:"视频内容理解" },
+    "Video Analysis":          { label:"视频分析",         desc:"视频内容理解" },
+    "image_generation":        { label:"图像生成",         desc:"根据描述生成图像" },
+    "Image Generation":        { label:"图像生成",         desc:"根据描述生成图像" },
+    "schedule":                { label:"定时任务",         desc:"自然语言描述的自动化调度" },
+    "Scheduled Tasks":         { label:"定时任务",         desc:"自然语言描述的自动化调度" },
+    "computer_use":            { label:"计算机控制",       desc:"桌面级计算机操作" },
+    "Computer Use":            { label:"计算机控制",       desc:"桌面级计算机操作" },
+    "browser_vision":          { label:"浏览器视觉",       desc:"带视觉能力的浏览器自动化" },
+    "Browser Vision":          { label:"浏览器视觉",       desc:"带视觉能力的浏览器自动化" },
+    "close_terminal":          { label:"关闭终端",         desc:"关闭已打开的终端会话" },
+    "Close Terminal":          { label:"关闭终端",         desc:"关闭已打开的终端会话" },
+    "read_terminal":           { label:"读取终端",         desc:"读取终端实时输出" },
+    "Read Terminal":           { label:"读取终端",         desc:"读取终端实时输出" },
+    "web_api_key":             { label:"Web API 密钥",     desc:"Web 搜索等服务的 API 密钥" },
+    "Web API Key":             { label:"Web API 密钥",     desc:"Web 搜索等服务的 API 密钥" },
+    "kanban":                  { label:"看板",             desc:"多智能体看板协作" },
+    "Kanban":                  { label:"看板",             desc:"多智能体看板协作" },
+    "kanban_orchestrator":     { label:"看板编排器",       desc:"看板工作流编排" },
+    "Kanban Orchestrator":     { label:"看板编排器",       desc:"看板工作流编排" },
   };
   var EXT_PERSONAS = {
     default:   { emoji:"🤖", label:"默认助手",   prompt:"你是用户的默认主力助手。请直接、简洁地回答用户问题，不擅自启用专家团、工作流或多智能体协作模式。仅当用户明确请求组建专家团或执行工作流时，才切换到对应模式。你的回复应保持自然、专注，优先解决用户当前提出的任务。" },
@@ -3460,12 +3507,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         grid.innerHTML = Object.keys(nts).map(function(k){
           var t = nts[k];
           var on = !!t.enabled;
-          var ic = EXT_ICONS[k] || "🔧";
+          // 中文环境下对原生 API 返回的英文 label/description 做映射
+          var loc = (typeof localStorage !== 'undefined' ? localStorage.getItem('hermes-locale') : '') || 'en';
+          var isZh = (loc === 'zh' || loc === 'zh-hant');
+          var i18n = isZh ? (EXT_I18N[k] || EXT_I18N[t.label] || EXT_I18N[t.name] || {}) : {};
+          var label = escapeHtml(i18n.label || t.label || t.name || k);
+          var desc  = escapeHtml(i18n.desc  || t.description || '');
+          var ic = i18n.icon || EXT_ICONS[k] || EXT_ICONS[t.name] || "🔧";
           return '<div class="ext-card'+(on?' on':'')+'" style="cursor:pointer" onclick="extToggleToolset(\''+k+'\')">'+
             '<div class="ext-card-head"><span class="ext-card-icon">'+ic+'</span>'+
-            '<span class="ext-card-title">'+escapeHtml(t.label||t.name)+'</span>'+
+            '<span class="ext-card-title">'+label+'</span>'+
             '<span class="ext-badge '+(on?'':'muted')+'">'+(on?'已启用':'关闭')+'</span></div>'+
-            '<div class="ext-card-desc">'+escapeHtml(t.description||'')+'</div></div>';
+            '<div class="ext-card-desc">'+desc+'</div></div>';
         }).join('');
       } else {
         grid.innerHTML = EXT_TOOLSETS.map(function(t){
