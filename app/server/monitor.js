@@ -5309,7 +5309,13 @@ function startServer() {
     socket.destroy();
   });
 
-  server.on("error", (err) => { log(`Server error: ${err?.message || err}`); });
+  server.on("error", (err) => {
+    log(`Server error: ${err?.message || err}`);
+    if (err?.code === "EADDRINUSE") {
+      log(`[FATAL] Unix socket ${SOCKET_PATH} 已被占用，可能存在另一个 monitor 实例；退出以避免多实例冲突`);
+      process.exit(1);
+    }
+  });
 
   server.listen({ path: SOCKET_PATH }, () => {
     try { chmodSync(SOCKET_PATH, 0o777); } catch {}

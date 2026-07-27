@@ -25,12 +25,13 @@ start_process() {
     if status; then return 0; fi
     if ! command -v node >/dev/null 2>&1; then log_msg "node not found"; return 1; fi
 
-    # 修复权限漂移：确保数据目录归属与 app 目录一致，防止 root/hermes-agent 混跑导致 EACCES
+    # 修复权限漂移：确保数据/日志目录归属与 app 目录一致，防止 root/hermes-agent 混跑导致 EACCES
     # （安装/调试期可能以 root 写入，后续正常启动降为 hermes-agent 时无法覆写）
-    if [ -d "${TRIM_APPDEST}" ] && [ -d "${TRIM_PKGVAR}" ]; then
+    if [ -d "${TRIM_APPDEST}" ]; then
         APP_OWNER=$(stat -c '%U:%G' "${TRIM_APPDEST}" 2>/dev/null)
         if [ -n "$APP_OWNER" ]; then
-            chown -R "$APP_OWNER" "${TRIM_PKGVAR}" 2>/dev/null || true
+            [ -d "${TRIM_PKGVAR}" ] && chown -R "$APP_OWNER" "${TRIM_PKGVAR}" 2>/dev/null || true
+            [ -d "${TRIM_PKGHOME}" ] && chown -R "$APP_OWNER" "${TRIM_PKGHOME}" 2>/dev/null || true
         fi
     fi
 
