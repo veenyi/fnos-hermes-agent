@@ -674,9 +674,9 @@
       .chat-messages{padding:12px}
       .msg-content{max-width:92%}
       /* 移动端角色/专家团胶囊栏：单行横向滚动，不挤占输入区 */
-      .chat-composer > .chat-composer-inner > .persona-bar-wrap{flex-wrap:nowrap !important;overflow-x:auto;white-space:nowrap;padding:0 2px 4px;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:5px}
-      .chat-composer > .chat-composer-inner > .persona-bar-wrap::-webkit-scrollbar{display:none}
-      .chat-composer > .chat-composer-inner > .persona-bar-wrap > .ext-persona-bar{flex:0 0 auto;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 8px;font-size:11px}
+      .chat-composer > .chat-composer-inner > .chat-tools-row > .persona-bar-wrap{flex-wrap:nowrap !important;overflow-x:auto;white-space:nowrap;padding:0 2px 0 0;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:5px}
+      .chat-composer > .chat-composer-inner > .chat-tools-row > .persona-bar-wrap::-webkit-scrollbar{display:none}
+      .chat-composer > .chat-composer-inner > .chat-tools-row > .persona-bar-wrap > .ext-persona-bar{flex:0 0 auto;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 8px;font-size:11px}
       .chat-composer{padding:4px 6px calc(6px + env(safe-area-inset-bottom, 0px))}
       .chat-composer-inner{max-width:100%;width:92%;border-radius:20px;background:var(--bg2)}
       .chat-input{flex:1;font-size:16px}
@@ -738,7 +738,7 @@
     .ext-persona-bar{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border,#2a2f3a);border-radius:999px;font-size:12px;color:var(--text3,#8a909c);background:var(--bg2,#1b1f27);cursor:pointer}
     .ext-persona-bar.active{color:var(--accent,#4f8cff);border-color:var(--accent,#4f8cff)}
     .ext-persona-bar-ghost{opacity:.6;border-style:dashed}
-    .persona-bar-wrap{display:flex;gap:6px;flex-wrap:wrap;padding:0 2px 8px}
+    .persona-bar-wrap{display:flex;gap:6px;flex-wrap:nowrap;align-items:center;flex:0 0 auto;padding:0 2px 0 0}
 
     /* ── 扩展能力：页签 / 卡片网格 / 内嵌浏览（美化）── */
     .ext-tabs{display:flex;gap:6px;overflow-x:auto;white-space:nowrap;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid var(--border,#2a2f3a)}
@@ -824,8 +824,10 @@
     .chat-header-btn:hover{background:var(--bg3);color:var(--text)}
     .chat-header-btn.active{color:var(--accent)}
     .theme-sep{width:1px;height:18px;background:var(--border);margin:0 3px}
-    .chat-toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px 2px;flex-wrap:wrap}
-    .chat-tool-btn{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;line-height:1;padding:7px 12px;border-radius:18px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;transition:.15s;white-space:nowrap}
+    .chat-tools-row{display:flex;align-items:center;gap:6px;padding:6px 12px 2px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+    .chat-tools-row::-webkit-scrollbar{display:none}
+    .chat-toolbar{display:flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:nowrap}
+    .chat-tool-btn{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;line-height:1;padding:7px 12px;border-radius:18px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0}
     .chat-tool-btn:hover{background:var(--bg3);color:var(--text);border-color:var(--border2)}
     .chat-tool-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
     .mini-popup{position:fixed;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);display:none;width:560px;max-width:min(92vw,560px);overflow:hidden}
@@ -863,11 +865,67 @@
     .model-name{font-size:13px;font-weight:500;color:var(--text)}
     .model-meta{font-size:11px;color:var(--text3)}
     @media (max-width:768px){
-      .chat-toolbar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;scrollbar-width:none}
-      .chat-toolbar::-webkit-scrollbar{display:none}
+      .chat-tools-row{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;scrollbar-width:none}
+      .chat-tools-row::-webkit-scrollbar{display:none}
+      .chat-toolbar{flex-wrap:nowrap}
       .mini-popup{left:12px!important;right:12px!important;width:auto!important;max-width:none;bottom:84px!important;top:auto!important}
       .mini-popup::after{display:none}
       .cmd-grid{grid-template-columns:1fr}
+    }
+
+    /* ── 连接器卡片（真实 OCTOP 风格）── */
+    .conn-list{display:flex;flex-direction:column;gap:8px}
+    .conn-card{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--card2);cursor:pointer;transition:border-color .15s,transform .1s}
+    .conn-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+    .conn-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto}
+    .conn-info{flex:1;min-width:0}
+    .conn-name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px}
+    .conn-desc{font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .conn-tools-count{font-size:11px;color:var(--text3);margin-top:2px}
+    .conn-mode{font-size:10px;padding:1px 6px;border-radius:6px;font-weight:600}
+    .conn-mode.gateway{background:#3b82f622;color:#3b82f6}
+    .conn-mode.remote{background:#a855f722;color:#a855f7}
+    .conn-status{font-size:11px;padding:2px 8px;border-radius:999px;flex:0 0 auto}
+    .conn-status.on{background:#16a34a22;color:#16a34a}
+    .conn-status.off{background:#6b728022;color:var(--text3)}
+    .conn-go{font-size:12px;color:var(--accent);flex:0 0 auto}
+
+    /* ── 连接器详情弹窗 ── */
+    .conn-modal{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center}
+    .conn-modal.open{display:flex}
+    .conn-modal-mask{position:absolute;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(2px)}
+    .conn-modal-panel{position:relative;width:min(680px,94vw);max-height:88vh;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+    .conn-modal-head{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--border)}
+    .conn-modal-ico{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto}
+    .conn-modal-title{font-size:17px;font-weight:700}
+    .conn-modal-close{margin-left:auto;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:8px}
+    .conn-modal-close:hover{background:var(--card2)}
+    .conn-modal-body{padding:18px 20px}
+    .conn-sec{margin-bottom:20px}
+    .conn-sec-title{font-size:13px;font-weight:700;color:var(--text1);margin-bottom:10px}
+    .conn-hint{font-size:12px;color:var(--text2);background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:10px;line-height:1.6}
+    .conn-field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:12px;color:var(--text2)}
+    .conn-field input{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text1);font-size:13px}
+    .conn-field input:focus{outline:none;border-color:var(--accent)}
+    .conn-actions{display:flex;align-items:center;gap:10px;margin-top:4px}
+    .conn-doc{font-size:12px;color:var(--accent);text-decoration:none}
+    .conn-msg{font-size:12px;margin-top:8px;min-height:16px}
+    .conn-msg.ok{color:#16a34a}
+    .conn-msg.err{color:#ef4444}
+    .conn-tool{border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden}
+    .conn-tool-head{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--card2)}
+    .conn-tool-name{font-weight:600;font-size:13px}
+    .conn-tool-desc{font-size:12px;color:var(--text2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .conn-tool-toggle{transition:transform .15s;color:var(--text3)}
+    .conn-tool.open .conn-tool-toggle{transform:rotate(180deg)}
+    .conn-tool-body{padding:12px;display:none;flex-direction:column;gap:8px}
+    .conn-tool.open .conn-tool-body{display:flex}
+    .conn-call-result{margin-top:8px;background:#0b0f1708;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace}
+    .conn-call-result.loading{color:var(--text3)}
+    .conn-call-result.ok{color:var(--text1)}
+    .conn-call-result.err{color:#ef4444}
+    @media (max-width:640px){
+      .conn-modal-panel{width:96vw;max-height:92vh}
     }
   </style>
 </head>
@@ -1400,14 +1458,16 @@
           </div>
           <div class="chat-composer">
             <div class="chat-composer-inner">
-              <div class="persona-bar-wrap" id="personaBar"></div>
-              <div class="chat-file-preview" id="chatFilePreview" style="display:none"></div>
-              <div class="chat-toolbar" id="chatToolbar">
-                <button class="chat-tool-btn" onclick="chatOpenMini('quick')">⚡ 快捷指令</button>
-                <button class="chat-tool-btn" onclick="chatOpenMini('connector')">🔌 连接器</button>
-                <button class="chat-tool-btn" onclick="chatOpenMini('skill')">📚 技能</button>
-                <button class="chat-tool-btn" onclick="chatOpenMini('model')">🧠 模型</button>
+              <div class="chat-tools-row">
+                <div class="persona-bar-wrap" id="personaBar"></div>
+                <div class="chat-toolbar" id="chatToolbar">
+                  <button class="chat-tool-btn" onclick="chatOpenMini('quick')">⚡ 快捷指令</button>
+                  <button class="chat-tool-btn" onclick="chatOpenMini('connector')">🔌 连接器</button>
+                  <button class="chat-tool-btn" onclick="chatOpenMini('skill')">📚 技能</button>
+                  <button class="chat-tool-btn" onclick="chatOpenMini('model')">🧠 模型</button>
+                </div>
               </div>
+              <div class="chat-file-preview" id="chatFilePreview" style="display:none"></div>
               <div class="chat-composer-row">
                 <button class="chat-file-btn" id="chatFileBtn" onclick="chatPickFile()" title="发送文件">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -5614,8 +5674,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   // ═══════════════════════════════════════════════
   var updatePollTimer = null;
 
-  function apiPost(path) {
-    return api(path, 'POST', {});
+  function apiPost(path, body) {
+    return api(path, 'POST', body || {});
   }
   function apiGet(path) {
     return api(path, 'GET');
@@ -6485,29 +6545,40 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var html = '';
     if(compact !== false){
       html += '<div style="font-size:12px;color:var(--text2);padding:2px 2px 10px;line-height:1.6">'
-        + '连接器即 <b>技能（Skill）</b>：在扩展页 / SkillHub 安装启用，部分外部服务（如腾讯新闻）需配置 <b>API Key</b> 后方可在对话中调用。</div>';
+        + '连接器即 <b>技能（Skill）</b> 或 <b>MCP 服务器</b>。下方为真实可用的连接器，点击卡片可配置凭证并直接调用其工具。</div>';
     }
-    html += '<div class="conn-list">';
-    var list = [
-      {ico:'📰',n:'腾讯新闻',d:'7×24 资讯 / 事实核查（需 API Key）',st:0,go:'extensions'},
-      {ico:'💬',n:'微信 ClawBot',d:'个人微信消息收发',st:0,go:'channels'},
-      {ico:'🐧',n:'QQ Bot',d:'QQ 频道 / 群消息',st:0,go:'channels'},
-      {ico:'📨',n:'飞书',d:'飞书机器人',st:0,go:'channels'},
-      {ico:'✈️',n:'Telegram',d:'Telegram Bot',st:0,go:'channels'},
-      {ico:'🐙',n:'GitHub',d:'MCP 连接仓库 / Issue',st:0,go:'extensions'},
-      {ico:'📞',n:'WhatsApp',d:'本地 Baileys 桥接',st:0,go:'channels'},
-      {ico:'🔌',n:'自定义 MCP',d:'接入任意 MCP 服务',st:0,go:'extensions'}
-    ];
-    list.forEach(function(c){
-      html += '<div class="conn-card">'
-        + '<div class="conn-ico">'+c.ico+'</div>'
-        + '<div class="conn-info"><div class="conn-name">'+c.n+'</div><div class="conn-desc">'+c.d+'</div></div>'
-        + '<span class="conn-status '+(c.st?'on':'off')+'">'+(c.st?'已配置':'未配置')+'</span>'
-        + '<span class="conn-go" onclick="switchView(\''+c.go+'\')">去配置 ›</span>'
-        + '</div>';
-    });
-    html += '</div>';
+    html += '<div class="conn-list" data-conn-list="1">'
+      + '<div style="font-size:12px;color:var(--text3);padding:8px">加载连接器中…</div></div>';
     return html;
+  }
+  // 真实加载连接器列表（OCTOP 风格：从 /api/connectors 读取 catalog + 配置状态）
+  function loadConnectorsList(el, compact){
+    if (!el) return;
+    apiGet('/api/connectors').then(function(d){
+      var list = (d && d.connectors) || [];
+      if (!list.length){ el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px">暂无可用的连接器。</div>'; return; }
+      var html = '';
+      list.forEach(function(c){
+        var badge = c.configured
+          ? '<span class="conn-status on">已配置</span>'
+          : '<span class="conn-status off">未配置</span>';
+        var modeTag = c.mcp_mode === 'remote'
+          ? '<span class="conn-mode remote">远程 MCP</span>'
+          : '<span class="conn-mode gateway">网关直连</span>';
+        var toolCount = (c.tools || []).length;
+        html += '<div class="conn-card" onclick="openConnectorDetail(\''+c.kind+'\')">'
+          + '<div class="conn-ico" style="background:'+(c.color||'#3b82f6')+'22;color:'+(c.color||'#3b82f6')+'">'+c.icon+'</div>'
+          + '<div class="conn-info"><div class="conn-name">'+escapeHtml(c.name)+' '+modeTag+'</div>'
+          + '<div class="conn-desc">'+escapeHtml(c.description)+'</div>'
+          + '<div class="conn-tools-count">'+(toolCount>0?toolCount+' 个工具':'')+'</div></div>'
+          + badge
+          + '<span class="conn-go">管理 ›</span>'
+          + '</div>';
+      });
+      el.innerHTML = html;
+    }).catch(function(){
+      el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px">加载连接器失败，请检查网关连接。</div>';
+    });
   }
   function renderSkills(){
     var html = '<div style="font-size:12px;color:var(--text2);padding:2px 2px 10px;line-height:1.6">'
@@ -6551,7 +6622,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     document.getElementById('chatMiniTitle').textContent = titles[key] || '面板';
     var body = document.getElementById('chatMiniBody');
     if (key === 'quick') body.innerHTML = renderQuickCmds();
-    else if (key === 'connector') body.innerHTML = renderConnectors();
+    else if (key === 'connector') { body.innerHTML = renderConnectors(); loadConnectorsList(body.querySelector('[data-conn-list]'), true); }
     else if (key === 'skill') body.innerHTML = renderSkills();
     else if (key === 'model') { body.innerHTML = '<div class="mini-search" placeholder="加载中…"></div>'; renderModelList(body); }
     else if (key === 'persona') body.innerHTML = renderPersonaSelector();
@@ -6597,36 +6668,177 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var container = document.getElementById('connectorsContainer');
     var summaryBadge = document.getElementById('connSummary');
     var summaryText = document.getElementById('connSummaryText');
-    if(container) container.innerHTML = renderConnectors(false);
-    if(summaryBadge){ summaryBadge.className = 'badge badge-ok'; }
-    if(summaryText){ summaryText.textContent = '8 个可用'; }
-    // 尝试读取配置检测已启用项
-    apiGet('/api/config').then(function(d){
-      var mcps = (d && d.mcp_servers) ? Object.keys(d.mcp_servers) : [];
-      var skills = (d && d.skills && d.skills.external_dirs) ? d.skills.external_dirs : [];
-      var platforms = (d && d.platforms) ? Object.keys(d.platforms) : [];
-      document.querySelectorAll('#connectorsContainer .conn-card').forEach(function(card){
-        var name = (card.querySelector('.conn-name') || {}).textContent || '';
-        var stEl = card.querySelector('.conn-status');
-        var configured = false;
-        if(name.indexOf('腾讯新闻') >= 0 || name.indexOf('GitHub') >= 0 || name.indexOf('自定义 MCP') >= 0){
-          configured = mcps.some(function(k){ return k.toLowerCase().indexOf(name.split(' ')[0].toLowerCase()) >= 0 || (name.indexOf('腾讯新闻')>=0 && k.toLowerCase().indexOf('news')>=0) || (name.indexOf('GitHub')>=0 && k.toLowerCase().indexOf('github')>=0); });
-          if(!configured && name.indexOf('自定义 MCP') >= 0) configured = mcps.length > 0;
-        } else if(name.indexOf('微信')>=0 || name.indexOf('QQ')>=0 || name.indexOf('飞书')>=0 || name.indexOf('Telegram')>=0 || name.indexOf('WhatsApp')>=0){
-          configured = platforms.some(function(k){ return k.toLowerCase().indexOf(name.charAt(0).toLowerCase()) >= 0 || (name.indexOf('微信')>=0 && k.toLowerCase().indexOf('weixin')>=0) || (name.indexOf('飞书')>=0 && k.toLowerCase().indexOf('feishu')>=0) || (name.indexOf('WhatsApp')>=0 && k.toLowerCase().indexOf('whatsapp')>=0); });
-        }
-        if(stEl){
-          stEl.className = 'conn-status ' + (configured ? 'on' : 'off');
-          stEl.textContent = configured ? '已配置' : '未配置';
-        }
-      });
-      var onCount = document.querySelectorAll('#connectorsContainer .conn-status.on').length;
-      if(summaryText){ summaryText.textContent = onCount + ' / 8 已配置'; }
+    if(container){ container.innerHTML = renderConnectors(false); loadConnectorsList(container.querySelector('[data-conn-list]'), false); }
+    if(summaryBadge){ summaryBadge.className = 'badge badge-wait'; }
+    if(summaryText){ summaryText.textContent = '加载中…'; }
+    apiGet('/api/connectors').then(function(d){
+      var list = (d && d.connectors) || [];
+      var total = list.length;
+      var on = list.filter(function(c){ return c.configured; }).length;
+      if(summaryBadge){ summaryBadge.className = 'badge badge-ok'; }
+      if(summaryText){ summaryText.textContent = on + ' / ' + total + ' 已配置'; }
     }).catch(function(){
-      if(summaryText){ summaryText.textContent = '8 个可用'; }
+      if(summaryBadge){ summaryBadge.className = 'badge badge-err'; }
+      if(summaryText){ summaryText.textContent = '加载失败'; }
+    });
+  };
+
+  // ─── 连接器详情弹窗（OCTOP 风格：配置凭证 + 直接调用工具）───
+  window.openConnectorDetail = function(kind){
+    var modal = document.getElementById('connectorModal');
+    if (!modal) return;
+    modal.setAttribute('data-kind', kind);
+    modal.querySelector('.conn-modal-body').innerHTML = '<div style="font-size:12px;color:var(--text3);padding:20px">加载中…</div>';
+    modal.classList.add('open');
+    apiGet('/api/connectors/' + encodeURIComponent(kind)).then(function(d){
+      if (!d || !d.ok){ modal.querySelector('.conn-modal-body').innerHTML = '<div style="padding:20px;color:var(--text2)">连接器不存在。</div>'; return; }
+      renderConnectorDetail(modal, d);
+    }).catch(function(){
+      modal.querySelector('.conn-modal-body').innerHTML = '<div style="padding:20px;color:var(--text2)">加载失败。</div>';
+    });
+  };
+  window.closeConnectorModal = function(){
+    var modal = document.getElementById('connectorModal');
+    if (modal) modal.classList.remove('open');
+  };
+
+  function renderConnectorDetail(modal, d){
+    var color = d.color || '#3b82f6';
+    var head = modal.querySelector('.conn-modal-head');
+    head.innerHTML = '<span class="conn-modal-ico" style="background:'+(color+'22')+';color:'+color+'">'+d.icon+'</span>'
+      + '<div style="flex:1"><div class="conn-modal-title">'+escapeHtml(d.name)+'</div>'
+      + '<div style="font-size:12px;color:var(--text2)">'+escapeHtml(d.description)+'</div></div>'
+      + '<button class="conn-modal-close" onclick="closeConnectorModal()">✕</button>';
+    var body = modal.querySelector('.conn-modal-body');
+    var isRemote = d.mcp_mode === 'remote';
+    var fields = d.fields || [];
+    var credsSet = d.creds_set || {};
+    var html = '';
+    // 凭证表单
+    html += '<div class="conn-sec"><div class="conn-sec-title">凭证配置</div>';
+    if (d.auth_hint) html += '<div class="conn-hint">'+escapeHtml(d.auth_hint)+'</div>';
+    html += '<div id="connCredForm">';
+    fields.forEach(function(f){
+      var saved = credsSet[f.key] ? '（已保存，留空则不修改）' : '';
+      html += '<label class="conn-field"><span>'+escapeHtml(f.label)+' '+saved+'</span>'
+        + '<input type="'+(f.secret?'password':'text')+'" data-cred="'+f.key+'" placeholder="'+escapeHtml(f.placeholder||'')+'"></label>';
+    });
+    html += '</div>';
+    html += '<div class="conn-actions">';
+    if (!isRemote) html += '<button class="btn btn-ghost" onclick="connTestCreds()">测试连接</button>';
+    html += '<button class="btn btn-primary" onclick="connSaveCreds()">保存凭证</button>';
+    if (d.doc_url) html += '<a class="conn-doc" href="'+encodeURI(d.doc_url)+'" target="_blank" rel="noopener">查看文档 ↗</a>';
+    html += '</div>';
+    html += '<div id="connCredMsg" class="conn-msg"></div>';
+    html += '</div>';
+    // 工具列表
+    html += '<div class="conn-sec"><div class="conn-sec-title">可用工具（'+(d.tools?d.tools.length:0)+'）</div>';
+    if (isRemote){
+      html += '<div class="conn-hint">远程 MCP 连接器：保存凭证后将注册为 MCP 服务器，由对话中的智能体直接调用，无需在此手动执行。</div>';
+    }
+    var tools = d.tools || [];
+    if (!tools.length) html += '<div style="font-size:12px;color:var(--text3)">该连接器未暴露独立工具。</div>';
+    tools.forEach(function(t, i){
+      var props = (t.inputSchema && t.inputSchema.properties) || {};
+      var required = (t.inputSchema && t.inputSchema.required) || [];
+      var fieldsHtml = '';
+      Object.keys(props).forEach(function(pk){
+        var p = props[pk];
+        var reqMark = required.indexOf(pk) >= 0 ? ' *' : '';
+        var ph = (p && p.description) ? p.description : pk;
+        fieldsHtml += '<label class="conn-field"><span>'+escapeHtml(pk)+escapeHtml(reqMark)+'</span>'
+          + '<input type="text" data-arg="'+escapeHtml(pk)+'" placeholder="'+escapeHtml(ph||'')+'"></label>';
+      });
+      html += '<div class="conn-tool">'
+        + '<div class="conn-tool-head" onclick="this.parentNode.classList.toggle(\'open\')"><span class="conn-tool-name">🔧 '+escapeHtml(t.name)+'</span><span class="conn-tool-desc">'+escapeHtml(t.description||'')+'</span><span class="conn-tool-toggle">▾</span></div>'
+        + '<div class="conn-tool-body">'+fieldsHtml
+        + '<button class="btn btn-primary" onclick="connCallTool(\''+escapeHtml(t.name)+'\', this)">调用</button>'
+        + '<div class="conn-call-result" style="display:none"></div>'
+        + '</div></div>';
+    });
+    html += '</div>';
+    body.innerHTML = html;
+  }
+
+  window.connSaveCreds = function(){
+    var modal = document.getElementById('connectorModal');
+    var kind = modal.getAttribute('data-kind');
+    var form = modal.querySelector('#connCredForm');
+    var msg = modal.querySelector('#connCredMsg');
+    if (!form) return;
+    var body = {};
+    form.querySelectorAll('[data-cred]').forEach(function(inp){
+      body[inp.getAttribute('data-cred')] = inp.value;
+    });
+    msg.className = 'conn-msg'; msg.textContent = '保存中…';
+    apiPost('/api/connectors/' + encodeURIComponent(kind), body).then(function(r){
+      if (r.ok){
+        msg.className = 'conn-msg ok'; msg.textContent = '已保存' + (modal.querySelector('.conn-modal-body').innerHTML.indexOf('远程 MCP')>=0 ? '，已注册为 MCP 服务器，重启网关后生效。' : '，凭证校验通过。');
+        if (window.connectorsLoad) window.connectorsLoad();
+      } else {
+        msg.className = 'conn-msg err'; msg.textContent = r.error || '保存失败';
+      }
+    }).catch(function(e){ msg.className = 'conn-msg err'; msg.textContent = '保存失败：' + (e && e.message ? e.message : e); });
+  };
+  window.connTestCreds = function(){
+    var modal = document.getElementById('connectorModal');
+    var kind = modal.getAttribute('data-kind');
+    var form = modal.querySelector('#connCredForm');
+    var msg = modal.querySelector('#connCredMsg');
+    if (!form) return;
+    var body = {};
+    form.querySelectorAll('[data-cred]').forEach(function(inp){
+      if (inp.value) body[inp.getAttribute('data-cred')] = inp.value;
+    });
+    msg.className = 'conn-msg'; msg.textContent = '测试连接中…';
+    // 复用保存接口触发 probe（空字段用已保存值）；这里直接保存后再测试
+    apiPost('/api/connectors/' + encodeURIComponent(kind), body).then(function(r){
+      if (r.ok){ msg.className = 'conn-msg ok'; msg.textContent = '连接成功，凭证有效。'; if (window.connectorsLoad) window.connectorsLoad(); }
+      else { msg.className = 'conn-msg err'; msg.textContent = '连接失败：' + (r.error||'未知错误'); }
+    }).catch(function(e){ msg.className = 'conn-msg err'; msg.textContent = '测试失败：' + (e && e.message ? e.message : e); });
+  };
+  window.connCallTool = function(toolName, btn){
+    var modal = document.getElementById('connectorModal');
+    var kind = modal.getAttribute('data-kind');
+    var toolBox = btn.closest('.conn-tool');
+    var resultEl = toolBox.querySelector('.conn-call-result');
+    var args = {};
+    toolBox.querySelectorAll('[data-arg]').forEach(function(inp){
+      var k = inp.getAttribute('data-arg');
+      var v = inp.value.trim();
+      if (v === '') return;
+      // 尝试解析数字
+      if (/^-?\d+(\.\d+)?$/.test(v)) args[k] = Number(v);
+      else args[k] = v;
+    });
+    resultEl.style.display = 'block';
+    resultEl.className = 'conn-call-result loading';
+    resultEl.textContent = '调用中…';
+    apiPost('/api/connectors/' + encodeURIComponent(kind) + '/call', { tool: toolName, args: args }).then(function(r){
+      if (r.ok){
+        resultEl.className = 'conn-call-result ok';
+        try { resultEl.textContent = typeof r.result === 'string' ? r.result : JSON.stringify(r.result, null, 2); }
+        catch(e){ resultEl.textContent = String(r.result); }
+      } else {
+        resultEl.className = 'conn-call-result err';
+        resultEl.textContent = '调用失败：' + (r.error || '未知错误');
+      }
+    }).catch(function(e){
+      resultEl.className = 'conn-call-result err';
+      resultEl.textContent = '调用失败：' + (e && e.message ? e.message : e);
     });
   };
 })();
 </script>
+
+<!-- ═══ 连接器详情弹窗（OCTOP 风格）═══ -->
+<div class="conn-modal" id="connectorModal">
+  <div class="conn-modal-mask" onclick="closeConnectorModal()"></div>
+  <div class="conn-modal-panel">
+    <div class="conn-modal-head"></div>
+    <div class="conn-modal-body"></div>
+  </div>
+</div>
+
 </body>
 </html>

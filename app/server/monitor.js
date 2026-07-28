@@ -9,6 +9,7 @@ import { resolve as resolvePath, dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { PROVIDER_PRESETS, PROVIDER_MODELS, PROVIDER_API_KEYS, PROVIDER_CLASSES, PROVIDER_HERMES_IDS } from "./provider-config.js";
 import { handleCustomRoute } from "./custom_routes.js";
+import { CONNECTOR_CATALOG, getConnector, callConnectorTool, probeConnector } from "./connectors.js";
 
 // 加载 vendor 目录内置的 ws 库（Node.js 无内置 WebSocket 服务器）
 const _require = createRequire(import.meta.url);
@@ -3206,6 +3207,53 @@ async function handleFetch(req) {
     }
     return (content ? content.replace(/\n?$/, "\n") : "") + line + "\n";
   }
+  // ── 连接器凭证存储（DATA_DIR/connectors-state.json，权限 0o600）──
+  const CONNECTORS_STATE = `${DATA_DIR}/connectors-state.json`;
+  function _readConnectorsState(){
+    try { if (existsSync(CONNECTORS_STATE)) return JSON.parse(readFileSync(CONNECTORS_STATE, "utf8") || "{}"); } catch (e) {}
+    return {};
+  }
+  function _writeConnectorsState(obj){
+    try { writeFileSync(CONNECTORS_STATE, JSON.stringify(obj, null, 2), { mode: 0o600 }); return true; } catch (e) { return false; }
+  }
+  // 解析现有 mcp_servers 顶层映射块为 { name: {url, headers:{...}} }
+  function _parseMcpServers(yml){
+    const block = _yamlBlockOf(yml, "mcp_servers");
+    const obj = {};
+    if (!block.trim()) return obj;
+    const lines = block.split("\n");
+    let curName = null, curEntry = null, inHeaders = false;
+    for (const line of lines){
+      const nm = line.match(/^  ([A-Za-z0-9_-]+):\s*$/);
+      if (nm && !inHeaders){
+        if (curName) obj[curName] = curEntry;
+        curName = nm[1]; curEntry = {}; inHeaders = false; continue;
+      }
+      const sk = line.match(/^    ([A-Za-z0-9_-]+):\s*(.*)$/);
+      if (sk && curName && curEntry){
+        const k = sk[1], v = sk[2].trim();
+        if (k === "headers"){ curEntry.headers = {}; inHeaders = true; continue; }
+        inHeaders = false;
+        curEntry[k] = v === "" ? {} : v;
+        continue;
+      }
+      const hk = line.match(/^      ([A-Za-z0-9_-]+):\s*(.*)$/);
+      if (hk && curEntry && curEntry.headers && typeof curEntry.headers === "object"){
+        curEntry.headers[hk[1]] = hk[2].trim();
+      }
+    }
+    if (curName) obj[curName] = curEntry;
+    return obj;
+  }
+  // 合并写入 mcp_servers（保留用户其它条目，仅增/改/删本连接器对应项）
+  function _upsertMcpServer(name, entry){
+    let yml = _readHermesConfig();
+    const obj = _parseMcpServers(yml);
+    if (entry == null) delete obj[name];
+    else obj[name] = entry;
+    yml = _setYamlMapBlock(yml, "mcp_servers", obj);
+    _writeHermesConfig(yml);
+  }
   function _readHermesConfig(){
     try { if (existsSync(HERMES_CONFIG)) return readFileSync(HERMES_CONFIG, "utf8"); } catch (e) {}
     return "";
@@ -3802,15 +3850,15 @@ async function handleFetch(req) {
         const blockMatch = stateYaml.match(/^providers:\n([\s\S]*)$/m);
         if (blockMatch) {
           const lines = blockMatch[1].split("\n");
-          let currentId = null, currentModel = "", currentBaseUrl = "", currentName = "";
+          let currentId = null, currentModel = "", currentBaseUrl = "", currentName = "", currentTemp = null, currentMax = null;
           lines.forEach(line => {
             const keyMatch = line.match(/^  ([a-zA-Z0-9_-]+):\s*$/);
             if (keyMatch) {
               // 保存上一个
               if (currentId && currentModel) {
-                provModelMap[currentId] = { model: currentModel, base_url: currentBaseUrl || "", name: currentName || "" };
+                provModelMap[currentId] = { model: currentModel, base_url: currentBaseUrl || "", name: currentName || "", temperature: currentTemp, max_tokens: currentMax };
               }
-              currentId = keyMatch[1]; currentModel = ""; currentBaseUrl = ""; currentName = "";
+              currentId = keyMatch[1]; currentModel = ""; currentBaseUrl = ""; currentName = ""; currentTemp = null; currentMax = null;
               return;
             }
             const m = line.match(/^    model:\s*(.+)\s*$/);
@@ -3819,9 +3867,13 @@ async function handleFetch(req) {
             if (b && currentId) { currentBaseUrl = b[1].trim(); return; }
             const n = line.match(/^    name:\s*(.+)\s*$/);
             if (n && currentId) { try { currentName = JSON.parse(n[1].trim()); } catch { currentName = n[1].trim(); } }
+            const t = line.match(/^    temperature:\s*(.+)\s*$/);
+            if (t && currentId) { const tv = parseFloat(t[1].trim()); if (!isNaN(tv)) currentTemp = tv; }
+            const x = line.match(/^    max_tokens:\s*(.+)\s*$/);
+            if (x && currentId) { const xv = parseInt(x[1].trim(), 10); if (!isNaN(xv)) currentMax = xv; }
           });
           if (currentId && currentModel) {
-            provModelMap[currentId] = { model: currentModel, base_url: currentBaseUrl || "", name: currentName || "" };
+            provModelMap[currentId] = { model: currentModel, base_url: currentBaseUrl || "", name: currentName || "", temperature: currentTemp, max_tokens: currentMax };
           }
         }
       }
@@ -3854,8 +3906,8 @@ async function handleFetch(req) {
           type: "openai-compatible",
           base_url: preset ? preset.base_url : baseUrl,
           model,
-          temperature: 0.7,
-          max_tokens: 4096,
+          temperature: info.temperature ?? 0.7,
+          max_tokens: info.max_tokens ?? 4096,
           api_key_masked: maskedKey,
           api_key_configured: !!envApiKeys[id],
           is_custom: isCustom,
@@ -4166,6 +4218,32 @@ async function handleFetch(req) {
     }
   }
 
+  // ── 触发网关重启（异步、尽力而为）─────────────────────────────────────
+  // 用于频道绑定 / 配置变更后让网关重新加载 .env 与 config.yaml。
+  // 直接 POST 到 Dashboard 的 /api/gateway/restart（monitor 代理会处理
+  // 官方「复用旧进程」守卫导致的空操作并重发）。网关未运行时跳过。
+  function _triggerGatewayRestart(reason) {
+    const tag = reason || "config";
+    try {
+      if (!isPortListening(GATEWAY_PORT)) {
+        log(`[gw-restart] ${tag}: 网关未运行，跳过重启`);
+        return;
+      }
+      const h = new Headers();
+      h.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
+      h.set("Content-Type", "application/json");
+      fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/gateway/restart`, {
+        method: "POST", headers: h, signal: AbortSignal.timeout(10000),
+      }).then(async (r) => {
+        log(`[gw-restart] ${tag}: 已发送重启请求，status=${r && r.status}`);
+      }).catch((e) => {
+        log(`[gw-restart] ${tag}: 重启请求失败 ${e?.message || e}`);
+      });
+    } catch (e) {
+      log(`[gw-restart] ${tag}: 异常 ${e?.message || e}`);
+    }
+  }
+
   // ── Telegram 扫码创建机器人 ───────────────────────────────────────────
   // GET /api/channels/telegram/qr  → 创建配对，返回 deep_link/qr_payload
   if (path === "/api/channels/telegram/qr" && req.method === "GET") {
@@ -4253,10 +4331,18 @@ async function handleFetch(req) {
       _writeEnvFile(env);
       const cfg = _readPlatformConfig("telegram");
       cfg.enabled = true;
+      // 同步 allow_from 到 config.yaml：与上游 bootstrap 约定一致，
+      // 即使 .env 被重建，白名单也能从配置恢复（双保险）。
+      cfg.allow_from = allowedUserIds.join(",");
       cfg.updated_at = Date.now();
       _writeHermesConfig(_setPlatformConfig("telegram", cfg));
       _telegramPairings.delete(pairingId);
-      return new Response(JSON.stringify({ ok: true, bot_username: rec.bot_username }), { headers: jsonHeaders() });
+      // ── 关键安全修复 ──
+      // 写入 TELEGRAM_ALLOWED_USERS 后必须重启网关，否则正在运行的网关
+      // 不会加载新的白名单，导致任意 Telegram 帐号都能私聊操控机器人
+      // （含授权 root 等高危操作）。见上游 adapter._is_user_authorized_from_message。
+      _triggerGatewayRestart("telegram-bind");
+      return new Response(JSON.stringify({ ok: true, bot_username: rec.bot_username, gateway_restarting: true }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
@@ -4328,10 +4414,100 @@ async function handleFetch(req) {
       _writeEnvFile(env);
       const cfg = _readPlatformConfig("whatsapp");
       cfg.enabled = true;
+      cfg.allow_from = allowedUsers || "";
       cfg.updated_at = Date.now();
       _writeHermesConfig(_setPlatformConfig("whatsapp", cfg));
       _whatsappPairings.delete(pairingId);
-      return new Response(JSON.stringify({ ok: true, account_id: rec.account_id, account_name: rec.account_name }), { headers: jsonHeaders() });
+      // 同 Telegram：写入 WHATSAPP_ALLOWED_USERS 后重启网关，确保白名单生效
+      _triggerGatewayRestart("whatsapp-bind");
+      return new Response(JSON.stringify({ ok: true, account_id: rec.account_id, account_name: rec.account_name, gateway_restarting: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ── 连接器（OCTOP 风格：catalog + 真实 callTool）──
+  if (path === "/api/connectors" && req.method === "GET") {
+    try {
+      const state = _readConnectorsState();
+      const list = CONNECTOR_CATALOG.map(function (c) {
+        const st = state[c.kind] || {};
+        return {
+          kind: c.kind, name: c.name, icon: c.icon, color: c.color,
+          description: c.description, auth_kind: c.auth_kind, mcp_mode: c.mcp_mode,
+          phase: c.phase, doc_url: c.doc_url, auth_hint: c.auth_hint,
+          fields: c.fields, tools: c.tools,
+          configured: !!(c.fields && c.fields.length) && c.fields.every(function (f) { return !!st[f.key]; }),
+          creds_set: (c.fields || []).filter(function (f) { return !!st[f.key]; }).map(function (f) { return f.key; }),
+        };
+      });
+      return new Response(JSON.stringify({ ok: true, connectors: list }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  const _connMatch = path.match(/^\/api\/connectors\/([A-Za-z0-9_-]+)(\/call)?$/);
+  if (_connMatch) {
+    const kind = _connMatch[1];
+    const isCall = !!_connMatch[2];
+    const cat = getConnector(kind);
+    if (!cat) return new Response(JSON.stringify({ ok: false, error: "未知连接器: " + kind }), { status: 404, headers: jsonHeaders() });
+    try {
+      if (req.method === "GET" && !isCall) {
+        const st = _readConnectorsState()[kind] || {};
+        const masked = {};
+        (cat.fields || []).forEach(function (f) { masked[f.key] = !!st[f.key]; });
+        return new Response(JSON.stringify({
+          ok: true, kind: kind, name: cat.name, fields: cat.fields, tools: cat.tools,
+          mcp_mode: cat.mcp_mode, configured: (cat.fields || []).every(function (f) { return !!st[f.key]; }), creds_set: masked,
+        }), { headers: jsonHeaders() });
+      }
+      if (req.method === "DELETE" && !isCall) {
+        const state = _readConnectorsState(); delete state[kind]; _writeConnectorsState(state);
+        if (cat.mcp_mode === "remote") _upsertMcpServer(kind, null);
+        return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
+      }
+      if (req.method === "POST" && !isCall) {
+        const body = await req.json().catch(function () { return {}; });
+        const creds = {};
+        (cat.fields || []).forEach(function (f) { const v = body[f.key]; creds[f.key] = (v == null ? "" : String(v)); });
+        if ((cat.fields || []).some(function (f) { return !creds[f.key]; })) {
+          return new Response(JSON.stringify({ ok: false, error: "请填写所有必填凭证" }), { status: 400, headers: jsonHeaders() });
+        }
+        if (cat.impl && cat.impl.probeCredentials) {
+          try { await probeConnector(kind, creds); }
+          catch (pe) { return new Response(JSON.stringify({ ok: false, error: "凭证校验失败: " + pe.message }), { status: 400, headers: jsonHeaders() }); }
+        }
+        const state = _readConnectorsState(); state[kind] = creds; _writeConnectorsState(state);
+        if (cat.mcp_mode === "remote") {
+          const tokenField = (cat.fields || []).find(function (f) { return f.key === "token" || f.key === "api_key"; });
+          const headers = {};
+          if (tokenField) headers["Authorization"] = "Bearer " + creds[tokenField.key];
+          if (cat.kind === "tencent-lexiang" && creds.company_from) headers["X-Company-From"] = creds.company_from;
+          _upsertMcpServer(kind, { url: cat.mcp_url, headers: headers });
+          _triggerGatewayRestart("connector-remote-" + kind);
+        }
+        return new Response(JSON.stringify({ ok: true, configured: true }), { headers: jsonHeaders() });
+      }
+      if (req.method === "POST" && isCall) {
+        if (cat.mcp_mode === "remote") {
+          return new Response(JSON.stringify({ ok: false, error: "该连接器为远程 MCP 模式，请在对话中由智能体调用" }), { status: 400, headers: jsonHeaders() });
+        }
+        const body = await req.json().catch(function () { return {}; });
+        const tool = String(body.tool || "");
+        const args = (body.args && typeof body.args === "object") ? body.args : {};
+        const st = _readConnectorsState()[kind] || {};
+        if (!(cat.fields || []).every(function (f) { return !!st[f.key]; })) {
+          return new Response(JSON.stringify({ ok: false, error: "请先配置并保存凭证" }), { status: 400, headers: jsonHeaders() });
+        }
+        try {
+          const result = await callConnectorTool(kind, st, tool, args);
+          return new Response(JSON.stringify({ ok: true, result: result }), { headers: jsonHeaders() });
+        } catch (ce) {
+          return new Response(JSON.stringify({ ok: false, error: ce.message || String(ce) }), { status: 502, headers: jsonHeaders() });
+        }
+      }
+      return new Response(JSON.stringify({ ok: false, error: "方法不允许" }), { status: 405, headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
@@ -4365,12 +4541,12 @@ async function handleFetch(req) {
           const blockMatch = stateYaml.match(/^providers:\n([\s\S]*)$/m);
           if (blockMatch) {
             const lines = blockMatch[1].split("\n");
-            let curId = null, curModel = "", curBase = "", curName = "";
+            let curId = null, curModel = "", curBase = "", curName = "", curTemp = null, curMax = null;
             lines.forEach(line => {
               const km = line.match(/^  ([a-zA-Z0-9_-]+):\s*$/);
               if (km) {
-                if (curId && curModel) allProvConfig[curId] = { model: curModel, base_url: curBase, name: curName };
-                curId = km[1]; curModel = ""; curBase = ""; curName = "";
+                if (curId && curModel) allProvConfig[curId] = { model: curModel, base_url: curBase, name: curName, temperature: curTemp, max_tokens: curMax };
+                curId = km[1]; curModel = ""; curBase = ""; curName = ""; curTemp = null; curMax = null;
                 return;
               }
               const mm = line.match(/^    model:\s*(.+)\s*$/);
@@ -4379,8 +4555,12 @@ async function handleFetch(req) {
               if (bm && curId) { curBase = bm[1].trim(); return; }
               const nm = line.match(/^    name:\s*(.+)\s*$/);
               if (nm && curId) { try { curName = JSON.parse(nm[1].trim()); } catch { curName = nm[1].trim(); } }
+              const tm = line.match(/^    temperature:\s*(.+)\s*$/);
+              if (tm && curId) { const t = parseFloat(tm[1].trim()); if (!isNaN(t)) curTemp = t; }
+              const xm = line.match(/^    max_tokens:\s*(.+)\s*$/);
+              if (xm && curId) { const x = parseInt(xm[1].trim(), 10); if (!isNaN(x)) curMax = x; }
             });
-            if (curId && curModel) allProvConfig[curId] = { model: curModel, base_url: curBase, name: curName };
+            if (curId && curModel) allProvConfig[curId] = { model: curModel, base_url: curBase, name: curName, temperature: curTemp, max_tokens: curMax };
           }
         }
       } catch (e) {}
@@ -4405,10 +4585,14 @@ async function handleFetch(req) {
           // 内置预设兜底：用户未填时回填默认 URL
           if (!baseUrl && PROVIDER_PRESETS[p.id]) baseUrl = PROVIDER_PRESETS[p.id].base_url || "";
         }
+        const incomingTemp = p.temperature != null ? parseFloat(p.temperature) : null;
+        const incomingMax = p.max_tokens != null ? parseInt(p.max_tokens, 10) : null;
         allProvConfig[p.id] = {
           model,
           base_url: baseUrl,
           name: incomingName || existingEntry?.name || "",
+          temperature: (incomingTemp != null && !isNaN(incomingTemp)) ? incomingTemp : (existingEntry?.temperature ?? null),
+          max_tokens: (incomingMax != null && !isNaN(incomingMax)) ? incomingMax : (existingEntry?.max_tokens ?? null),
         };
       });
 
@@ -4433,6 +4617,8 @@ async function handleFetch(req) {
             let entry = `  ${id}:\n    model: ${cfg.model}`;
             if (cfg.base_url) entry += `\n    base_url: ${cfg.base_url}`;
             if (cfg.name) entry += `\n    name: ${JSON.stringify(cfg.name)}`;
+            if (cfg.temperature != null) entry += `\n    temperature: ${cfg.temperature}`;
+            if (cfg.max_tokens != null) entry += `\n    max_tokens: ${cfg.max_tokens}`;
             return entry;
           })
           .join("\n");
