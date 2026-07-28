@@ -1129,7 +1129,7 @@ function finalizeAssistantMessage(sessionId, content, options = {}) {
 }
 
 
-function createChatStream(sessionId, message, reqSignal) {
+function createChatStream(sessionId, message, reqSignal, systemOverride) {
   const enc = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
@@ -1168,7 +1168,8 @@ function createChatStream(sessionId, message, reqSignal) {
         }
 
         // 智能上下文：保留首条用户消息 + 最近 MAX_HISTORY_MESSAGES 条
-        const history = buildChatHistory(session, UI_CAPABILITIES_PROMPT);
+        // systemOverride（persona / 专家团提示）注入 system prompt，避免污染用户消息历史
+        const history = buildChatHistory(session, (systemOverride ? systemOverride + "\n\n" : "") + UI_CAPABILITIES_PROMPT);
 
         const cfg = getChatConfig();
         const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
@@ -1306,7 +1307,7 @@ function createChatStream(sessionId, message, reqSignal) {
 // 前端流程：POST /api/chat/ws-send 入队消息 → 建 ws://.../api/chat/ws 连接取流
 const wsClients = new Map(); // session_id → ws
 
-async function runChatWS(ws, sessionId, message) {
+async function runChatWS(ws, sessionId, message, systemOverride) {
   const sendJSON = (obj) => { try { ws.send(JSON.stringify(obj)); } catch {} };
 
   const stopCtrl = new AbortController();
@@ -1340,7 +1341,8 @@ async function runChatWS(ws, sessionId, message) {
     }
 
     // 智能上下文：保留首条用户消息 + 最近 MAX_HISTORY_MESSAGES 条
-    const history = buildChatHistory(session, UI_CAPABILITIES_PROMPT);
+    // systemOverride（persona / 专家团提示）注入 system prompt，避免污染用户消息历史
+    const history = buildChatHistory(session, (systemOverride ? systemOverride + "\n\n" : "") + UI_CAPABILITIES_PROMPT);
 
     const cfg = getChatConfig();
     const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
@@ -4922,12 +4924,14 @@ async function handleFetch(req) {
   // ─── Chat: WebSocket 消息队列（前端先 POST 消息入队，再建 WS 连接取流）──────
   if (path === "/api/chat/ws-send" && req.method === "POST") {
     const body = await req.json();
-    const { session_id, message } = body;
+    const { session_id, message, system } = body;
     const messageEmpty = message == null || (Array.isArray(message) && message.length === 0) || (typeof message === "string" && message.length === 0);
     if (!session_id || messageEmpty) {
       return new Response(JSON.stringify({ error: "session_id and message required" }), { status: 400, headers: jsonHeaders() });
     }
-    wsMessageQueue.set(session_id, message);
+    // system 字段携带 persona / 专家团提示，由 createChatStream 注入 system prompt，
+    // 避免把人格提示拼进用户消息污染对话历史
+    wsMessageQueue.set(session_id, { message, system: system || "" });
     // 30秒后自动清除（防止 WS 连接未建立导致泄漏）
     setTimeout(() => wsMessageQueue.delete(session_id), 30000);
     return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
@@ -4936,7 +4940,7 @@ async function handleFetch(req) {
   // ─── 聊天：流式 API ──────────────────────────────────────────────────────
   if (path === "/api/chat/stream" && req.method === "POST") {
     const body = await req.json();
-    const { session_id, message } = body;
+    const { session_id, message, system } = body;
     const messageEmpty = message == null || (Array.isArray(message) && message.length === 0) || (typeof message === "string" && message.length === 0);
     if (!session_id || messageEmpty) {
       return new Response(JSON.stringify({ error: "session_id and message required" }), {
@@ -4944,7 +4948,7 @@ async function handleFetch(req) {
         headers: jsonHeaders(),
       });
     }
-    return new Response(createChatStream(session_id, message, req.signal), {
+    return new Response(createChatStream(session_id, message, req.signal, system), {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
@@ -5274,13 +5278,13 @@ function startServer() {
         socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); socket.destroy(); return;
       }
       const sessionId = url.searchParams.get("session_id") || "";
-      const message = wsMessageQueue.get(sessionId);
-      if (!sessionId || !message) {
+      const _q = wsMessageQueue.get(sessionId);
+      if (!sessionId || !_q) {
         socket.write("HTTP/1.1 400 Bad Request\r\n\r\n"); socket.destroy(); return;
       }
       wsMessageQueue.delete(sessionId);
       wss.handleUpgrade(req, socket, head, (ws) => {
-        ws.data = { sessionId, message, stopCtrl: null };
+        ws.data = { sessionId, message: _q.message, system: _q.system || "", stopCtrl: null };
         attachWsHandlers(ws);
       });
       return;

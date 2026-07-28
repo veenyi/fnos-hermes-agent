@@ -817,6 +817,55 @@
     .workflow-node>summary::-webkit-details-marker{display:none}
     .workflow-node .wf-task{font-size:13px;color:var(--text3,#8a909c);margin-bottom:6px}
     .workflow-node .wf-result{font-size:14px}
+
+    /* ═══ 聊天工具栏 + 迷你浮窗（v17 融合）═══ */
+    .chat-header-actions{display:flex;align-items:center;gap:2px;margin-left:auto}
+    .chat-header-btn{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--text2);border-radius:8px;cursor:pointer;font-size:15px;line-height:1;padding:0}
+    .chat-header-btn:hover{background:var(--bg3);color:var(--text)}
+    .chat-header-btn.active{color:var(--accent)}
+    .theme-sep{width:1px;height:18px;background:var(--border);margin:0 3px}
+    .chat-toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px 2px;flex-wrap:wrap}
+    .chat-tool-btn{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;line-height:1;padding:7px 12px;border-radius:18px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;transition:.15s;white-space:nowrap}
+    .chat-tool-btn:hover{background:var(--bg3);color:var(--text);border-color:var(--border2)}
+    .chat-tool-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
+    .mini-popup{position:fixed;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);display:none;width:560px;max-width:min(92vw,560px);overflow:hidden}
+    [theme-mode="dark"] .mini-popup{box-shadow:0 12px 40px rgba(0,0,0,.5)}
+    .mini-popup.open{display:block;animation:fadeIn .14s ease}
+    .mini-popup-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:14px}
+    .mini-popup-close{border:none;background:transparent;color:var(--text3);font-size:20px;cursor:pointer;line-height:1;padding:0 4px}
+    .mini-popup-close:hover{color:var(--text)}
+    .mini-popup-body{max-height:min(60vh,520px);overflow-y:auto;padding:12px}
+    .mini-search{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:9px;background:var(--bg1);color:var(--text);font-size:13px;margin-bottom:8px}
+    .cmd-group-title{grid-column:1/-1;font-size:11px;font-weight:600;color:var(--text3);padding:8px 4px 2px;margin-top:2px}
+    .cmd-group-title:first-child{margin-top:0;padding-top:0}
+    .cmd-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+    .cmd-cell{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg1);cursor:pointer;transition:.15s}
+    .cmd-cell:hover{background:var(--bg3);border-color:var(--border2)}
+    .cmd-cell .ico{font-size:16px;flex-shrink:0}
+    .cmd-cell .ct{font-size:12.5px;font-weight:500;color:var(--text)}
+    .cmd-cell .cs{font-size:10.5px;color:var(--text3);margin-top:1px}
+    .conn-list{display:flex;flex-direction:column;gap:8px}
+    .conn-card{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:11px;background:var(--bg1)}
+    .conn-ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--accent-bg);color:var(--accent);flex-shrink:0}
+    .conn-info{flex:1;min-width:0}
+    .conn-name{font-size:13px;font-weight:500;color:var(--text)}
+    .conn-desc{font-size:11px;color:var(--text3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .conn-status{font-size:11px;padding:3px 8px;border-radius:20px;flex-shrink:0}
+    .conn-status.on{background:rgba(40,160,90,.14);color:#1f9d57}
+    .conn-status.off{background:var(--bg3);color:var(--text3)}
+    .conn-go{font-size:12px;color:var(--accent);cursor:pointer;flex-shrink:0}
+    .model-cell{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg1);cursor:pointer;margin-bottom:6px}
+    .model-cell:hover{background:var(--bg3)}
+    .model-cell.active{border-color:var(--accent);background:var(--accent-bg)}
+    .model-name{font-size:13px;font-weight:500;color:var(--text)}
+    .model-meta{font-size:11px;color:var(--text3)}
+    @media (max-width:768px){
+      .chat-toolbar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;scrollbar-width:none}
+      .chat-toolbar::-webkit-scrollbar{display:none}
+      .mini-popup{left:12px!important;right:12px!important;width:auto!important;max-width:none;bottom:84px!important;top:auto!important}
+      .mini-popup::after{display:none}
+      .cmd-grid{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body>
@@ -848,6 +897,10 @@
       <button class="nav-item" data-view="extensions" onclick="switchView('extensions')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
         <span class="nav-label">扩展</span>
+      </button>
+      <button class="nav-item" data-view="connectors" onclick="switchView('connectors')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span class="nav-label">连接器</span>
       </button>
       <button class="nav-item" data-view="channels" onclick="switchView('channels')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
@@ -1171,6 +1224,22 @@
       </div>
     </div>
 
+    <!-- ═══ 连接器视图 ═══ -->
+    <div class="view" id="viewConnectors">
+      <div class="main-inner">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">连接器 · Skills / MCP</span>
+            <span class="badge badge-wait" id="connSummary"><span class="dot"></span><span id="connSummaryText">加载中…</span></span>
+          </div>
+          <div class="card-body">
+            <div class="ext-hint">连接器即 <b>技能（Skill）</b> 或 <b>MCP 服务器</b>：在扩展页 / SkillHub 安装启用，部分外部服务（如腾讯新闻）需配置 <b>API Key</b> 后方可在对话中调用。点击卡片可跳转到对应配置页。</div>
+            <div id="connectorsContainer" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ 通讯 / 平台频道视图 ═══ -->
     <div class="view" id="viewChannels">
       <div class="main-inner">
@@ -1277,6 +1346,7 @@
           <button class="mobile-nav-btn" data-view="chat" onclick="switchView('chat')">对话</button>
           <button class="mobile-nav-btn" data-view="settings" onclick="switchView('settings')">模型</button>
           <button class="mobile-nav-btn" data-view="extensions" onclick="switchView('extensions')">扩展</button>
+          <button class="mobile-nav-btn" data-view="connectors" onclick="switchView('connectors')">连接器</button>
           <button class="mobile-nav-btn" data-view="channels" onclick="switchView('channels')">通讯</button>
           <button class="mobile-nav-btn" data-view="update" onclick="switchView('update')">更新</button>
         </div>
@@ -1295,9 +1365,16 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <span class="chat-header-title" id="chatHeaderTitle" onclick="chatRenameSession()"></span>
-            <button class="chat-popout-btn" id="chatPopoutBtn" title="在新窗口打开" onclick="chatOpenNewWindow()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            </button>
+            <div class="chat-header-actions">
+              <a class="chat-header-btn" href="https://github.com/veenyi/fnos-hermes-agent" target="_blank" rel="noopener" title="GitHub 项目">&#128025;</a>
+              <button class="chat-header-btn" id="themeAuto" title="跟随系统" onclick="chatSetTheme('auto')">&#127968;</button>
+              <button class="chat-header-btn" id="themeLight" title="白天模式" onclick="chatSetTheme('light')">&#9728;</button>
+              <button class="chat-header-btn" id="themeDark" title="黑夜模式" onclick="chatSetTheme('dark')">&#9790;</button>
+              <span class="theme-sep"></span>
+              <button class="chat-popout-btn" id="chatPopoutBtn" title="在新窗口打开" onclick="chatOpenNewWindow()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </button>
+            </div>
           </div>
           <div class="chat-messages" id="chatMessages">
             <button class="scroll-bottom-btn" id="scrollBottomBtn" onclick="scrollChatToBottom()" title="回到底部">
@@ -1322,6 +1399,12 @@
             <div class="chat-composer-inner">
               <div class="persona-bar-wrap" id="personaBar"></div>
               <div class="chat-file-preview" id="chatFilePreview" style="display:none"></div>
+              <div class="chat-toolbar" id="chatToolbar">
+                <button class="chat-tool-btn" onclick="chatOpenMini('quick')">⚡ 快捷指令</button>
+                <button class="chat-tool-btn" onclick="chatOpenMini('connector')">🔌 连接器</button>
+                <button class="chat-tool-btn" onclick="chatOpenMini('skill')">📚 技能</button>
+                <button class="chat-tool-btn" onclick="chatOpenMini('model')">🧠 模型</button>
+              </div>
               <div class="chat-composer-row">
                 <button class="chat-file-btn" id="chatFileBtn" onclick="chatPickFile()" title="发送文件">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -1337,6 +1420,10 @@
         </div>
       </div>
     </div>
+      <div class="mini-popup" id="chatMiniPopup">
+        <div class="mini-popup-head"><span id="chatMiniTitle">面板</span><button class="mini-popup-close" onclick="chatCloseMini()">×</button></div>
+        <div class="mini-popup-body" id="chatMiniBody"></div>
+      </div>
 
 
 
@@ -1437,17 +1524,35 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 <script>
 (function(){
-  // ─── 主题 ───
-  var theme = '';
-  try { theme = localStorage.getItem('fnos-theme-mode') || ''; } catch(e){}
-  if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  document.body.setAttribute('theme-mode', theme);
-  // 监听系统主题切换
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
-    var t = e.matches ? 'dark' : 'light';
+  // ─── 主题（auto / light / dark）───
+  function applyTheme(t){
+    if (t === 'auto') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     document.body.setAttribute('theme-mode', t);
-    try { localStorage.setItem('fnos-theme-mode', t); } catch(e){}
+  }
+  var themeMode = 'auto';
+  try { themeMode = localStorage.getItem('fnos-theme-mode') || 'auto'; } catch(e){}
+  applyTheme(themeMode);
+  // 监听系统主题切换（仅当用户选择“跟随系统”时才自动跟随）
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+    var m = 'auto';
+    try { m = localStorage.getItem('fnos-theme-mode') || 'auto'; } catch(e){}
+    if (m === 'auto') applyTheme('auto');
   });
+  window.chatSetTheme = function(mode){
+    themeMode = mode;
+    try { localStorage.setItem('fnos-theme-mode', mode); } catch(e){}
+    applyTheme(mode);
+    chatSyncThemeButtons();
+  };
+  function chatSyncThemeButtons(){
+    var m = 'auto';
+    try { m = localStorage.getItem('fnos-theme-mode') || 'auto'; } catch(e){}
+    ['auto','light','dark'].forEach(function(k){
+      var el = document.getElementById('theme' + k.charAt(0).toUpperCase() + k.slice(1));
+      if (el) el.classList.toggle('active', k === m);
+    });
+  }
+  chatSyncThemeButtons();
 
   // ─── 基础路径 ───
   // 从 <base href> 推导 BASE，避免 pathname 带 index.html / 查询参数时拼错 API 路径导致请求挂起、页面永久转圈
@@ -1542,6 +1647,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // channelsLoad 定义在本 IIFE 末尾，初始化阶段可能尚未挂载到 window，延迟到脚本执行完毕后调用
         setTimeout(function(){ if(window.channelsLoad) window.channelsLoad(); }, 0);
       }
+    }
+    if(view === 'connectors'){
+      setTimeout(function(){ if(window.connectorsLoad) window.connectorsLoad(); }, 0);
     }
     if(view === 'update') {
       // 进入更新页时自动填充当前版本
@@ -2892,22 +3000,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if(empty) empty.remove();
       var sentAttachments = chatAttachments.slice();
       var sendContent = await buildMessageContent(text);
-      // 角色 / 人格（多智能体切换）：注入系统指令，用户气泡保持原样
-      try {
+      // 角色 / 人格（多智能体切换）：persona / 专家团提示改为通过 system 字段下发，
+      // 由 monitor.js 注入 system prompt；不再拼进用户消息，避免对话历史被人格提示污染
       var _p = (chatState && chatState.persona) || (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default';
-      var _pfx = '';
-      if (_p === '__team__') {
-        _pfx = extBuildTeamPrompt();
-      } else {
-        var _pobj = extLookupPersona(_p);
-        _pfx = (_pobj && _pobj.prompt) ? _pobj.prompt : '';
-      }
-        if (_pfx) {
-          if (typeof sendContent === 'string') {
-            sendContent = _pfx + "\n\n" + sendContent;
-          } else if (Array.isArray(sendContent)) {
-            sendContent.unshift({ type: 'text', text: _pfx });
-          }
+      var _sysOverride = '';
+      try {
+        if (_p === '__team__') {
+          _sysOverride = extBuildTeamPrompt();
+        } else {
+          var _pobj = extLookupPersona(_p);
+          _sysOverride = (_pobj && _pobj.prompt) ? _pobj.prompt : '';
         }
       } catch(e){}
       chatAttachments = [];
@@ -3180,7 +3282,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (!xhrDone) { xhrDone = true; onFinish(false); }
         };
         xhr.onabort = function() { if (!xhrDone) { xhrDone = true; onFinish(true); } };
-        xhr.send(JSON.stringify({ session_id: sessionId, message: sendContent }));
+        xhr.send(JSON.stringify({ session_id: sessionId, message: sendContent, system: _sysOverride }));
       }
 
       // ── WebSocket（带自动重连/恢复）；彻底失败才降级 XHR ──
@@ -3193,7 +3295,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         fetch(apiUrl('/api/chat/ws-send'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': monitorToken || '' },
-          body: JSON.stringify({ session_id: sessionId, message: sendContent }),
+          body: JSON.stringify({ session_id: sessionId, message: sendContent, system: _sysOverride }),
         }).then(function() {
           var wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
           var wsUrl = wsProto + '//' + window.location.host + apiUrl('/api/chat/ws')
@@ -6273,6 +6375,223 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.checkAppUpdate = checkAppUpdate;
   window.settingsSaveConfig = settingsSaveConfig;
   window.refreshSysInfo = refreshSysInfo;
+
+  // ═══ 聊天工具栏迷你浮窗 + 快捷指令 + 连接器 + 技能（v17 融合）═══
+  var QUICK_CMDS = [
+    { g:'核心命令', items:[
+      {ico:'📊',t:'会话状态',c:'/status',s:'查看当前会话元数据'},
+      {ico:'🧠',t:'切换模型',c:'/model [provider:model]',s:'临时切换模型'},
+      {ico:'💬',t:'新对话',c:'/new [title]',s:'创建新会话'},
+      {ico:'🗜️',t:'压缩记忆',c:'/compact',s:'压缩长期记忆'},
+      {ico:'🛑',t:'停止生成',c:'/stop',s:'终止当前输出'},
+      {ico:'📈',t:'对话统计',c:'/history',s:'查看 token 用量'},
+      {ico:'🔁',t:'重试',c:'/retry',s:'重新生成上一条回复'},
+      {ico:'⏩',t:'继续',c:'/continue',s:'继续被截断的回复'},
+      {ico:'♻️',t:'重置会话',c:'/reset',s:'清空当前会话上下文'},
+      {ico:'🪙',t:'Token 用量',c:'/token',s:'查看本次对话 token'}
+    ]},
+    { g:'会话管理', items:[
+      {ico:'📋',t:'会话列表',c:'/list',s:'列出所有会话'},
+      {ico:'🔀',t:'切换会话',c:'/switch [id]',s:'切换到指定会话'},
+      {ico:'📥',t:'恢复会话',c:'/resume [id]',s:'恢复历史会话'},
+      {ico:'🏷️',t:'重命名',c:'/title [新标题]',s:'修改会话标题'},
+      {ico:'✏️',t:'改名',c:'/rename [新标题]',s:'同 /title'},
+      {ico:'🗑️',t:'删除会话',c:'/delete [id]',s:'删除指定会话'},
+      {ico:'📌',t:'置顶',c:'/pin',s:'置顶当前会话'},
+      {ico:'🧹',t:'清空',c:'/clear',s:'清空消息'}
+    ]},
+    { g:'工具与技能', items:[
+      {ico:'🛠️',t:'工具列表',c:'/tools',s:'查看可用工具'},
+      {ico:'📚',t:'技能列表',c:'/skills',s:'查看已安装技能'},
+      {ico:'👥',t:'智能体',c:'/agents',s:'查看子智能体'},
+      {ico:'🎭',t:'角色',c:'/personas',s:'查看角色预设'},
+      {ico:'🧠',t:'记忆',c:'/memory',s:'查看长期记忆'},
+      {ico:'⚙️',t:'配置',c:'/config',s:'查看当前配置'}
+    ]},
+    { g:'系统', items:[
+      {ico:'❓',t:'帮助',c:'/help',s:'查看命令帮助'},
+      {ico:'🐞',t:'调试',c:'/debug',s:'输出调试信息'},
+      {ico:'📡',t:'通讯平台',c:'/channels',s:'查看已连接平台'},
+      {ico:'📣',t:'广播',c:'/broadcast [消息]',s:'向所有平台广播'},
+      {ico:'🔌',t:'MCP',c:'/mcp',s:'查看 MCP 服务'},
+      {ico:'ℹ️',t:'版本',c:'/version',s:'查看版本信息'}
+    ]}
+  ];
+  function renderQuickCmds(){
+    var html = '<input class="mini-search" placeholder="搜索命令…" oninput="chatFilterCmds(this.value)">';
+    html += '<div class="cmd-grid" id="cmdGrid">';
+    QUICK_CMDS.forEach(function(group){
+      html += '<div class="cmd-group-title">'+escapeHtml(group.g)+'</div>';
+      group.items.forEach(function(it){
+        html += '<div class="cmd-cell" onclick="chatQuickCmd(this)" data-cmd="'+escapeHtml(it.c)+'">'
+              + '<div class="ico">'+it.ico+'</div>'
+              + '<div><div class="ct">'+escapeHtml(it.t)+'</div><div class="cs">'+escapeHtml(it.c)+'</div></div>'
+              + '</div>';
+      });
+    });
+    html += '</div>';
+    return html;
+  }
+  window.chatFilterCmds = function(v){
+    v = (v||'').toLowerCase();
+    document.querySelectorAll('#cmdGrid .cmd-cell').forEach(function(c){
+      var txt = (c.getAttribute('data-cmd')+' '+c.querySelector('.ct').textContent).toLowerCase();
+      c.style.display = txt.indexOf(v) >= 0 ? '' : 'none';
+    });
+    document.querySelectorAll('#cmdGrid .cmd-group-title').forEach(function(t){
+      var prev = t.nextElementSibling, any=false;
+      while(prev && prev.classList.contains('cmd-cell')){ if(prev.style.display!=='none'){any=true;break;} prev=prev.nextElementSibling; }
+      t.style.display = any ? '' : 'none';
+    });
+  };
+  window.chatQuickCmd = function(el){
+    var cmd = el.getAttribute('data-cmd');
+    var input = document.getElementById('chatInput');
+    if (!input) return;
+    input.value = cmd; input.focus();
+    chatCloseMini();
+    chatSend();
+  };
+  function renderConnectors(compact){
+    var html = '';
+    if(compact !== false){
+      html += '<div style="font-size:12px;color:var(--text2);padding:2px 2px 10px;line-height:1.6">'
+        + '连接器即 <b>技能（Skill）</b>：在扩展页 / SkillHub 安装启用，部分外部服务（如腾讯新闻）需配置 <b>API Key</b> 后方可在对话中调用。</div>';
+    }
+    html += '<div class="conn-list">';
+    var list = [
+      {ico:'📰',n:'腾讯新闻',d:'7×24 资讯 / 事实核查（需 API Key）',st:0,go:'extensions'},
+      {ico:'💬',n:'微信 ClawBot',d:'个人微信消息收发',st:0,go:'channels'},
+      {ico:'🐧',n:'QQ Bot',d:'QQ 频道 / 群消息',st:0,go:'channels'},
+      {ico:'📨',n:'飞书',d:'飞书机器人',st:0,go:'channels'},
+      {ico:'✈️',n:'Telegram',d:'Telegram Bot',st:0,go:'channels'},
+      {ico:'🐙',n:'GitHub',d:'MCP 连接仓库 / Issue',st:0,go:'extensions'},
+      {ico:'📞',n:'WhatsApp',d:'本地 Baileys 桥接',st:0,go:'channels'},
+      {ico:'🔌',n:'自定义 MCP',d:'接入任意 MCP 服务',st:0,go:'extensions'}
+    ];
+    list.forEach(function(c){
+      html += '<div class="conn-card">'
+        + '<div class="conn-ico">'+c.ico+'</div>'
+        + '<div class="conn-info"><div class="conn-name">'+c.n+'</div><div class="conn-desc">'+c.d+'</div></div>'
+        + '<span class="conn-status '+(c.st?'on':'off')+'">'+(c.st?'已配置':'未配置')+'</span>'
+        + '<span class="conn-go" onclick="switchView(\''+c.go+'\')">去配置 ›</span>'
+        + '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+  function renderSkills(){
+    var html = '<div style="font-size:12px;color:var(--text2);padding:2px 2px 10px;line-height:1.6">'
+      + '已内置技能与扩展能力，可在对话中调用或前往扩展页管理。</div>';
+    html += '<div class="conn-list">';
+    var list = [
+      {ico:'🎯',n:'agency-orchestrator',d:'专家团 DAG 工作流编排'},
+      {ico:'📚',n:'fnos-knowledge',d:'飞牛 OS 本地知识库'},
+      {ico:'🛠️',n:'trim-cli',d:'跨平台命令行工具集'}
+    ];
+    list.forEach(function(c){
+      html += '<div class="conn-card">'
+        + '<div class="conn-ico">'+c.ico+'</div>'
+        + '<div class="conn-info"><div class="conn-name">'+c.n+'</div><div class="conn-desc">'+c.d+'</div></div>'
+        + '<span class="conn-go" onclick="switchView(\'extensions\')">管理 ›</span>'
+        + '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+  function renderModelList(body){
+    fetch(apiUrl('/api/config'), {signal: AbortSignal.timeout(5000)}).then(function(r){return r.json();}).then(function(d){
+      var provs = (d && d.providers) || [];
+      var active = (d && d.active_provider) || '';
+      if (!provs.length){ body.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px">尚未添加模型服务，请到「模型」页添加。</div>'; return; }
+      var html = '';
+      provs.forEach(function(p){
+        var isA = p.name === active;
+        html += '<div class="model-cell'+(isA?' active':'')+'" onclick="switchView(\'settings\')">'
+          + '<div><div class="model-name">'+escapeHtml(p.name||'')+'</div><div class="model-meta">'+(isA?'当前模型':'点击切换')+'</div></div>'
+          + (isA?'<span class="conn-status on">使用中</span>':'<span class="conn-status off">未启用</span>')
+          + '</div>';
+      });
+      body.innerHTML = html;
+    }).catch(function(){ body.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px">读取模型配置失败。</div>'; });
+  }
+  window.chatOpenMini = function(key){
+    var popup = document.getElementById('chatMiniPopup');
+    if (popup.classList.contains('open') && popup.getAttribute('data-key') === key){ chatCloseMini(); return; }
+    var titles = { quick:'快捷指令', connector:'连接器', skill:'技能', model:'模型' };
+    document.getElementById('chatMiniTitle').textContent = titles[key] || '面板';
+    var body = document.getElementById('chatMiniBody');
+    if (key === 'quick') body.innerHTML = renderQuickCmds();
+    else if (key === 'connector') body.innerHTML = renderConnectors();
+    else if (key === 'skill') body.innerHTML = renderSkills();
+    else if (key === 'model') { body.innerHTML = '<div class="mini-search" placeholder="加载中…"></div>'; renderModelList(body); }
+    popup.setAttribute('data-key', key);
+    popup.classList.add('open');
+    var pw = popup.getBoundingClientRect();
+    var left = (window.innerWidth - pw.width) / 2;
+    var maxLeft = window.innerWidth - pw.width - 8;
+    left = Math.max(8, Math.min(left, maxLeft));
+    popup.style.left = left + 'px';
+    popup.style.right = 'auto';
+    popup.style.bottom = '84px';
+    popup.style.top = 'auto';
+    document.querySelectorAll('.chat-tool-btn').forEach(function(b){ b.classList.remove('active'); });
+    var act = document.querySelector('.chat-tool-btn[onclick="chatOpenMini(\''+key+'\')"]');
+    if (act) act.classList.add('active');
+  };
+  window.chatCloseMini = function(){
+    var popup = document.getElementById('chatMiniPopup');
+    popup.classList.remove('open');
+    document.querySelectorAll('.chat-tool-btn').forEach(function(b){ b.classList.remove('active'); });
+  };
+  document.addEventListener('click', function(e){
+    var p = document.getElementById('chatMiniPopup');
+    if (!p || !p.classList.contains('open')) return;
+    if (p.contains(e.target)) return;
+    if (e.target.closest && e.target.closest('.chat-tool-btn')) return;
+    chatCloseMini();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') {
+      var p = document.getElementById('chatMiniPopup');
+      if (p && p.classList.contains('open')) { chatCloseMini(); e.stopPropagation(); }
+    }
+  });
+
+  // ─── 连接器独立页 ───
+  window.connectorsLoad = function(){
+    var container = document.getElementById('connectorsContainer');
+    var summaryBadge = document.getElementById('connSummary');
+    var summaryText = document.getElementById('connSummaryText');
+    if(container) container.innerHTML = renderConnectors(false);
+    if(summaryBadge){ summaryBadge.className = 'badge badge-ok'; }
+    if(summaryText){ summaryText.textContent = '8 个可用'; }
+    // 尝试读取配置检测已启用项
+    apiGet('/api/config').then(function(d){
+      var mcps = (d && d.mcp_servers) ? Object.keys(d.mcp_servers) : [];
+      var skills = (d && d.skills && d.skills.external_dirs) ? d.skills.external_dirs : [];
+      var platforms = (d && d.platforms) ? Object.keys(d.platforms) : [];
+      document.querySelectorAll('#connectorsContainer .conn-card').forEach(function(card){
+        var name = (card.querySelector('.conn-name') || {}).textContent || '';
+        var stEl = card.querySelector('.conn-status');
+        var configured = false;
+        if(name.indexOf('腾讯新闻') >= 0 || name.indexOf('GitHub') >= 0 || name.indexOf('自定义 MCP') >= 0){
+          configured = mcps.some(function(k){ return k.toLowerCase().indexOf(name.split(' ')[0].toLowerCase()) >= 0 || (name.indexOf('腾讯新闻')>=0 && k.toLowerCase().indexOf('news')>=0) || (name.indexOf('GitHub')>=0 && k.toLowerCase().indexOf('github')>=0); });
+          if(!configured && name.indexOf('自定义 MCP') >= 0) configured = mcps.length > 0;
+        } else if(name.indexOf('微信')>=0 || name.indexOf('QQ')>=0 || name.indexOf('飞书')>=0 || name.indexOf('Telegram')>=0 || name.indexOf('WhatsApp')>=0){
+          configured = platforms.some(function(k){ return k.toLowerCase().indexOf(name.charAt(0).toLowerCase()) >= 0 || (name.indexOf('微信')>=0 && k.toLowerCase().indexOf('weixin')>=0) || (name.indexOf('飞书')>=0 && k.toLowerCase().indexOf('feishu')>=0) || (name.indexOf('WhatsApp')>=0 && k.toLowerCase().indexOf('whatsapp')>=0); });
+        }
+        if(stEl){
+          stEl.className = 'conn-status ' + (configured ? 'on' : 'off');
+          stEl.textContent = configured ? '已配置' : '未配置';
+        }
+      });
+      var onCount = document.querySelectorAll('#connectorsContainer .conn-status.on').length;
+      if(summaryText){ summaryText.textContent = onCount + ' / 8 已配置'; }
+    }).catch(function(){
+      if(summaryText){ summaryText.textContent = '8 个可用'; }
+    });
+  };
 })();
 </script>
 </body>
