@@ -841,6 +841,9 @@
     .cmd-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
     .cmd-cell{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg1);cursor:pointer;transition:.15s}
     .cmd-cell:hover{background:var(--bg3);border-color:var(--border2)}
+    .cmd-cell.active{border-color:var(--accent);background:var(--accent-bg);color:var(--accent)}
+    .cmd-cell.active .ct{color:var(--accent)}
+    .cmd-cell.disabled{opacity:.5;cursor:not-allowed}
     .cmd-cell .ico{font-size:16px;flex-shrink:0}
     .cmd-cell .ct{font-size:12.5px;font-weight:500;color:var(--text)}
     .cmd-cell .cs{font-size:10.5px;color:var(--text3);margin-top:1px}
@@ -3411,6 +3414,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     loaded: false,
     localMode: false,
   };
+  window.settingsState = settingsState;
 
   // 前端预设兜底 — 数据统一由后端 provider-config.js 管理
   // 通过 /api/config 接口获取 presets 和 provider_models
@@ -3695,11 +3699,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   // 合并内置与自定义人格
   function extAllPersonas(){
-    var ext = settingsState.config.extensions || {};
-    var custom = ext.personas || {};
     var out = {};
     Object.keys(EXT_PERSONAS).forEach(function(k){ out[k] = EXT_PERSONAS[k]; });
-    Object.keys(custom).forEach(function(k){ out[k] = custom[k]; });
+    try {
+      var ext = settingsState.config.extensions || {};
+      var custom = ext.personas || {};
+      Object.keys(custom).forEach(function(k){ out[k] = custom[k]; });
+    } catch(e){}
     return out;
   }
 
@@ -4833,30 +4839,53 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       .catch(function(e){ window._nativeToolsets = null; settingsRenderExtensions(); });
   }
 
-  // 聊天工具栏角色快速切换条（内置 + 自定义）
+  // 聊天工具栏角色选择器：合并为单一当前角色胶囊，点击弹出选择面板
   function renderPersonaBar(){
     var bar = document.getElementById('personaBar');
     if(!bar) return;
-    var cur = (chatState && chatState.persona) || (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default';
+    var cur = 'default';
+    try { cur = (typeof chatState !== 'undefined' && chatState && chatState.persona) || (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default'; } catch(e){}
     var personas = extAllPersonas();
-    // 最多展示 6 个，内置优先，再按自定义添加顺序
-    var keys = Object.keys(personas).slice(0, 8);
-    var html = keys.map(function(k){
+    var p = personas[cur];
+    var label, emoji, title;
+    if (cur === '__team__') {
+      var _delegOn = !!(settingsState.config.extensions && settingsState.config.extensions.toolsets && settingsState.config.extensions.toolsets.delegation);
+      label = '专家团'; emoji = '👥'; title = _delegOn ? '专家团（真·多智能体协作）' : '专家团（多智能体协作）';
+    } else if (cur === '__workflow__') {
+      label = '工作流'; emoji = '🔀'; title = '执行专家团工作流';
+    } else {
+      label = p ? p.label : '默认助手'; emoji = p ? (p.emoji || '🤖') : '🤖'; title = p ? (p.desc || p.label) : '默认主力助手';
+    }
+    bar.innerHTML = '<span class="ext-persona-bar active persona-selector" title="'+escapeHtml(title)+'" onclick="chatOpenMini(\'persona\')">'+escapeHtml(emoji)+' '+escapeHtml(label)+' <span style="font-size:10px;opacity:.7;margin-left:2px">▾</span></span>';
+  }
+  function renderPersonaSelector(){
+    var cur = 'default';
+    try { cur = (typeof chatState !== 'undefined' && chatState && chatState.persona) || (settingsState.config.extensions && settingsState.config.extensions.persona) || 'default'; } catch(e){}
+    var personas = extAllPersonas();
+    var html = '<div style="font-size:12px;color:var(--text2);padding:2px 2px 10px;line-height:1.6">选择当前对话角色。专家团/工作流会改变系统提示，不会写入对话历史。</div>';
+    html += '<div class="cmd-group-title">角色</div><div class="cmd-grid" id="personaGrid">';
+    Object.keys(personas).slice(0, 12).forEach(function(k){
       var p = personas[k];
-      return '<span class="ext-persona-bar'+(k===cur?' active':'')+'" title="'+escapeHtml(p.label)+'" onclick="extQuickPersona(\''+k+'\')">'+escapeHtml(p.emoji || '🤖')+' '+escapeHtml(p.label)+'</span>';
-    }).join('');
-    // 专家团快捷入口（始终显示；未配置成员时点击跳转配置页）
+      var isA = k === cur;
+      html += '<div class="cmd-cell'+(isA?' active':'')+'" data-persona="'+k+'" onclick="extQuickPersona(\''+k+'\'); chatCloseMini();">'
+        + '<div class="ico">'+escapeHtml(p.emoji || '🤖')+'</div><div><div class="ct">'+escapeHtml(p.label)+'</div><div class="cs">'+escapeHtml((p.desc || p.label).slice(0,36))+'</div></div>'
+        + '</div>';
+    });
+    html += '</div>';
+    // 专家团
     var _team = settingsState.config.extensions && settingsState.config.extensions.team;
     var _teamReady = _team && _team.length;
     var _delegOn = !!(settingsState.config.extensions && settingsState.config.extensions.toolsets && settingsState.config.extensions.toolsets.delegation);
-    var _teamTitle = _delegOn ? '专家团（真·多智能体：delegate_task 子智能体协作）' : '专家团（多智能体协作，未启用 delegation 时为角色扮演）';
-    html += '<span class="ext-persona-bar'+(cur==='__team__'?' active':'')+(_teamReady?'':' ext-persona-bar-ghost')+'" title="'+_teamTitle+'" onclick="extQuickTeam()">👥 专家团' + (_delegOn ? ' <span style="font-size:10px;opacity:.8">⚡</span>' : '') + '</span>';
-    // 工作流快捷入口（存在步骤时显示）
+    html += '<div class="cmd-group-title" style="margin-top:10px">专家团 / 工作流</div><div class="cmd-grid">';
+    html += '<div class="cmd-cell'+(cur==='__team__'?' active':'')+(_teamReady?'':' disabled')+'" onclick="'+(_teamReady?'extQuickPersona(\'__team__\'); chatCloseMini();':'switchView(\'extensions\'); chatCloseMini();')+'">'
+      + '<div class="ico">👥</div><div><div class="ct">专家团'+(_delegOn?' ⚡':'')+'</div><div class="cs">'+(_teamReady?'已配置 '+_team.length+' 位成员':'未配置，点击前往设置')+'</div></div></div>';
     var _wf = settingsState.config.extensions && settingsState.config.extensions.workflow;
     if (_wf && _wf.steps && _wf.steps.length) {
-      html += '<span class="ext-persona-bar'+(cur==='__workflow__'?' active':'')+'" title="执行专家团工作流" onclick="extQuickPersona(\'__workflow__\')">🔀 工作流</span>';
+      html += '<div class="cmd-cell'+(cur==='__workflow__'?' active':'')+'" onclick="extQuickPersona(\'__workflow__\'); chatCloseMini();">'
+        + '<div class="ico">🔀</div><div><div class="ct">工作流</div><div class="cs">'+escapeHtml((_wf.name || '专家团 DAG 工作流').slice(0,30))+'</div></div></div>';
     }
-    bar.innerHTML = html;
+    html += '</div>';
+    return html;
   }
   function extQuickTeam(){
     var ext = settingsState.config.extensions || (settingsState.config.extensions = {});
@@ -6518,13 +6547,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   window.chatOpenMini = function(key){
     var popup = document.getElementById('chatMiniPopup');
     if (popup.classList.contains('open') && popup.getAttribute('data-key') === key){ chatCloseMini(); return; }
-    var titles = { quick:'快捷指令', connector:'连接器', skill:'技能', model:'模型' };
+    var titles = { quick:'快捷指令', connector:'连接器', skill:'技能', model:'模型', persona:'选择角色' };
     document.getElementById('chatMiniTitle').textContent = titles[key] || '面板';
     var body = document.getElementById('chatMiniBody');
     if (key === 'quick') body.innerHTML = renderQuickCmds();
     else if (key === 'connector') body.innerHTML = renderConnectors();
     else if (key === 'skill') body.innerHTML = renderSkills();
     else if (key === 'model') { body.innerHTML = '<div class="mini-search" placeholder="加载中…"></div>'; renderModelList(body); }
+    else if (key === 'persona') body.innerHTML = renderPersonaSelector();
     popup.setAttribute('data-key', key);
     popup.classList.add('open');
     var pw = popup.getBoundingClientRect();
@@ -6535,20 +6565,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     popup.style.right = 'auto';
     popup.style.bottom = '84px';
     popup.style.top = 'auto';
-    document.querySelectorAll('.chat-tool-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelectorAll('.chat-tool-btn, .persona-selector').forEach(function(b){ b.classList.remove('active'); });
     var act = document.querySelector('.chat-tool-btn[onclick="chatOpenMini(\''+key+'\')"]');
     if (act) act.classList.add('active');
+    if (key === 'persona') {
+      var psel = document.querySelector('.persona-selector');
+      if (psel) psel.classList.add('active');
+    }
   };
   window.chatCloseMini = function(){
     var popup = document.getElementById('chatMiniPopup');
     popup.classList.remove('open');
-    document.querySelectorAll('.chat-tool-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelectorAll('.chat-tool-btn, .persona-selector').forEach(function(b){ b.classList.remove('active'); });
   };
   document.addEventListener('click', function(e){
     var p = document.getElementById('chatMiniPopup');
     if (!p || !p.classList.contains('open')) return;
     if (p.contains(e.target)) return;
-    if (e.target.closest && e.target.closest('.chat-tool-btn')) return;
+    if (e.target.closest && (e.target.closest('.chat-tool-btn') || e.target.closest('.persona-selector'))) return;
     chatCloseMini();
   });
   document.addEventListener('keydown', function(e){
