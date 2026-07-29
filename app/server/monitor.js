@@ -745,6 +745,10 @@ function createSSEParser(onDelta, onDone, onError, onToolEvent, onUsage) {
           emoji: toolData.emoji || "",
           label: toolData.label || "",
           toolZh: TOOL_NAME_ZH[toolData.tool] || toolData.tool,
+          command: toolData.command || "",
+          summary: toolData.summary || "",
+          args: toolData.args || "",
+          result: toolData.result || "",
         });
       }
     }
@@ -778,6 +782,10 @@ function createSSEParser(onDelta, onDone, onError, onToolEvent, onUsage) {
               if (tj.status) toolData.status = tj.status;
               if (tj.emoji) toolData.emoji = tj.emoji;
               if (tj.label) toolData.label = tj.label;
+              if (tj.command) toolData.command = tj.command;
+              if (tj.summary) toolData.summary = tj.summary;
+              if (tj.args) toolData.args = tj.args;
+              if (tj.result) toolData.result = tj.result;
             } catch {}
             eventData = ""; // 不再走普通 delta 路径
           }
@@ -887,11 +895,15 @@ function resolveProviderBase(provider) {
 }
 
 async function autoTitle(userMsg, provider) {
-  // userMsg 可能是字符串，也可能是多模态 content 数组（图片消息），这里只取文字部分用于生成标题
+  // userMsg 可能是字符串、多模态 content 数组，或前端旧版对象 {text, images, files}
+  // 这里只取文字部分用于生成标题
   let plainMsg = userMsg;
   if (Array.isArray(userMsg)) {
     const textPart = userMsg.find(p => p && p.type === "text");
     plainMsg = (textPart && textPart.text) || "[图片消息]";
+  } else if (userMsg && typeof userMsg === "object") {
+    // 兼容前端 buildMessageContent 发送的 {text, images, files} 对象
+    plainMsg = userMsg.text || "[图片消息]";
   } else if (typeof userMsg !== "string") {
     plainMsg = String(userMsg ?? "");
   }
@@ -1007,6 +1019,79 @@ async function chatRequest(provider, message, history, reqSignal) {
   return upstream;
 }
 
+// ─── 辅助：把前端送来的 {text, images, files} 消息对象规范化为
+//      OpenAI 兼容的 content 格式（字符串 或 多模态数组）──────────────────
+const MIME_BY_EXT = {
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
+  webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon",
+};
+function mimeFromPath(p) {
+  const ext = (p.split(".").pop() || "").toLowerCase();
+  return MIME_BY_EXT[ext] || "image/png";
+}
+function urlToUploadPath(url) {
+  if (!url) return null;
+  if (url.startsWith("/uploads/images/")) return `${UPLOAD_IMG_DIR}/${url.slice("/uploads/images/".length)}`;
+  if (url.startsWith("/uploads/files/")) return `${UPLOAD_FILE_DIR}/${url.slice("/uploads/files/".length)}`;
+  if (url.startsWith("/uploads/")) return `${UPLOAD_DIR}/${url.slice("/uploads/".length)}`;
+  return url;
+}
+async function normalizeMessage(message) {
+  if (message == null) return "";
+  if (typeof message === "string") return message;
+  if (typeof message !== "object") return String(message);
+  const text = message.text || "";
+  const images = Array.isArray(message.images) ? message.images : [];
+  const files = Array.isArray(message.files) ? message.files : [];
+  if (images.length === 0 && files.length === 0) return text;
+
+  const parts = [];
+  if (text) parts.push({ type: "text", text });
+
+  for (const imgUrl of images) {
+    const fp = urlToUploadPath(imgUrl);
+    if (fp && existsSync(fp)) {
+      try {
+        const buf = readFileSync(fp);
+        const mime = mimeFromPath(fp);
+        const b64 = Buffer.from(buf).toString("base64");
+        parts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } });
+        continue;
+      } catch (e) { log(`[normalizeMessage] image read failed ${fp}: ${e.message}`); }
+    }
+    parts.push({ type: "text", text: `[图片: ${imgUrl}]` });
+  }
+
+  let fileText = "";
+  for (const fileUrl of files) {
+    const fp = urlToUploadPath(fileUrl);
+    if (fp && existsSync(fp)) {
+      try {
+        const st = statSync(fp);
+        const name = decodeURIComponent(fp.split("/").pop());
+        const sizeStr = st.size < 1024 ? `${st.size}B`
+                      : st.size < 1048576 ? `${Math.round(st.size / 1024)}KB`
+                      : `${Math.round(st.size / 1048576 * 10) / 10}MB`;
+        fileText += `\n\n### 文件: ${name} [${sizeStr}]\n已保存到本机路径: ${fp}\n你读取此文件并分析`;
+        continue;
+      } catch (e) { log(`[normalizeMessage] file stat failed ${fp}: ${e.message}`); }
+    }
+    fileText += `\n\n[文件: ${fileUrl}]`;
+  }
+
+  if (fileText) {
+    if (parts.length > 0 && parts[0].type === "text") {
+      parts[0].text += fileText;
+    } else {
+      parts.unshift({ type: "text", text: fileText.trim() });
+    }
+  }
+
+  if (parts.length === 0) return "";
+  if (parts.length === 1 && parts[0].type === "text") return parts[0].text;
+  return parts;
+}
+
 // ── 辅助：流式消费 upstream，yield delta ──────────────────────────────────────
 async function* streamDeltas(upstream, decoder, reqSignal) {
   const reader = upstream.body.getReader();
@@ -1117,8 +1202,11 @@ function finalizeAssistantMessage(sessionId, content, options = {}) {
       last.content = content;
       last.ts = Date.now();
       delete last._streaming;
+      if (options.tools) last.tools = options.tools;
     } else {
-      session.messages.push({ role: "assistant", content, ts: Date.now() });
+      const msg = { role: "assistant", content, ts: Date.now() };
+      if (options.tools) msg.tools = options.tools;
+      session.messages.push(msg);
     }
     if (options.title && session.title === "New Chat") {
       session.title = options.title;
@@ -1154,6 +1242,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride) {
       };
 
       try {
+        const normalizedMessage = await normalizeMessage(message);
         const session = getSession(sessionId);
         if (!session) {
           sendJSON({ error: "session not found" }); send("[DONE]", "end"); cleanup(); controller.close(); return;
@@ -1162,9 +1251,9 @@ function createChatStream(sessionId, message, reqSignal, systemOverride) {
         // 去重：WS 路径（runChatWS）可能在 XHR 回退前已推送过该用户消息
         const _lastMsg = session.messages[session.messages.length - 1];
         const _isSameUserMsg = _lastMsg && _lastMsg.role === "user" &&
-          JSON.stringify(_lastMsg.content) === JSON.stringify(message);
+          JSON.stringify(_lastMsg.content) === JSON.stringify(normalizedMessage);
         if (!_isSameUserMsg) {
-          session.messages.push({ role: "user", content: message, ts: Date.now() });
+          session.messages.push({ role: "user", content: normalizedMessage, ts: Date.now() });
           saveSession(session);
         }
 
@@ -1185,6 +1274,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride) {
         let fullReply = "";
         let requestError = null;
         let hadToolCalls = false;
+        let responseTools = [];
 
         // 每 5 秒 / 每 1000 字符做一次增量 checkpoint，异常时也能保留进度
         let lastCheckpointLen = 0;
@@ -1210,7 +1300,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride) {
             const timeoutTimer = setTimeout(() => timeoutController.abort(), PROVIDER_TIMEOUT_MS);
             const signal = combineSignals([timeoutController.signal, stopCtrl.signal]);
 
-            const upstream = await chatRequest(provider, message, history, signal);
+            const upstream = await chatRequest(provider, normalizedMessage, history, signal);
             clearTimeout(timeoutTimer);
 
             hadToolCalls = false;
@@ -1219,7 +1309,19 @@ function createChatStream(sessionId, message, reqSignal, systemOverride) {
               (delta) => { fullReply += delta; sendJSON({ delta }); },
               () => {},
               (err) => { requestError = err; sendJSON({ error: err }); },
-              (toolEvent) => { hadToolCalls = true; sendJSON({ tool_progress: toolEvent }); },
+              (toolEvent) => {
+                hadToolCalls = true;
+                sendJSON({ tool_progress: toolEvent });
+                responseTools.push({
+                  tool: toolEvent.tool,
+                  toolCallId: toolEvent.toolCallId,
+                  status: toolEvent.status || "done",
+                  emoji: toolEvent.emoji || "",
+                  label: toolEvent.label || toolEvent.command || toolEvent.summary || "",
+                  toolZh: toolEvent.toolZh || toolEvent.tool || "工具",
+                  result: (toolEvent.result || "").slice(0, 4000),
+                });
+              },
               (usage) => {
                 usageReported = true;
                 try {
@@ -1279,7 +1381,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride) {
         // 替换最近的 WS 助手消息（来自 WS→XHR 回退），使会话反映用户实际看到的内容
         //（即 XHR 响应），而非不完整的 WS 响应。
         const _assistantContent = fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）");
-        finalizeAssistantMessage(sessionId, _assistantContent);
+        finalizeAssistantMessage(sessionId, _assistantContent, { tools: responseTools });
 
         if (session.title === "New Chat" && session.messages.length >= 2) {
           autoTitle(message, primary).then(title => {
@@ -1329,15 +1431,16 @@ async function runChatWS(ws, sessionId, message, systemOverride) {
 
   let session = null;
   try {
+    const normalizedMessage = await normalizeMessage(message);
     session = getSession(sessionId);
     if (!session) { sendJSON({ error: "session not found" }); sendJSON({ done: true }); cleanup(); return; }
 
     // 去重：防止边界情况（如并发调用）下出现重复用户消息
     const _wsLastMsg = session.messages[session.messages.length - 1];
     const _wsIsSameMsg = _wsLastMsg && _wsLastMsg.role === "user" &&
-      JSON.stringify(_wsLastMsg.content) === JSON.stringify(message);
+      JSON.stringify(_wsLastMsg.content) === JSON.stringify(normalizedMessage);
     if (!_wsIsSameMsg) {
-      session.messages.push({ role: "user", content: message, ts: Date.now() });
+      session.messages.push({ role: "user", content: normalizedMessage, ts: Date.now() });
       saveSession(session);
     }
 
@@ -1382,7 +1485,7 @@ async function runChatWS(ws, sessionId, message, systemOverride) {
         const timeoutTimer = setTimeout(() => timeoutController.abort(), PROVIDER_TIMEOUT_MS);
         const signal = combineSignals([timeoutController.signal, stopCtrl.signal]);
 
-        const upstream = await chatRequest(provider, message, history, signal);
+        const upstream = await chatRequest(provider, normalizedMessage, history, signal);
         clearTimeout(timeoutTimer);
 
         const localParser = createSSEParser(
@@ -1439,7 +1542,7 @@ async function runChatWS(ws, sessionId, message, systemOverride) {
       finalizeAssistantMessage(sessionId, partialContent);
       sendJSON({ error: `所有模型均失败: ${requestError}` });
     } else {
-      finalizeAssistantMessage(sessionId, fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）"));
+      finalizeAssistantMessage(sessionId, fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）"), { tools: responseTools });
     }
 
     if (!requestError && session.title === "New Chat" && session.messages.length >= 2) {

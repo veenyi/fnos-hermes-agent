@@ -13,6 +13,7 @@
       --text:#1f2937; --text2:#374151; --text3:#6b7280;
       --accent:#5e64f3; --accent-h:#4f55d8; --accent-bg:#e8eafe;
       --blue:#2563eb; --blue-bg:#dbeafe;
+      --red:#ef4444; --red-bg:#fee2e2;
       --radius:10px; --radius-lg:14px;
       --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,"PingFang SC","Microsoft YaHei",sans-serif;
     }
@@ -22,6 +23,7 @@
       --text:#e8eaed; --text2:#c9cdd4; --text3:#8b929d;
       --accent:#6b70ff; --accent-h:#585dff; --accent-bg:#2a2d4a;
       --blue:#3b82f6; --blue-bg:#1e3a5f;
+      --red:#f87171; --red-bg:#450a0a;
     }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0;font-family:var(--font);background:var(--bg0);color:var(--text);overflow:hidden}
@@ -41,8 +43,11 @@
     /* 全局顶栏 */
     .global-topbar{height:50px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0}
     .global-topbar .left{display:flex;align-items:center;gap:10px}
-    .brand-logo{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.3px}
-    .brand-logo::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:8px;vertical-align:middle}
+    .brand-logo{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+    .brand-dot{width:8px;height:8px;border-radius:50%;background:#9ca3af;transition:background .2s}
+    .brand-dot.online{background:#22c55e}
+    .brand-dot.offline{background:#ef4444}
+    .brand-dot.connecting{background:#f59e0b}
     .brand-ver{font-size:11px;color:var(--text3);background:var(--bg1);padding:2px 7px;border-radius:10px;border:1px solid var(--border)}
     .global-topbar .right{display:flex;align-items:center;gap:6px}
     .glob-btn{width:32px;height:32px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
@@ -87,6 +92,9 @@
     .session-item .title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .session-item .del{opacity:0;color:var(--text3);font-size:13px}
     .session-item:hover .del{opacity:1}
+    .session-item .si-body{display:flex;flex-direction:column;flex:1;min-width:0;line-height:1.3}
+    .session-item .title{flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .session-item .meta{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 
     /* 页面容器 */
     .page-container{flex:1;display:flex;min-width:0;position:relative;overflow:hidden;background:var(--bg2)}
@@ -117,23 +125,58 @@
     .msg-bubble{padding:12px 14px;border-radius:14px;font-size:14px;line-height:1.6;word-break:break-word}
     .msg.user .msg-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
     .msg.assistant .msg-bubble{background:var(--bg1);border:1px solid var(--border);border-bottom-left-radius:4px;color:var(--text)}
+    .msg-bubble .table-wrap{overflow-x:auto;margin:8px 0;max-width:100%}
+    .msg-bubble table{border-collapse:collapse;margin:0;min-width:100%;width:max-content}
+    .msg-bubble th,.msg-bubble td{border:1px solid var(--border);padding:6px 10px;text-align:left;font-size:13px}
+    .msg-bubble th{background:var(--bg3);font-weight:600;white-space:nowrap}
+    .msg-bubble td{white-space:pre-wrap}
+    .msg-bubble ul,.msg-bubble ol{margin:6px 0 10px;padding-left:20px}
+    .msg-bubble li{margin:3px 0}
     .msg-meta{font-size:11px;color:var(--text3)}
     .system-tip{align-self:center;background:var(--bg3);color:var(--text2);font-size:12px;padding:5px 12px;border-radius:20px;margin:4px 0}
 
     /* 工具/技能调用卡片 */
     .tool-call{margin-top:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);overflow:hidden}
-    .tool-head{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg1);border-bottom:1px solid var(--border);font-size:12px}
+    .tool-call.running{border-color:#f59e0b}
+    .tool-head{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg1);border-bottom:1px solid var(--border);font-size:12px;cursor:pointer;user-select:none}
     .tool-icon{font-size:14px}
     .tool-name{font-weight:600;color:var(--text)}
-    .tool-status{margin-left:auto;color:#16a34a;font-size:11px}
-    .tool-cmd{padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--text2);border-bottom:1px dashed var(--border);background:var(--bg2)}
-    .tool-out{padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--text);line-height:1.5;white-space:pre-wrap}
+    .tool-status{margin-left:auto;font-size:11px}
+    .tool-status.running{color:#d97706}
+    .tool-status.done{color:#16a34a}
+    .tool-cmd{padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--text2);border-bottom:1px dashed var(--border);background:var(--bg2);white-space:pre-wrap;word-break:break-word}
+    .tool-out{padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--text);line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto}
+    .tool-cmd-label{display:block;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+    .tool-call.collapsed .tool-cmd,.tool-call.collapsed .tool-out{display:none}
+
+    /* 消息内富文本（对齐 Markdown 渲染） */
+    .msg-bubble pre{background:var(--bg0);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow:auto;margin:8px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12.5px;line-height:1.5;color:var(--text);white-space:pre}
+    .msg-bubble code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12.5px;background:var(--bg3);padding:2px 5px;border-radius:4px}
+    .msg-bubble pre code{background:transparent;padding:0;font-size:inherit}
+    .msg-bubble blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;color:var(--text2);background:var(--bg1)}
+    .msg-bubble blockquote p{margin:0 0 4px}
+    .msg-bubble h1,.msg-bubble h2,.msg-bubble h3{margin:10px 0 6px;line-height:1.3}
+    .msg-bubble h1{font-size:18px}.msg-bubble h2{font-size:16px}.msg-bubble h3{font-size:14px}
+    .msg-bubble a{color:var(--accent);text-decoration:underline}
+    .msg-bubble hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+
+    /* 工具调用集合（历史消息中） */
+    .msg-tools{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+
+    /* 流式状态行（info 事件） */
+    .chat-info{display:none;align-items:center;gap:6px;font-size:12px;color:var(--text3);padding:4px 0}
+    .chat-info .info-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite}
+    @keyframes pulse{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
 
     /* 输入区 */
     .chat-composer{border-top:1px solid var(--border);padding:14px 16px 16px;background:var(--bg2)}
     .input-outer{background:var(--bg2);border:1px solid var(--border);border-radius:22px;padding:12px 14px 10px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
     body.theme-dark .input-outer{box-shadow:0 2px 8px rgba(0,0,0,.2)}
     .input-outer:focus-within{border-color:var(--accent)}
+    .skill-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 8px}
+    .skill-chip{display:inline-flex;align-items:center;gap:5px;background:var(--accent-bg);color:var(--accent);border-radius:12px;padding:2px 9px;font-size:11px;cursor:pointer;line-height:1.6}
+    .skill-chip .x{font-weight:700;opacity:.65}
+    .skill-chip:hover .x{opacity:1}
     .input-wrap{display:flex;align-items:flex-end;gap:10px;margin-bottom:10px}
     .input-wrap textarea{flex:1;border:none;background:transparent;outline:none;resize:none;font-size:15px;line-height:1.6;max-height:200px;padding:4px 2px;font-family:inherit;color:var(--text)}
     .input-wrap textarea::placeholder{color:var(--text3)}
@@ -328,7 +371,10 @@
 .ov-logbox-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600}
 .ov-logbox-ctrl{display:flex;align-items:center;gap:10px}
 .ov-refresh-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3)}
-.ov-logpre{margin:0;padding:12px 14px;flex:1;min-height:0;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.6;color:var(--text2);background:#0f1115;color:#c9cdd4}
+.ov-logpre{margin:0;padding:12px 14px;flex:1;min-height:0;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.6;color:#c9cdd4;background:#0f1115;white-space:pre-wrap;word-break:break-word}
+.ov-logpre .log-error{color:#ef4444}
+.ov-logbtn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);font-weight:600}
+.msg-bubble .error-text{color:#ef4444}
 .settings-section{display:flex;flex-direction:column;gap:14px}
 .section-head{display:flex;align-items:center;justify-content:space-between}
 .section-head h2{margin:0;font-size:16px}
@@ -440,7 +486,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
     <!-- 全局顶栏 -->
     <header class="global-topbar">
       <div class="left">
-        <div class="brand-logo">Hermes</div>
+        <div class="brand-logo"><span class="brand-dot" id="brandDot"></span>Hermes</div>
         <span class="brand-ver" id="brandVer">--</span>
       </div>
       <div class="right">
@@ -503,6 +549,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 
           <div class="chat-composer" id="chatComposer">
             <div class="input-outer">
+              <div class="skill-chips" id="skillChips" style="display:none"></div>
               <div class="input-wrap">
                 <textarea id="chatInput" rows="1" placeholder="和 AI 小助手说点什么吧~" oninput="autoResize(this)" onkeydown="onKey(event)"></textarea>
                 <button class="send" id="sendBtn" onclick="sendChat()" disabled>
@@ -585,7 +632,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
   </div>
   <div class="ov-logbox">
     <div class="ov-logbox-head">
-      <span>HERMES.LOG</span>
+      <span id="logBoxTitle">Monitor 日志</span>
       <div class="ov-logbox-ctrl">
         <button class="ov-logbtn" onclick="clearLog()">清除</button>
         <div class="ov-refresh-toggle"><span>开启刷新</span><div class="toggle" id="logRefreshToggle" onclick="toggleLogRefresh()"></div></div>
@@ -602,19 +649,19 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
           <div class="page-header"><h1>模型</h1></div>
           <div class="page-body">
             <div class="settings-section">
-  <div class="section-head"><h2>LLM Provider</h2><button class="ov-actbtn" onclick="openProviderModal()">+ 添加 Provider</button></div>
+  <div class="section-head"><h2>模型列表</h2><button class="ov-actbtn" onclick="openProviderModal()">+ 添加模型</button></div>
   <div class="provider-grid" id="providerGrid"></div>
 </div>
 <div id="providerModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeProviderModal()">
   <div class="modal-panel">
-    <div class="modal-head"><h3>Provider</h3><button class="modal-close" onclick="closeProviderModal()">×</button></div>
+    <div class="modal-head"><h3>模型设置</h3><button class="modal-close" onclick="closeProviderModal()">×</button></div>
     <div class="modal-body">
       <input type="hidden" id="providerId">
       <div class="field"><label>类型</label><select id="providerPreset" onchange="onProviderPresetChange()"><option value="">自定义</option></select></div>
       <div class="field"><label>名称</label><input type="text" id="providerName" placeholder="显示名称"></div>
       <div class="field"><label>Base URL</label><input type="text" id="providerBaseUrl" placeholder="https://api..."></div>
       <div class="field"><label>API Key</label><div class="key-wrap"><input type="password" id="providerKey" placeholder="sk-..."><button onclick="toggleKeyVisibility()">👁</button></div></div>
-      <div class="field"><label>默认模型</label><select id="providerModel"></select><input type="text" id="providerCustomModel" placeholder="自定义模型 ID" style="display:none;margin-top:6px"></div>
+      <div class="field"><label>默认模型</label><select id="providerModel" onchange="onProviderModelChange()"></select><input type="text" id="providerCustomModel" placeholder="自定义模型 ID" style="display:none;margin-top:6px"></div>
       <div class="field-row">
         <div class="field"><label>Temperature</label><input type="number" id="providerTemp" step="0.1" min="0" max="2" value="0.7"></div>
         <div class="field"><label>Max Tokens</label><input type="number" id="providerMaxTokens" min="1" max="128000" value="4096"></div>
@@ -4687,6 +4734,7 @@ var _skillLocal = [];            // /api/extensions/skills/local
 var _skillNative = [];           // /proxy/dashboard/api/skills
 var _settingsLoaded = false;
 var _logStream = null;
+var _logInited = false;
 
 /* ============================ 基础工具 ============================ */
 function $(s){ return document.querySelector(s); }
@@ -4806,7 +4854,14 @@ function renderMarkdown(text, streaming){
   src = src.replace(/\r/g,'');
   src = linkifyBareUrls(src);
   var html;
-  try { html = window.marked.parse(src, { breaks:true, gfm:true }); }
+  try {
+    // marked v13+ 默认返回 Promise，强制同步解析
+    if(window.marked.parseSync){
+      html = window.marked.parseSync(src, { breaks:true, gfm:true });
+    } else {
+      html = window.marked.parse(src, { breaks:true, gfm:true, async:false });
+    }
+  }
   catch(e){ html = escapeHtml(src); }
   html = window.DOMPurify ? window.DOMPurify.sanitize(html, { ADD_ATTR:['target'] }) : html;
   html = html.replace(/<a[^>]*href="mailto:[^"]*"[^>]*>(.*?)<\/a>/gi, '$1');
@@ -4838,6 +4893,20 @@ function loadSessions(){
     })
     .catch(function(){ toast('加载会话失败，无法连接后端'); renderRail(); });
 }
+function fmtDateTime(ts){
+  if(!ts) return '';
+  var d = new Date(ts);
+  if(isNaN(d.getTime())) return '';
+  var pad = function(n){ return (n<10?'0':'')+n; };
+  var now = new Date();
+  var hm = pad(d.getHours())+':'+pad(d.getMinutes());
+  var sameDay = d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
+  if(sameDay) return '今天 '+hm;
+  var y = new Date(now); y.setDate(now.getDate()-1);
+  var isYest = d.getFullYear()===y.getFullYear() && d.getMonth()===y.getMonth() && d.getDate()===y.getDate();
+  if(isYest) return '昨天 '+hm;
+  return (d.getMonth()+1)+'月'+d.getDate()+'日 '+hm;
+}
 function renderRail(){
   var el = document.getElementById('railScroll');
   if(!el) return;
@@ -4851,8 +4920,13 @@ function renderRail(){
     '<div class="session-list open" id="sess-default">';
   html += _sessions.map(function(s){
     var sa = s.id===currentSession ? 'active' : '';
+    // 标题优先显示真实会话标题；未命名/新建回退为「新会话」
+    var rawTitle = (s.title && s.title!=='New Chat' && s.title!=='未命名会话') ? s.title : '';
+    var title = rawTitle || '新会话';
+    var meta = fmtDateTime(s.updated_at) + (s.message_count ? ' · '+s.message_count+' 条' : '');
     return '<div class="session-item '+sa+'" onclick="switchSession(\'default\',\''+esc(s.id)+'\',event)">'+
-      '<span class="dot"></span><span class="title">'+esc(s.title||'未命名会话')+'</span>'+
+      '<span class="dot"></span>'+
+      '<span class="si-body"><span class="title">'+esc(title)+'</span>'+(meta?'<span class="meta">'+esc(meta)+'</span>':'')+'</span>'+
       '<span class="del" onclick="delSession(\'default\',\''+esc(s.id)+'\',event)">×</span></div>';
   }).join('');
   html += '</div></div>';
@@ -4902,15 +4976,73 @@ function loadSessionMessages(sid){
     })
     .catch(function(){ body.innerHTML = '<div class="system-tip">加载消息失败，请确认后端已连接。</div>'; });
 }
+function splitContent(content){
+  if(typeof content === 'string') return { text: content, images: [] };
+  if(Array.isArray(content)){
+    var text = '', images = [];
+    content.forEach(function(p){
+      if(!p) return;
+      if(p.type === 'text' && p.text) text += (text ? '\n' : '') + p.text;
+      else if(p.type === 'image_url' && p.image_url && p.image_url.url) images.push(p.image_url.url);
+    });
+    return { text: text, images: images };
+  }
+  if(content && typeof content === 'object'){
+    return { text: content.text || '', images: Array.isArray(content.images) ? content.images : [] };
+  }
+  return { text: '', images: [] };
+}
 function msgHTML(m){
+  var parts = splitContent(m.content);
+  var text = parts.text, imgs = parts.images;
+  var imgHtml = imgs.map(function(u){ return '<img src="'+esc(u)+'" style="max-width:200px;max-height:200px;border-radius:8px;display:block;margin-top:6px">'; }).join('');
   if(m.role === 'user'){
-    var text = (typeof m.content === 'string') ? m.content : (m.content && m.content.text ? m.content.text : '');
-    var imgs = (m.content && m.content.images) ? m.content.images : [];
-    var imgHtml = imgs.map(function(u){ return '<img src="'+esc(u)+'" style="max-width:200px;max-height:200px;border-radius:8px;display:block;margin-top:6px">'; }).join('');
     return '<div class="msg user"><div class="msg-bubble">'+escapeHtml(text).replace(/\n/g,'<br>')+imgHtml+'</div><div class="msg-meta">你 · 刚刚</div></div>';
   }
-  var content = (typeof m.content === 'string') ? m.content : (m.content && m.content.text ? m.content.text : '');
-  return '<div class="msg assistant"><div class="msg-bubble">'+renderMarkdown(content)+'</div><div class="msg-meta">Hermes · 刚刚</div></div>';
+  var toolsHtml = (Array.isArray(m.tools) && m.tools.length)
+    ? ('<div class="msg-tools">'+m.tools.map(toolCardHTML).join('')+'</div>') : '';
+  return '<div class="msg assistant"><div class="msg-bubble">'+renderMarkdown(text)+imgHtml+toolsHtml+'</div><div class="msg-meta">Hermes · 刚刚</div></div>';
+}
+
+/* 工具调用映射（对齐 Hermes 消息网关规范：terminal=💻 / web=🔍 / execute_code=🐍 等） */
+var TOOL_EMOJI = {
+  terminal: '💻', execute_code: '🐍', run_code: '🐍',
+  read_file: '📄', write_file: '📝', edit_file: '✏️',
+  search_files: '🔎', web: '🔍', web_search: '🔍', web_extract: '📄',
+  delegate_task: '🤖', delegation: '🤖', session_search: '💬',
+  browser: '🌐', image_gen: '🎨', file_ops: '📂', memory: '🧠',
+  shell: '💻', bash: '💻', cmd: '💻',
+};
+var TOOL_NAME_ZH = {
+  terminal: '终端命令', execute_code: '执行代码', run_code: '执行代码',
+  read_file: '读取文件', write_file: '写入文件', edit_file: '编辑文件',
+  search_files: '搜索文件', web: '网页搜索', web_search: '网页搜索', web_extract: '网页提取',
+  delegate_task: '委派任务', delegation: '委派任务', session_search: '会话搜索',
+  browser: '浏览器', image_gen: '图像生成', file_ops: '文件操作', memory: '记忆',
+  shell: '终端命令', bash: '终端命令', cmd: '终端命令',
+};
+function toolCardHTML(tp){
+  if(!tp) return '';
+  var emoji = tp.emoji || TOOL_EMOJI[tp.tool] || '🔧';
+  var name = tp.toolZh || TOOL_NAME_ZH[tp.tool] || tp.tool || '工具';
+  var status = tp.status || 'done';
+  var running = !(status==='done'||status==='completed'||status==='finish'||status==='finished');
+  var label = tp.label || tp.command || tp.summary || '';
+  var result = tp.result || '';
+  var idAttr = tp.toolCallId ? (' data-tid="'+esc(tp.toolCallId)+'"') : '';
+  var html = '<div class="tool-call'+(running?' running':'')+'"'+idAttr+'>'+
+    '<div class="tool-head" onclick="this.parentNode.classList.toggle(\'collapsed\')">'+
+      '<span class="tool-icon">'+emoji+'</span>'+
+      '<span class="tool-name">'+esc(name)+'</span>'+
+      '<span class="tool-status '+(running?'running':'done')+'">'+(running?'执行中…':'已完成')+'</span>'+
+    '</div>';
+  if(label){
+    html += '<div class="tool-cmd"><span class="tool-cmd-label">命令</span>'+escapeHtml(label)+'</div>';
+  }
+  if(result){
+    html += '<div class="tool-out"><span class="tool-cmd-label">结果</span>'+escapeHtml(result)+'</div>';
+  }
+  return html+'</div>';
 }
 function updateHeader(){
   var s = _sessions.find(function(x){ return x.id===currentSession; });
@@ -4947,9 +5079,10 @@ function sendChat(){
   var ta=document.getElementById('chatInput');
   var text=ta.value.trim();
   if(!text && _pendingAttachments.length===0) return;
-  sendRaw(text);
   ta.value=''; ta.style.height='auto';
   var btn=document.getElementById('sendBtn'); if(btn) btn.disabled=true;
+  if(text.charAt(0)==='/'){ handleSlashCommand(text); return; }
+  sendRaw(text);
 }
 
 /* 真实发送：流式对话（SSE / XHR 降级） */
@@ -4966,10 +5099,11 @@ function sendRaw(text){
   body.appendChild(userDiv); body.scrollTop=body.scrollHeight;
 
   var asst = document.createElement('div'); asst.className='msg assistant';
-  asst.innerHTML = '<div class="msg-bubble"><div class="md-text"><span class="cursor-blink">|</span></div><div class="tool-calls"></div></div><div class="msg-meta">Hermes · 刚刚</div>';
+  asst.innerHTML = '<div class="msg-bubble"><div class="md-text"><span class="cursor-blink">|</span></div><div class="chat-info"></div><div class="tool-calls"></div></div><div class="msg-meta">Hermes · 刚刚</div>';
   body.appendChild(asst); body.scrollTop=body.scrollHeight;
   var mdEl = asst.querySelector('.md-text');
   var toolBox = asst.querySelector('.tool-calls');
+  var infoEl = asst.querySelector('.chat-info');
   var fullText = '';
   var toolCards = {};
 
@@ -4983,24 +5117,60 @@ function sendRaw(text){
   }
 
   function doStream(){
+    var sys = _personaPrompt || '';
+    if(_activeSkills.length){ sys += '\n\n【已启用技能】请在本轮对话中优先使用以下技能：'+_activeSkills.join('、')+'。'; }
     var payload = {
       session_id: currentSession,
       message: buildMessageContent(text, attachments),
-      system: _personaPrompt || ''
+      system: sys
     };
     streamChat(payload, {
       onDelta: function(d){ fullText += d; mdEl.innerHTML = renderMarkdown(fullText, true); body.scrollTop=body.scrollHeight; },
       onTool: function(tp){
         var id = tp.toolCallId || tp.tool || 'tool';
         var card = toolCards[id];
-        if(!card){ card=document.createElement('div'); card.className='tool-call'; toolBox.appendChild(card); toolCards[id]=card; }
-        card.innerHTML = '<div class="tool-head"><span class="tool-icon">🔧</span><span class="tool-name">'+esc(tp.toolZh||tp.tool||'工具')+'</span><span class="tool-status '+(tp.status==='running'?'':'done')+'">'+(tp.status==='running'?'执行中':'已完成')+'</span></div>';
+        if(!card){
+          card = document.createElement('div');
+          card.className = 'tool-call';
+          if(tp.toolCallId) card.setAttribute('data-tid', tp.toolCallId);
+          toolBox.appendChild(card);
+          toolCards[id] = card;
+        }
+        // 同一工具可能多次推送事件（start → done → result），按最新状态重绘
+        var running = !(tp.status==='done'||tp.status==='completed'||tp.status==='finish'||tp.status==='finished');
+        card.className = 'tool-call' + (running ? ' running' : '');
+        var emoji = tp.emoji || TOOL_EMOJI[tp.tool] || '🔧';
+        var name = tp.toolZh || TOOL_NAME_ZH[tp.tool] || tp.tool || '工具';
+        var html = '<div class="tool-head" onclick="this.parentNode.classList.toggle(\'collapsed\')">'+
+          '<span class="tool-icon">'+emoji+'</span>'+
+          '<span class="tool-name">'+esc(name)+'</span>'+
+          '<span class="tool-status '+(running?'running':'done')+'">'+(running?'执行中…':'已完成')+'</span>'+
+        '</div>';
+        var label = tp.label || tp.command || tp.summary || '';
+        if(label) html += '<div class="tool-cmd"><span class="tool-cmd-label">命令</span>'+escapeHtml(label)+'</div>';
+        if(tp.result) html += '<div class="tool-out"><span class="tool-cmd-label">结果</span>'+escapeHtml(tp.result)+'</div>';
+        card.innerHTML = html;
         body.scrollTop=body.scrollHeight;
       },
-      onInfo: function(i){},
-      onError: function(err){ mdEl.innerHTML = '<span style="color:var(--red)">⚠ '+esc(err)+'</span>'; },
+      onInfo: function(i){
+        if(!i) return;
+        infoEl.innerHTML = '<span class="info-dot"></span>'+escapeHtml(i);
+        infoEl.style.display = 'flex';
+        body.scrollTop=body.scrollHeight;
+      },
+      onUsage: function(u){
+        if(!u) return;
+        var meta = asst.querySelector('.msg-meta');
+        if(meta){
+          var t = (u.total_tokens!=null) ? u.total_tokens
+                : ((u.prompt_tokens||0) + (u.completion_tokens||0));
+          meta.textContent = 'Hermes · 刚刚 · ' + t + ' tokens';
+        }
+      },
+      onError: function(err){ mdEl.innerHTML = '<span class="error-text">⚠ '+esc(err)+'</span>'; },
       onDone: function(aborted){
         mdEl.innerHTML = renderMarkdown(fullText) + (aborted ? ' <em>(已停止)</em>' : '');
+        infoEl.style.display = 'none';
         _msgState.streaming=false; _msgState.abortCtrl=null;
         loadSessions();
       }
@@ -5148,9 +5318,10 @@ function buildMiniData(){
     return { t:c.name||c.kind, d:c.configured?'已启用':'未配置', ico:(c.icon||'🔌') };
   });
   if(!connectors.length) connectors = PV.octopConnectors.slice(0,3).map(function(c){ return { t:c.name, d:'未配置', ico:c.icon }; });
-  var skills = (_skillLocal.length?_skillLocal:_state.skills&&PV.skillsLocal)||[];
+  var skills = (_skillLocal.length?_skillLocal:(_state&&_state.skills&&PV.skillsLocal))||[];
   var skillItems = (skills.length?skills:PV.skillsLocal).map(function(sk){
-    return { t:sk.name||sk.name, d:sk.desc||sk.description||'', ico:sk.icon||'📦', active:!!sk.enabled };
+    var nm = sk.name||sk.id||'技能';
+    return { t:nm, d:sk.desc||sk.description||'', ico:sk.icon||'📦', active:_activeSkills.indexOf(nm)>=0 };
   });
   return {
     model:{ title:'选择模型', items:providers },
@@ -5233,12 +5404,75 @@ function pickItem(key, el){
     var b=document.getElementById('btnModel'); if(b) b.setAttribute('data-tip','模型: '+name);
     _selectedModel = name;
   } else if(key==='skill'){
-    var b2=document.getElementById('btnSkill'); if(b2) b2.classList.add('active');
+    // 真实切换「已启用技能」：加入/移除 _activeSkills，渲染 chip，并在发送时注入 system 提示
+    var idx=_activeSkills.indexOf(name);
+    if(idx>=0){ _activeSkills.splice(idx,1); el.classList.remove('active'); toast('已停用技能：'+name); }
+    else { _activeSkills.push(name); el.classList.add('active'); toast('已启用技能：'+name); }
+    var b2=document.getElementById('btnSkill'); if(b2) b2.classList.toggle('active', _activeSkills.length>0);
+    renderSkillChips();
+    return; // 保持弹窗打开，可继续勾选多个技能
   }
   closeMini();
 }
 var _selectedModel = '';
-function pickQuick(cmd){ closeMini(); sendRaw(cmd); }
+var _activeSkills = [];   // 当前会话已启用的技能（名称列表），发送时注入 system 提示
+function renderSkillChips(){
+  var box=document.getElementById('skillChips'); if(!box) return;
+  if(!_activeSkills.length){ box.innerHTML=''; box.style.display='none'; return; }
+  box.style.display='flex';
+  box.innerHTML = _activeSkills.map(function(n){
+    return '<span class="skill-chip" onclick="removeSkill(\''+esc(n).replace(/'/g,"\\'")+'\')">'+esc(n)+' <span class="x">×</span></span>';
+  }).join('');
+}
+function removeSkill(n){
+  var idx=_activeSkills.indexOf(n); if(idx>=0) _activeSkills.splice(idx,1);
+  var b2=document.getElementById('btnSkill'); if(b2) b2.classList.toggle('active', _activeSkills.length>0);
+  renderSkillChips();
+}
+function pickQuick(cmd){ closeMini(); handleSlashCommand(cmd); }
+function handleSlashCommand(cmd){
+  if(!cmd || cmd.charAt(0)!=='/'){ sendRaw(cmd); return; }
+  var parts = cmd.split(' ');
+  var base = parts[0].toLowerCase();
+  var arg = parts.slice(1).join(' ').trim();
+  if(base==='/new'){
+    newSession();
+    return;
+  }
+  if(base==='/stop'){
+    chatStop();
+    toast('已停止当前生成');
+    return;
+  }
+  if(base==='/reset'){
+    if(currentSession){
+      fetch(apiUrl('/api/sessions/'+encodeURIComponent(currentSession)), { method:'DELETE', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+        .then(function(){ newSession(); toast('已重置当前会话'); })
+        .catch(function(){ toast('重置失败'); });
+    } else { newSession(); }
+    return;
+  }
+  if(base==='/status'){
+    var statusMsg = '当前状态：';
+    statusMsg += 'Gateway ' + (_services.gateway?'运行中':'未启动') + '，';
+    statusMsg += 'Dashboard ' + (_services.dashboard?'运行中':'未启动') + '；';
+    statusMsg += '当前模型 ' + (_cfg.active_provider||'自动') + '；';
+    statusMsg += '角色 ' + (_persona||'default') + '。';
+    appendSystemMessage(statusMsg);
+    return;
+  }
+  if(base==='/help'){
+    appendSystemMessage('可用快捷指令：/new 新对话、/stop 停止生成、/reset 重置会话、/status 查看状态、/help 帮助。其他命令将直接发送给 AI。');
+    return;
+  }
+  // 其余命令直接发送给 AI（带提示前缀以便模型理解）
+  sendRaw('执行命令：' + cmd);
+}
+function appendSystemMessage(text){
+  var body=document.getElementById('chatBody'); if(!body) return;
+  var div=document.createElement('div'); div.className='system-tip'; div.textContent=text;
+  body.appendChild(div); body.scrollTop=body.scrollHeight;
+}
 function quickReply(cmd){
   if(cmd==='/status') return '当前会话状态：模型=自动，记忆=开启，工具集=hermes-cli+delegation。';
   if(cmd==='/stop') return '已停止当前生成。';
@@ -5288,48 +5522,73 @@ function setTheme(mode){
 }
 
 /* ============================ 概览 ============================ */
+var _connecting = false;  // 重启/启动/停止进行中，保持「连接中」琥珀态，避免闪烁离线
+function applyServiceState(s){
+  var gw = !!(s.gateway && s.gateway.running);
+  var db = !!(s.dashboard && s.dashboard.running);
+  _services = { gateway:gw, dashboard:db };
+  // 动作进行中且服务尚未就绪：保持连接中（琥珀），不要闪离线
+  if(_connecting && !(gw||db)){
+    var b0=document.getElementById('ovStatusBadge'); var t0=document.getElementById('ovStatusText');
+    if(b0) b0.className='ov-status connecting';
+    if(t0) t0.textContent='连接中…';
+    var bd0=document.getElementById('brandDot'); if(bd0) bd0.className='brand-dot connecting';
+    return;
+  }
+  _connecting = false;
+  var badge=document.getElementById('ovStatusBadge');
+  var txt=document.getElementById('ovStatusText');
+  if(badge) badge.className='ov-status '+(gw||db?'on':'off');
+  if(txt) txt.textContent=(gw||db)?'运行中':'已停止';
+  var brandDot=document.getElementById('brandDot');
+  if(brandDot) brandDot.className='brand-dot '+(gw?'online':(db?'connecting':'offline'));
+  setToggle('gwToggle', gw); setToggle('dbToggle', db);
+  var gwPid = s.gateway && s.gateway.pid;
+  var dbPid = s.dashboard && s.dashboard.pid;
+  var gsp=document.getElementById('gwStateText'); if(gsp) gsp.textContent= gw?'运行中':'未启动';
+  var dsp=document.getElementById('dbStateText'); if(dsp) dsp.textContent= db?'运行中':'未启动';
+  var gp=document.getElementById('gwPid'); if(gp) gp.textContent= gwPid?gwPid:'--';
+  var dp=document.getElementById('dbPid'); if(dp) dp.textContent= dbPid?dbPid:'--';
+  // 系统信息：统一走 ID，避免 querySelectorAll 索引错位；优先使用服务端已格式化的 s.uptime
+  var upEl=document.getElementById('sysUptime');
+  if(upEl){
+    if(s.uptime!=null){ upEl.textContent=s.uptime; }
+    else if(s.uptimeMs!=null){ upEl.textContent=fmtUptime(s.uptimeMs); }
+  }
+  var memEl=document.getElementById('sysMem');
+  if(memEl && s.memoryKB!=null){ memEl.textContent=Math.round(s.memoryKB/1024)+' MB'; }
+  var hvEl=document.getElementById('sysHermesVer');
+  if(hvEl && s.gateway && s.gateway.version){ hvEl.textContent=fmtHermesVer(s.gateway.version, s.hermes_version_date); }
+  var avEl=document.getElementById('sysAppVer');
+  if(avEl && s.app_version){ avEl.textContent=s.app_version; }
+  // 顶栏与更新页当前版本同步
+  var brand=document.getElementById('brandVer');
+  if(brand && s.app_version){ brand.textContent='v'+s.app_version; }
+  var hermCur=document.getElementById('hermesCurrent');
+  if(hermCur && s.gateway && s.gateway.version){ hermCur.textContent=fmtHermesVer(s.gateway.version, s.hermes_version_date); }
+  var appCur=document.getElementById('appCurrent');
+  if(appCur && s.app_version){ appCur.textContent='v'+s.app_version; }
+}
 function renderOverview(){
   apiGet('/api/status').then(function(s){
     if(!s || s.error){ setStatusOffline(); return; }
-    var gw = !!(s.gateway && s.gateway.running);
-    var db = !!(s.dashboard && s.dashboard.running);
-    _services = { gateway:gw, dashboard:db };
-    var badge=document.getElementById('ovStatusBadge');
-    var txt=document.getElementById('ovStatusText');
-    if(badge) badge.className='ov-status '+(gw||db?'on':'off');
-    if(txt) txt.textContent=(gw||db)?'运行中':'已停止';
-    setToggle('gwToggle', gw); setToggle('dbToggle', db);
-    var gwPid = s.gateway && s.gateway.pid;
-    var dbPid = s.dashboard && s.dashboard.pid;
-    var gsp=document.getElementById('gwStateText'); if(gsp) gsp.textContent= gw?'运行中':'未启动';
-    var dsp=document.getElementById('dbStateText'); if(dsp) dsp.textContent= db?'运行中':'未启动';
-    var gp=document.getElementById('gwPid'); if(gp) gp.textContent= gwPid?gwPid:'--';
-    var dp=document.getElementById('dbPid'); if(dp) dp.textContent= dbPid?dbPid:'--';
-    // 系统信息：统一走 ID，避免 querySelectorAll 索引错位；优先使用服务端已格式化的 s.uptime
-    var upEl=document.getElementById('sysUptime');
-    if(upEl){
-      if(s.uptime!=null){ upEl.textContent=s.uptime; }
-      else if(s.uptimeMs!=null){ upEl.textContent=fmtUptime(s.uptimeMs); }
-    }
-    var memEl=document.getElementById('sysMem');
-    if(memEl && s.memoryKB!=null){ memEl.textContent=Math.round(s.memoryKB/1024)+' MB'; }
-    var hvEl=document.getElementById('sysHermesVer');
-    if(hvEl && s.gateway && s.gateway.version){ hvEl.textContent=fmtHermesVer(s.gateway.version, s.hermes_version_date); }
-    var avEl=document.getElementById('sysAppVer');
-    if(avEl && s.app_version){ avEl.textContent=s.app_version; }
-    // 顶栏与更新页当前版本同步
-    var brand=document.getElementById('brandVer');
-    if(brand && s.app_version){ brand.textContent='v'+s.app_version; }
-    var hermCur=document.getElementById('hermesCurrent');
-    if(hermCur && s.gateway && s.gateway.version){ hermCur.textContent=fmtHermesVer(s.gateway.version, s.hermes_version_date); }
-    var appCur=document.getElementById('appCurrent');
-    if(appCur && s.app_version){ appCur.textContent='v'+s.app_version; }
+    applyServiceState(s);
+    // 默认加载 Monitor 日志（仅首次）
+    if(!_logInited){ _logInited=true; setTimeout(function(){ appendLog('monitor','Monitor 日志'); }, 100); }
   }).catch(function(){ setStatusOffline(); });
+}
+// 轻量级状态轮询：只更新顶栏状态点与服务卡片，不重渲染日志/系统信息区块（避免打断日志查看）
+function tickStatus(){
+  apiGet('/api/status').then(function(s){
+    if(!s || s.error){ if(!_connecting) setStatusOffline(); return; }
+    applyServiceState(s);
+  }).catch(function(){ if(!_connecting) setStatusOffline(); });
 }
 function setStatusOffline(){
   var badge=document.getElementById('ovStatusBadge'); var txt=document.getElementById('ovStatusText');
   if(badge) badge.className='ov-status off';
   if(txt) txt.textContent='离线';
+  var brandDot=document.getElementById('brandDot'); if(brandDot) brandDot.className='brand-dot offline';
   setToggle('gwToggle',false); setToggle('dbToggle',false);
   var gsp=document.getElementById('gwStateText'); if(gsp) gsp.textContent='未启动';
   var dsp=document.getElementById('dbStateText'); if(dsp) dsp.textContent='未启动';
@@ -5361,22 +5620,25 @@ function toggleService(name){
 }
 function startServices(which){
   var path = which==='dashboard' ? '/api/dashboard/start' : '/api/start';
+  _connecting = true;
   apiPost(path, {}).then(function(r){
-    if(r && r.error){ toast('启动失败：'+r.error); }
+    if(r && r.error){ toast('启动失败：'+r.error); _connecting=false; }
     else { toast('正在启动'+(which?(' '+which):'服务')); }
-    pollStatus();
-  }).catch(function(e){ toast('启动请求失败：'+e.message); });
+    tickStatus();
+  }).catch(function(e){ toast('启动请求失败：'+e.message); _connecting=false; });
 }
 function stopServices(which){
   var path = which==='dashboard' ? '/api/dashboard/stop' : '/api/stop';
+  _connecting = true;
   apiPost(path, {}).then(function(r){
-    if(r && r.error){ toast('停止失败：'+r.error); }
+    if(r && r.error){ toast('停止失败：'+r.error); _connecting=false; }
     else { toast('正在停止'+(which?(' '+which):'服务')); }
-    pollStatus();
-  }).catch(function(e){ toast('停止请求失败：'+e.message); });
+    tickStatus();
+  }).catch(function(e){ toast('停止请求失败：'+e.message); _connecting=false; });
 }
 function restartServices(){
-  apiPost('/api/restart', {}).then(function(r){ if(r && r.error) toast('重启失败：'+r.error); else toast('正在重启服务'); pollStatus(); }).catch(function(e){ toast('重启请求失败：'+e.message); });
+  _connecting = true;
+  apiPost('/api/restart', {}).then(function(r){ if(r && r.error){ toast('重启失败：'+r.error); _connecting=false; } else toast('正在重启服务'); tickStatus(); }).catch(function(e){ toast('重启请求失败：'+e.message); _connecting=false; });
 }
 function pollStatus(){
   var tries=0;
@@ -5404,21 +5666,44 @@ function refreshSysInfo(){
     if(memEl && s.memoryKB!=null){ memEl.textContent=Math.round(s.memoryKB/1024)+' MB'; }
   }).catch(function(){});
 }
+var _currentLogTag = 'monitor';
+var _logFileMap = {
+  monitor: 'hermes.log',
+  agent: 'agent.log',
+  gui: 'gui.log',
+  error: 'errors.log',
+  gateway: 'gateway.log',
+  gateway_restart: 'gateway-restart.log',
+  gateway_close: 'gateway-shutdown-diag.log',
+  gateway_exit: 'gateway-exit-diag.log'
+};
 function appendLog(tag, msg){
+  _currentLogTag = tag || 'monitor';
   var pre=document.getElementById('logPre'); if(!pre) return;
-  pre.textContent = '[ 加载日志中… ]';
-  fetch(apiUrl('/api/logs/history'), { cache:'no-store', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+  var titleEl=document.getElementById('logBoxTitle'); if(titleEl) titleEl.textContent = msg || '日志';
+  // 按钮高亮
+  document.querySelectorAll('.ov-logbtn').forEach(function(b){ b.classList.remove('active'); });
+  var activeBtn = Array.from(document.querySelectorAll('.ov-logbtn')).find(function(b){ return b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'"+tag+"'")>=0; });
+  if(activeBtn) activeBtn.classList.add('active');
+  pre.innerHTML = '[ 加载日志中… ]';
+  var file = _logFileMap[tag] || 'hermes.log';
+  fetch(apiUrl('/api/logs/read?file='+encodeURIComponent(file)), { cache:'no-store', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
     .then(function(r){ return r.json(); })
     .then(function(d){
       var lines=(d && d.lines) || [];
-      if(tag && tag!=='monitor'){ lines = lines.filter(function(l){ return String(l).toLowerCase().indexOf(String(tag).toLowerCase())>=0; }); }
-      pre.textContent = lines.length ? lines.join('\n') : '[ 无 '+tag+' 日志，或后端未提供该分类 ]';
+      if(!lines.length){ pre.textContent = '[ 无 '+msg+' 日志，或后端未提供该分类 ]'; return; }
+      pre.innerHTML = lines.map(function(l){
+        var lower = String(l).toLowerCase();
+        var isError = lower.indexOf('error')>=0 || lower.indexOf('failed')>=0 || lower.indexOf('失败')>=0 || lower.indexOf('exception')>=0 || lower.indexOf('fatal')>=0 || lower.indexOf('uncaught')>=0;
+        return isError ? '<span class="log-error">'+esc(l)+'</span>' : esc(l);
+      }).join('\n');
       pre.scrollTop = pre.scrollHeight;
     })
     .catch(function(){ pre.textContent = '[ 日志加载失败：无法连接后端 ]'; });
 }
 function clearLog(){
-  apiPost('/api/logs/clear', { file:'hermes.log' }).then(function(){
+  var file = _logFileMap[_currentLogTag] || 'hermes.log';
+  apiPost('/api/logs/clear', { file: file }).then(function(){
     var pre=document.getElementById('logPre'); if(pre) pre.textContent='';
   }).catch(function(){ toast('清除日志失败'); });
 }
@@ -5504,17 +5789,41 @@ function fillModelOptions(selected){
   var preset=document.getElementById('providerPreset').value;
   var models = preset ? (PV.providerPresets[preset] && PV.providerPresets[preset].models) : [];
   sel.innerHTML='';
+  // 自动获取选项
+  var fetchOpt=document.createElement('option'); fetchOpt.value='__fetch__'; fetchOpt.textContent='自动获取所有模型'; if(selected==='__fetch__') fetchOpt.selected=true; sel.appendChild(fetchOpt);
+  // 预设模型
+  var hasPreset=false;
   if(models && models.length){
+    hasPreset=true;
     models.forEach(function(mo){
       var o=document.createElement('option'); o.value=mo; o.textContent=mo; if(mo===selected) o.selected=true; sel.appendChild(o);
     });
-    custom.style.display='none';
-  } else {
-    var o=document.createElement('option'); o.value='__custom__'; o.textContent='自定义'; sel.appendChild(o);
-    custom.style.display='block'; custom.value=selected||'';
   }
+  // 当前已保存的模型（不在预设列表中时保留）
+  if(selected && selected!=='__fetch__' && selected!=='__custom__' && (!models || models.indexOf(selected)<0)){
+    var o=document.createElement('option'); o.value=selected; o.textContent=selected; o.selected=true; sel.appendChild(o);
+  }
+  // 自定义选项
+  var oc=document.createElement('option'); oc.value='__custom__'; oc.textContent='自定义'; if(selected==='__custom__') oc.selected=true; sel.appendChild(oc);
+  // 根据选中项显示/隐藏自定义输入框
+  var isCustom = (!selected || selected==='__custom__' || (selected!=='__fetch__' && !hasPreset && (!models || models.indexOf(selected)<0)));
+  custom.style.display = isCustom ? 'block' : 'none';
+  if(isCustom) custom.value = (selected==='__custom__' || selected==='__fetch__') ? '' : (selected||'');
 }
 function onProviderPresetChange(){ fillModelOptions(''); }
+function onProviderModelChange(){
+  var sel=document.getElementById('providerModel');
+  var custom=document.getElementById('providerCustomModel');
+  if(!sel) return;
+  if(sel.value==='__fetch__'){
+    fetchProviderModels();
+    custom.style.display='none';
+  } else if(sel.value==='__custom__'){
+    custom.style.display='block'; custom.value=''; custom.focus();
+  } else {
+    custom.style.display='none';
+  }
+}
 // 用后端 /api/config/test 返回的模型列表填充下拉（OpenAI 兼容 /models 接口）
 function fillModelOptionsFromList(list){
   var sel=document.getElementById('providerModel');
@@ -5563,6 +5872,7 @@ function buildProviderObj(){
   var name=document.getElementById('providerName').value.trim() || '自定义 Provider';
   var model=document.getElementById('providerModel').value;
   if(model==='__custom__') model=document.getElementById('providerCustomModel').value.trim();
+  if(model==='__fetch__') model=''; // 保存为空，由后端自动选择
   return {
     id: id || ('custom_'+uid()),
     name: name,
@@ -6342,6 +6652,8 @@ document.addEventListener('DOMContentLoaded', function(){
     }).catch(function(){});
     loadSessions();
     renderOverview();
+    tickStatus();
+    setInterval(tickStatus, 3000);   // 轻量周期轮询：状态变化（重启/启动/停止后）自动反映，无需阻塞等待
   }).catch(function(){
     toast('无法连接后端，已进入本地预览（数据不可用）。');
     renderRail();
