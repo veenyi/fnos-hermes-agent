@@ -589,7 +589,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
             <div class="input-outer">
               <div class="skill-chips" id="skillChips" style="display:none"></div>
               <div class="input-wrap">
-                <textarea id="chatInput" rows="1" placeholder="和 AI 小助手说点什么吧~" oninput="autoResize(this)" onkeydown="onKey(event)"></textarea>
+                <textarea id="chatInput" rows="1" placeholder="和 AI 小助手说点什么吧~（可 Ctrl+V 粘贴图片发送）" oninput="autoResize(this)" onkeydown="onKey(event)" onpaste="onChatPaste(event)"></textarea>
                 <button class="send" id="sendBtn" onclick="sendChat()" disabled>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-45 12 12)"/></svg>
                 </button>
@@ -5389,6 +5389,42 @@ function removeAttach(i){
   _pendingAttachments.splice(i,1);
   renderAttachChips();
   autoResize(document.getElementById('chatInput'));
+}
+
+/* 聊天输入框粘贴图片（Ctrl+V 直接贴图发送）
+ * - 检测到图片则阻止默认粘贴（避免把文件名/字节塞进文本框），并复用附件上传通道
+ * - 纯文本粘贴不拦截，保持原样
+ * - 支持一次粘贴多张图片 */
+function onChatPaste(e){
+  var cd = (e && e.clipboardData) || window.clipboardData || null;
+  if(!cd || !cd.items) return;            // 无剪贴板数据：交给浏览器默认行为
+  // 先同步收集所有图片文件，避免 items 在异步回调中失效
+  var files = [];
+  for(var i=0;i<cd.items.length;i++){
+    var it = cd.items[i];
+    if(it.kind === 'file' && /^image\//.test(it.type || '')){
+      var f = it.getAsFile();
+      if(f) files.push(f);
+    }
+  }
+  if(!files.length) return;              // 纯文本/非图片：不拦截，允许默认粘贴
+  e.preventDefault();                     // 检测到图片：阻止文本域写入原始数据
+  files.forEach(function(f){
+    var fd = new FormData(); fd.append('file', f);
+    var hdrs = {}; if(monitorToken) hdrs['X-Monitor-Token'] = monitorToken;
+    fetch(apiUrl('/api/chat/upload-image'), { method:'POST', body:fd, headers:hdrs })
+      .then(function(r){ return r.json(); })
+      .then(function(out){
+        if(out && !out.error && out.url){
+          _pendingAttachments.push({ url:out.url, type:f.type, name:(f.name || 'pasted.png') });
+          renderAttachChips();
+          autoResize(document.getElementById('chatInput'));
+        } else {
+          toast('图片上传失败：'+(out && out.error || '未知错误'));
+        }
+      })
+      .catch(function(){ toast('图片上传失败'); });
+  });
 }
 
 /* ============================ Mini Popup ============================ */
