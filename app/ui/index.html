@@ -197,7 +197,7 @@
     .tab:hover{color:var(--text)}
     .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
     .connector-grid, .ext-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-    .connector-card, .ext-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:14px;transition:all .15s;cursor:pointer;display:flex;flex-direction:column}
+    .connector-card, .ext-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:14px;transition:all .15s;cursor:pointer;display:flex;flex-direction:column;height:100%}
     .connector-card:hover, .ext-card:hover{background:var(--bg2);border-color:var(--accent);box-shadow:0 4px 12px rgba(0,0,0,.06)}
     .connector-card .top, .ext-card .top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
     .connector-card .icon, .ext-card .icon{width:40px;height:40px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
@@ -206,7 +206,7 @@
     .connector-card .status, .ext-card .status{font-size:12px;color:var(--text3);margin-top:4px}
     .connector-card .status.on, .ext-card .status.on{color:#16a34a}
     .connector-card .status.off, .ext-card .status.off{color:var(--text3)}
-    .connector-card .action, .ext-card .action, .ov-logbtn{margin-top:12px;width:100%;padding:7px 0;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);text-align:center}
+    .connector-card .action, .ext-card .action, .ov-logbtn{margin-top:auto;width:100%;padding:7px 0;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);text-align:center}
     .connector-card .action:hover, .ext-card .action:hover, .ov-logbtn:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
     .ov-logbtn{margin-top:0;width:auto;padding:6px 12px}
     .connector-card .badge{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:500;background:var(--bg3);color:var(--text3)}
@@ -333,12 +333,15 @@
 .section-head{display:flex;align-items:center;justify-content:space-between}
 .section-head h2{margin:0;font-size:16px}
 .provider-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.provider-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s}
+.provider-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column}
 .provider-card:hover{border-color:var(--accent);box-shadow:0 4px 12px rgba(0,0,0,.06)}
 .provider-card.active{border-color:var(--accent);background:var(--accent-bg)}
 .provider-card .name{font-size:14px;font-weight:600}
 .provider-card .model{font-size:12px;color:var(--text3);margin-top:4px}
 .provider-card .meta{font-size:11px;color:var(--text3);margin-top:8px;display:flex;gap:10px}
+.provider-card .status{margin-top:auto;padding-top:10px;font-size:12px}
+.provider-card .status.on{color:#16a34a}
+.provider-card .status.off{color:var(--accent);cursor:pointer}
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px}
 .modal-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
@@ -398,6 +401,20 @@
 body.theme-dark .gh-button{background:#1e3a8a;color:#bfdbfe;border-color:#1e40af}
 body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 
+/* ===== V17.1 新增：专家计数 / 工作流 / 角色管理 ===== */
+.exp-count{font-size:12px;color:var(--text3);margin:0 0 10px}
+.exp-dept .cnt{font-size:11px;color:var(--text3);margin-left:4px}
+.wf-intro{font-size:13px;color:var(--text2);margin-bottom:12px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.5}
+.ext-card.active{border-color:var(--accent);background:var(--accent-bg)}
+.persona-actions{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap}
+.persona-actions .action{margin-top:0;width:auto;flex:1;min-width:60px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:12px;cursor:pointer;color:var(--text);text-align:center}
+.persona-actions .action:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
+.persona-actions .action.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.persona-actions .action.primary:hover{opacity:.9}
+.persona-actions .action.danger{color:var(--red);border-color:var(--red)}
+.persona-actions .action.danger:hover{background:rgba(239,68,68,.1)}
+.modal-body textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);resize:vertical;font-family:inherit}
+
 </style>
 <script src="scripts/marked.min.js"></script>
 <script src="scripts/purify.min.js"></script>
@@ -424,7 +441,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
     <header class="global-topbar">
       <div class="left">
         <div class="brand-logo">Hermes</div>
-        <span class="brand-ver">v0.20.42</span>
+        <span class="brand-ver">v0.20.43</span>
       </div>
       <div class="right">
         <button class="glob-btn" title="在新标签打开" onclick="openNewWindow()">
@@ -482,30 +499,6 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 
           <div class="chat-body" id="chatBody">
             <div class="system-tip">系统已注入「默认主力助手」角色设定，不会写入对话历史</div>
-            <div class="msg assistant">
-              <div class="msg-bubble">你好，我是 Hermes Agent，运行在你 NAS 上的 AI 助手。有什么可以帮你的？</div>
-              <div class="msg-meta">Hermes · 刚刚</div>
-            </div>
-            <div class="msg user">
-              <div class="msg-bubble">帮我梳理一下下周的迭代计划</div>
-              <div class="msg-meta">你 · 刚刚</div>
-            </div>
-            <div class="msg assistant">
-              <div class="msg-bubble">好的，我们可以从这几个维度来梳理：1）功能交付 2）Bug 修复 3）文档与发布...</div>
-              <div class="msg-meta">Hermes · 刚刚</div>
-            </div>
-            <div class="msg assistant">
-              <div class="msg-bubble">
-                <div>我先检查一下 NAS 的磁盘空间。</div>
-                <div class="tool-call">
-                  <div class="tool-head"><span class="tool-icon">⌨️</span><span class="tool-name">终端 / 进程</span><span class="tool-status">已执行</span></div>
-                  <div class="tool-cmd">df -h</div>
-                  <div class="tool-out">Filesystem      Size  Used Avail Use% Mounted on
-/dev/sda1       1.8T  320G  1.4T  19% /</div>
-                </div>
-              </div>
-              <div class="msg-meta">Hermes · 刚刚</div>
-            </div>
           </div>
 
           <div class="chat-composer" id="chatComposer">
@@ -532,7 +525,6 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <section class="page" id="page-overview">
           <div class="page-header"><h1>概览</h1></div>
           <div class="page-body">
-            <div class="local-banner">ℹ️ 概览页实时反映后端服务状态、版本与日志；可直接启停服务。</div>
 <div class="overview-wrap">
   <div class="ov-header">
     <div class="ov-title">服务状态</div>
@@ -549,7 +541,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <div class="ov-metric"><span>运行</span><strong id="sysUptime">8小时 0分钟</strong></div>
         <div class="ov-metric"><span>内存</span><strong id="sysMem">82 MB</strong></div>
         <div class="ov-metric"><span>Hermes 版本</span><strong>v0.19.0 (2026.7.20)</strong></div>
-        <div class="ov-metric"><span>应用版本</span><strong>v0.20.42</strong></div>
+        <div class="ov-metric"><span>应用版本</span><strong>v0.20.43</strong></div>
       </div>
       <div class="ov-logbar">
         <button class="ov-logbtn" onclick="appendLog('monitor','Monitor 日志')">Monitor 日志</button>
@@ -611,8 +603,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <section class="page" id="page-models">
           <div class="page-header"><h1>模型</h1></div>
           <div class="page-body">
-            <div class="local-banner">ℹ️ 配置模型 Provider 后保存即写入后端，重启网关后生效。</div>
-<div class="settings-section">
+            <div class="settings-section">
   <div class="section-head"><h2>LLM Provider</h2><button class="ov-actbtn" onclick="openProviderModal()">+ 添加 Provider</button></div>
   <div class="provider-grid" id="providerGrid"></div>
 </div>
@@ -632,8 +623,24 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
       </div>
     </div>
     <div class="modal-foot">
+      <button class="action" onclick="fetchProviderModels()">获取模型</button>
       <button class="action" onclick="testProvider()">测试连接</button>
       <button class="action primary" onclick="saveProvider()">保存</button>
+    </div>
+  </div>
+</div>
+<div id="personaModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closePersonaModal()">
+  <div class="modal-panel">
+    <div class="modal-head"><h3 id="personaModalTitle">添加角色</h3><button class="modal-close" onclick="closePersonaModal()">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="personaEditId">
+      <div class="field"><label>图标 Emoji</label><input type="text" id="personaEmoji" placeholder="🤖" maxlength="4"></div>
+      <div class="field"><label>角色名称</label><input type="text" id="personaLabel" placeholder="如：代码重构专家"></div>
+      <div class="field"><label>角色介绍 / 系统提示词</label><textarea id="personaPrompt" rows="6" placeholder="描述这个角色的职责与人格，将作为 system 提示注入对话"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="action" id="personaDeleteBtn" style="display:none" onclick="deletePersona()">删除</button>
+      <button class="action primary" onclick="savePersona()">保存</button>
     </div>
   </div>
 </div>
@@ -644,8 +651,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <section class="page" id="page-extensions">
           <div class="page-header"><h1>扩展</h1></div>
           <div class="page-body">
-            <div class="local-banner">ℹ️ 扩展变更保存后即时写入后端；工具集/记忆等部分需重启网关生效。</div>
-<div class="ch-filterbar ext-tabs" id="extTabs">
+            <div class="ch-filterbar ext-tabs" id="extTabs">
   <button class="ch-filter active" onclick="extSwitchTab(this,'tools')">工具</button>
   <button class="ch-filter" onclick="extSwitchTab(this,'skills')">技能</button>
   <button class="ch-filter" onclick="extSwitchTab(this,'workflow')">工作流</button>
@@ -664,6 +670,9 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
     <div class="skill-grid" id="skillGrid"></div>
   </div>
   <div class="ext-pane" id="ext-workflow">
+    <div class="wf-intro">从下方预设模板一键应用工作流，或开启自定义 DAG 编排。</div>
+    <div class="ch-filterbar" id="wfCats"></div>
+    <div class="channel-grid" id="wfGrid"></div>
     <div class="wf-card"><h3>DAG 工作流编排</h3><p class="desc">启用后可通过 agency-orchestrator 编排多智能体 DAG。</p><div class="setting-row"><div><div class="label">启用工作流编排</div></div><div class="toggle" id="wfToggle" onclick="toggleWorkflow()"></div></div></div>
   </div>
   <div class="ext-pane" id="ext-memory">
@@ -671,10 +680,12 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
     <div class="field"><label>记忆字符上限</label><input type="range" id="memLimit" min="500" max="8000" step="100" value="2200" oninput="updateMemLimit(this.value)"><span id="memLimitVal">2200</span></div>
   </div>
   <div class="ext-pane" id="ext-agents">
+    <div class="section-head"><h2>智能体 / 角色</h2><button class="ov-actbtn" onclick="openPersonaModal(null)">+ 添加角色</button></div>
     <div class="persona-grid" id="personaGrid"></div>
   </div>
   <div class="ext-pane" id="ext-experts">
     <div class="exp-search"><input type="text" id="expSearch" placeholder="搜索专家..." oninput="renderExperts()"></div>
+    <div class="exp-count" id="expCount"></div>
     <div class="exp-depts" id="expDepts"></div>
     <div class="expert-grid" id="expertGrid"></div>
   </div>
@@ -690,8 +701,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <section class="page" id="page-comm">
           <div class="page-header"><h1>通讯</h1></div>
           <div class="page-body">
-            <div class="local-banner">ℹ️ 配置渠道凭证后将写入本机 ~/.hermes，保存后需重启网关生效。</div>
-<div class="ch-filterbar">
+            <div class="ch-filterbar">
   <button class="ch-filter active" onclick="setChFilter(this,'all')">全部</button>
   <button class="ch-filter" onclick="setChFilter(this,'configured')">已配置</button>
   <button class="ch-filter" onclick="setChFilter(this,'unconfigured')">未配置</button>
@@ -714,7 +724,6 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <section class="page" id="page-connectors">
           <div class="page-header"><h1>连接器</h1></div>
           <div class="page-body">
-            <div class="local-banner">ℹ️ 连接器凭证加密保存于本机；远程 MCP 类型保存后自动注册到网关。</div>
             <div class="ch-filterbar">
               <button class="ch-filter active" onclick="setConnFilter(this,'all')">全部</button>
               <button class="ch-filter" onclick="setConnFilter(this,'configured')">已配置</button>
@@ -738,8 +747,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <section class="page" id="page-updates">
           <div class="page-header"><h1>更新</h1></div>
           <div class="page-body">
-            <div class="local-banner">ℹ️ 更新将从官方源拉取并自动重启相关服务，期间服务会短暂中断。</div>
-<div class="update-grid">
+            <div class="update-grid">
   <div class="update-card">
     <div class="update-title">Hermes 核心</div>
     <div class="update-ver">当前 <strong>v0.19.0</strong> · 最新 <strong id="hermesLatest">v0.19.0</strong></div>
@@ -748,7 +756,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
   </div>
   <div class="update-card">
     <div class="update-title">Hermes Agent 应用</div>
-    <div class="update-ver">当前 <strong>v0.20.42</strong> · 最新 <strong id="appLatest">v0.20.42</strong></div>
+    <div class="update-ver">当前 <strong>v0.20.43</strong> · 最新 <strong id="appLatest">v0.20.43</strong></div>
     <button class="ov-actbtn" onclick="checkAppUpdate()">检查更新</button>
     <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">更新到最新</button>
   </div>
@@ -761,7 +769,6 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <section class="page" id="page-settings">
           <div class="page-header"><h1>设置</h1></div>
           <div class="page-body">
-            <div class="local-banner">ℹ️ 界面偏好（自动输入指示、消息音效等）保存在本机浏览器，刷新后仍生效。</div>
             <div class="settings-list">
               <div class="setting-row"><div><div class="label">自动发送 typing 指示器</div><div class="desc">在 WebChat 中显示「对方正在输入」</div></div><div class="toggle on" data-key="auto_typing"></div></div>
               <div class="setting-row"><div><div class="label">记住上次选择的模型</div><div class="desc">新建会话时默认使用上次模型</div></div><div class="toggle" data-key="remember_model"></div></div>
@@ -825,11 +832,29 @@ PV.agents = [
   ]}
 ];
 
+// 常见 LLM Provider 预设（base_url 为 OpenAI 兼容接口；留空 models 时可用「获取模型」从接口拉取）
 PV.providerPresets = {
-  hermes:{name:'Hermes 本地',base_url:'http://127.0.0.1:8080/v1',models:['hermes-3-llama-3.1-8b','hermes-3-llama-3.1-70b']},
-  openai:{name:'OpenAI',base_url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','o1-preview']},
-  anthropic:{name:'Anthropic',base_url:'https://api.anthropic.com/v1',models:['claude-3-5-sonnet-20241022','claude-3-opus-20240229']},
-  custom:{name:'自定义',base_url:'',models:[]}
+  hermes:{name:'Hermes 本地',base_url:'http://127.0.0.1:8080/v1',models:['hermes-3-llama-3.1-8b','hermes-3-llama-3.1-70b','hermes-3-llama-3.1-405b']},
+  openai:{name:'OpenAI',base_url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4-turbo','o1','o1-mini','o3','o3-mini']},
+  anthropic:{name:'Anthropic',base_url:'https://api.anthropic.com/v1',models:['claude-3-5-sonnet-20241022','claude-3-5-haiku-20241022','claude-3-opus-20240229','claude-3-7-sonnet-20250219','claude-sonnet-4-20250514','claude-opus-4-20250514']},
+  deepseek:{name:'DeepSeek',base_url:'https://api.deepseek.com/v1',models:['deepseek-chat','deepseek-reasoner']},
+  qwen:{name:'通义千问 Qwen',base_url:'https://dashscope.aliyuncs.com/compatible-mode/v1',models:['qwen-max','qwen-plus','qwen-turbo','qwen2.5-72b-instruct','qwen2.5-32b-instruct','qwen2.5-14b-instruct','qwen3-235b-a22b','qwen3-32b']},
+  moonshot:{name:'Moonshot Kimi',base_url:'https://api.moonshot.cn/v1',models:['moonshot-v1-8k','moonshot-v1-32k','moonshot-v1-128k','kimi-k2']},
+  zhipu:{name:'智谱 GLM',base_url:'https://open.bigmodel.cn/api/paas/v4',models:['glm-4-plus','glm-4-air','glm-4-airx','glm-4-flash','glm-4-long','glm-4v-plus']},
+  google:{name:'Google Gemini',base_url:'https://generativelanguage.googleapis.com/v1beta/openai',models:['gemini-2.0-flash','gemini-2.0-flash-lite','gemini-2.5-pro','gemini-2.5-flash','gemini-1.5-pro']},
+  ollama:{name:'Ollama (本机)',base_url:'http://localhost:11434/v1',models:['llama3.1','llama3.1:70b','qwen2.5','mistral','phi3','gemma2']},
+  groq:{name:'Groq',base_url:'https://api.groq.com/openai/v1',models:['llama-3.3-70b-versatile','llama-3.1-8b-instant','mixtral-8x7b-32768','gemma2-9b-it','llama-3.2-90b-vision-preview']},
+  mistral:{name:'Mistral',base_url:'https://api.mistral.ai/v1',models:['mistral-large-latest','mistral-small-latest','ministral-8b-latest','open-mistral-7b']},
+  siliconflow:{name:'硅基流动 SiliconFlow',base_url:'https://api.siliconflow.cn/v1',models:['Qwen/Qwen2.5-72B-Instruct','Qwen/Qwen2.5-32B-Instruct','deepseek-ai/DeepSeek-V3','deepseek-ai/DeepSeek-R1','meta-llama/Llama-3.3-70B-Instruct']},
+  volcengine:{name:'火山方舟 Volcengine',base_url:'https://ark.cn-beijing.volces.com/api/v3',models:['doubao-pro-32k','doubao-pro-256k','doubao-lite-32k','ep-xxx（你的 Endpoint ID）']},
+  minimax:{name:'MiniMax',base_url:'https://api.minimax.chat/v1',models:['abab6.5-chat','abab6.5s-chat','abab7-chat-preview']},
+  stepfun:{name:'阶跃星辰 StepFun',base_url:'https://api.stepfun.com/v1',models:['step-1v-8k','step-1v-32k','step-2-16k']},
+  baichuan:{name:'百川 Baichuan',base_url:'https://api.baichuan-ai.com/v1',models:['baichuan4','baichuan3-turbo','baichuan2-53b']},
+  together:{name:'Together AI',base_url:'https://api.together.xyz/v1',models:['meta-llama/Llama-3.3-70B-Instruct-Turbo','meta-llama/Llama-3.1-405B-Instruct-Turbo','Qwen/Qwen2.5-72B-Instruct-Turbo']},
+  openrouter:{name:'OpenRouter',base_url:'https://openrouter.ai/api/v1',models:['openai/gpt-4o','anthropic/claude-3.5-sonnet','google/gemini-pro-1.5','meta-llama/llama-3.1-405b-instruct']},
+  fireworks:{name:'Fireworks AI',base_url:'https://api.fireworks.ai/inference/v1',models:['accounts/fireworks/models/llama-v3p3-70b-instruct','accounts/fireworks/models/mixtral-8x22b-instruct']},
+  perplexity:{name:'Perplexity',base_url:'https://api.perplexity.ai',models:['sonar','sonar-pro','sonar-reasoning']},
+  azure:{name:'Azure OpenAI',base_url:'https://YOUR-RESOURCE.openai.azure.com/openai',models:['gpt-4o','gpt-4','gpt-35-turbo']}
 };
 
 PV.connectors = [
@@ -1475,9 +1500,11 @@ function buildMiniData(){
 }
 function expertsList(){
   if(window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length){
-    return window.AGENCY_PERSONAS.slice(0, 40).map(function(p){ return { id:p.id, name:p.name, dept:(p.dept||''), icon:(p.icon||'🎯') }; });
+    return window.AGENCY_PERSONAS.map(function(p){
+      return { id:p.id, name:(p.label||p.name||'未命名'), dept:(p.dept_label||p.dept||''), deptId:(p.dept||''), icon:(p.emoji||p.icon||'🎯') };
+    });
   }
-  return PV.experts;
+  return PV.experts.map(function(e){ return { id:e.id, name:e.name, dept:(e.dept||''), deptId:(e.dept||''), icon:(e.icon||'🎯') }; });
 }
 function openMini(btn, key){
   if(activeBtn===btn){ closeMini(); return; }
@@ -1806,6 +1833,33 @@ function fillModelOptions(selected){
   }
 }
 function onProviderPresetChange(){ fillModelOptions(''); }
+// 用后端 /api/config/test 返回的模型列表填充下拉（OpenAI 兼容 /models 接口）
+function fillModelOptionsFromList(list){
+  var sel=document.getElementById('providerModel');
+  var custom=document.getElementById('providerCustomModel');
+  if(!sel) return;
+  sel.innerHTML='';
+  (list||[]).forEach(function(mo){
+    var v = (typeof mo==='string') ? mo : (mo.id||mo.name);
+    var t = (typeof mo==='string') ? mo : (mo.name||mo.id);
+    if(!v) return;
+    var o=document.createElement('option'); o.value=v; o.textContent=t; sel.appendChild(o);
+  });
+  var oc=document.createElement('option'); oc.value='__custom__'; oc.textContent='自定义'; sel.appendChild(oc);
+  custom.style.display='block'; custom.value='';
+}
+// 从 Provider 的 /v1/models 接口拉取模型列表（经后端代理，规避 CORS）
+function fetchProviderModels(){
+  var provider=buildProviderObj();
+  if(!provider.base_url){ toast('请先填写 Base URL'); return; }
+  toast('正在获取模型列表…');
+  apiPost('/api/config/test', { provider: provider }).then(function(r){
+    var models=(r&&r.models)?r.models:[];
+    if(models.length){ fillModelOptionsFromList(models); toast('已获取 '+models.length+' 个模型'); }
+    else if(r&&r.error){ toast('获取失败：'+r.error); }
+    else toast('该端点未返回模型列表，可手动填写');
+  }).catch(function(e){ toast('获取失败：'+e.message); });
+}
 function toggleKeyVisibility(){
   var inp=document.getElementById('providerKey');
   inp.type = inp.type==='password' ? 'text' : 'password';
@@ -1814,9 +1868,11 @@ function testProvider(){
   var id=document.getElementById('providerId').value;
   var provider = buildProviderObj();
   apiPost('/api/config/test', { provider: provider }).then(function(r){
-    if(r && r.ok) toast('连接测试成功');
+    var models=(r&&r.models)?r.models:[];
+    if(r && r.ok){ toast('连接测试成功'); if(models.length) fillModelOptionsFromList(models); }
     else if(r && r.error) toast('测试失败：'+r.error);
-    else toast('测试接口未返回明确结果（可能暂不支持，保存后部署生效）');
+    else { toast('测试接口未返回明确结果（可能暂不支持，保存后部署生效）'); if(models.length) fillModelOptionsFromList(models); }
+    if(models.length) toast('已载入 '+models.length+' 个模型到下拉框');
   }).catch(function(e){ toast('测试请求失败：'+e.message); });
 }
 function buildProviderObj(){
@@ -1977,6 +2033,37 @@ function renderWorkflow(){
   var wf = _cfg.extensions.workflow;
   var on = !!(wf && (wf.enabled || (wf.steps && wf.steps.length)));
   setToggle('wfToggle', on);
+  renderWorkflowPresets();
+}
+var _wfCat='';
+function renderWorkflowPresets(){
+  var grid=document.getElementById('wfGrid'); if(!grid) return;
+  var presets = window.AO_WORKFLOW_PRESETS || [];
+  var cats=[{id:'',label:'全部'}];
+  presets.forEach(function(p){ if(p.category && !cats.some(function(c){return c.id===p.category;})) cats.push({id:p.category,label:p.category}); });
+  var catWrap=document.getElementById('wfCats');
+  if(catWrap){
+    catWrap.innerHTML = cats.map(function(c){ return '<button class="ch-filter'+(c.id===_wfCat?' active':'')+'" onclick="setWfCat(\''+esc(c.id)+'\')">'+esc(c.label)+'</button>'; }).join('');
+  }
+  var appliedKey = (_cfg.extensions.workflow && _cfg.extensions.workflow.key) || '';
+  grid.innerHTML = presets.filter(function(p){ return !_wfCat || p.category===_wfCat; }).map(function(p){
+    var applied = (p.key===appliedKey);
+    return '<div class="ext-card'+(applied?' active':'')+'">'+
+      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(p.name)+'</div><div class="status">'+(p.category||'通用')+(applied?' · 已应用':'')+'</div></div></div>'+
+      '<div class="conn-desc">'+esc(p.description||'')+'</div>'+
+      '<button class="action" onclick="applyWorkflow(\''+esc(p.key)+'\')">'+(applied?'重新应用':'应用')+'</button></div>';
+  }).join('') || '<div class="empty-state">暂无工作流模板。</div>';
+}
+function setWfCat(cat){ _wfCat=cat; renderWorkflowPresets(); }
+function applyWorkflow(key){
+  var p=(window.AO_WORKFLOW_PRESETS||[]).find(function(x){ return x.key===key; });
+  if(!p) return;
+  _cfg.extensions.workflow = {
+    key:p.key, name:p.name, description:p.description,
+    enabled:true, concurrency:(p.concurrency||2), category:(p.category||''),
+    inputs:(p.inputs||[]), steps:(p.steps||[])
+  };
+  saveConfig(); renderWorkflow(); toast('已应用工作流：'+p.name);
 }
 function toggleWorkflow(){
   var wf=_cfg.extensions.workflow;
@@ -2005,10 +2092,46 @@ function renderPersonas(){
   var personas=allPersonas();
   el.innerHTML = Object.keys(personas).map(function(k){
     var p=personas[k]; var active=(_persona===k);
-    return '<div class="ext-card" onclick="selectPersona(\''+k+'\')">'+
+    var isCustom = !EXT_PERSONAS[k];
+    return '<div class="ext-card" onclick="selectPersona(\''+esc(k)+'\')">'+
       '<div class="top"><div class="icon">'+(p.emoji||'🤖')+'</div><div><div class="name">'+esc(p.label||k)+'</div><div class="status '+(active?'on':'off')+'">'+(active?'当前角色':'点击切换')+'</div></div></div>'+
-      '<button class="action" onclick="event.stopPropagation();selectPersona(\''+k+'\')">'+(active?'已选择':'选择')+'</button></div>';
+      '<div class="conn-desc">'+esc((p.prompt||'').slice(0,60))+'</div>'+
+      '<div class="persona-actions">'+
+        '<button class="action sm" onclick="event.stopPropagation();openPersonaModal(\''+esc(k)+'\')">编辑</button>'+
+        (isCustom?'<button class="action sm danger" onclick="event.stopPropagation();deletePersona(\''+esc(k)+'\')">删除</button>':'')+
+        '<button class="action sm primary" onclick="event.stopPropagation();selectPersona(\''+esc(k)+'\')">'+(active?'已选择':'选择')+'</button>'+
+      '</div></div>';
   }).join('');
+}
+function openPersonaModal(id){
+  var m=document.getElementById('personaModal'); if(!m) return; m.style.display='flex';
+  document.getElementById('personaEditId').value = id||'';
+  document.getElementById('personaModalTitle').textContent = id? '编辑角色' : '添加角色';
+  var personas=allPersonas();
+  var p = id ? personas[id] : null;
+  document.getElementById('personaEmoji').value = p?(p.emoji||''):'🤖';
+  document.getElementById('personaLabel').value = p?(p.label||''):'';
+  document.getElementById('personaPrompt').value = p?(p.prompt||''):'';
+  document.getElementById('personaDeleteBtn').style.display = (id && !EXT_PERSONAS[id]) ? 'inline-block' : 'none';
+}
+function closePersonaModal(){ var m=document.getElementById('personaModal'); if(m) m.style.display='none'; }
+function savePersona(){
+  var id=document.getElementById('personaEditId').value;
+  var emoji=document.getElementById('personaEmoji').value.trim()||'🤖';
+  var label=document.getElementById('personaLabel').value.trim();
+  var prompt=document.getElementById('personaPrompt').value;
+  if(!label){ toast('请填写角色名称'); return; }
+  if(!_cfg.extensions.personas) _cfg.extensions.personas={};
+  if(!id){ id='custom_'+uid(); }
+  _cfg.extensions.personas[id]={ emoji:emoji, label:label, prompt:prompt };
+  saveConfig(); renderPersonas(); closePersonaModal(); toast('已保存角色：'+label);
+}
+function deletePersona(){
+  var id=document.getElementById('personaEditId').value;
+  if(!id) return;
+  if(_cfg.extensions.personas && _cfg.extensions.personas[id]){ delete _cfg.extensions.personas[id]; }
+  if(_persona===id){ _persona='default'; _cfg.extensions.persona='default'; try{ localStorage.setItem('hermes_persona','default'); }catch(e){} }
+  saveConfig(); renderPersonas(); closePersonaModal(); toast('已删除角色');
 }
 function selectPersona(id){
   _persona = id;
@@ -2019,33 +2142,33 @@ function selectPersona(id){
   try { localStorage.setItem('hermes_persona', id); } catch(e){}
   renderPersonas(); saveConfig();
 }
-var _expFilter='';
+var _expFilter=''; var _expDept='';
 function renderExperts(){
   var el=document.getElementById('expertGrid'); if(!el) return;
   var list = expertsList();
-  var depts={}; list.forEach(function(e){ depts[e.dept||'其他']=1; });
+  var cnt=document.getElementById('expCount'); if(cnt) cnt.textContent='共 '+list.length+' 位专家';
   var deptWrap=document.getElementById('expDepts');
-  if(deptWrap && !deptWrap.dataset.ready){
-    var dhtml='<div class="exp-dept active" onclick="filterDept(this,\'\')">全部</div>';
-    Object.keys(depts).forEach(function(d){ dhtml+='<div class="exp-dept" onclick="filterDept(this,\''+esc(d)+'\')">'+esc(d)+'</div>'; });
-    deptWrap.innerHTML=dhtml; deptWrap.dataset.ready='1';
+  var depts = (window.AGENCY_DEPTS && window.AGENCY_DEPTS.length) ? window.AGENCY_DEPTS : [];
+  if(deptWrap){
+    var dhtml='<div class="exp-dept'+(!_expDept?' active':'')+'" onclick="filterDept(this,\'\')">全部 <span class="cnt">'+list.length+'</span></div>';
+    depts.forEach(function(d){ dhtml+='<div class="exp-dept'+(d.id===_expDept?' active':'')+'" onclick="filterDept(this,\''+esc(d.id)+'\')">'+esc(d.label||d.id)+' <span class="cnt">'+esc(d.count||'')+'</span></div>'; });
+    deptWrap.innerHTML=dhtml;
   }
   var term=(document.getElementById('expSearch')?document.getElementById('expSearch').value:'').toLowerCase();
-  var activeDept=document.querySelector('.exp-dept.active');
-  var dept=activeDept?activeDept.dataset.dept||'':'';
   var team=_cfg.extensions.team||[];
   el.innerHTML = list.filter(function(e){
-    return (!dept || (e.dept||'其他')===dept) && (!term || (e.name||'').toLowerCase().indexOf(term)>=0);
+    return (!_expDept || (e.deptId||'')===_expDept) && (!term || (e.name||'').toLowerCase().indexOf(term)>=0);
   }).map(function(e){
     var inTeam = team.some(function(m){ return m.id===e.id; });
     return '<div class="ext-card" onclick="useExpert(\''+esc(e.id)+'\')">'+
       '<div class="top"><div class="icon">'+(e.icon||'🎯')+'</div><div><div class="name">'+esc(e.name)+'</div><div class="status">'+esc(e.dept||'')+'</div></div></div>'+
       '<button class="action" onclick="event.stopPropagation();useExpert(\''+esc(e.id)+'\')">'+(inTeam?'已加入':'加入团队')+'</button></div>';
-  }).join('');
+  }).join('') || '<div class="empty-state">没有匹配的专家。</div>';
 }
 function filterDept(el, dept){
+  _expDept=dept;
   document.querySelectorAll('.exp-dept').forEach(function(d){ d.classList.remove('active'); });
-  el.classList.add('active'); el.dataset.dept=dept;
+  el.classList.add('active');
   renderExperts();
 }
 function useExpert(id){
@@ -2068,11 +2191,14 @@ function renderTeam(){
 }
 function buildTeam(){
   _cfg.extensions.team_name = (document.getElementById('teamName').value)||'我的团队';
-  var list=expertsList();
   var ids;
-  if(window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length) ids=window.AGENCY_PERSONAS.slice(0,6);
-  else ids=PV.experts.slice(0,3);
-  _cfg.extensions.team = ids.map(function(p){ return { id:p.id, name:p.name, dept:p.dept, icon:p.icon }; });
+  if(window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length){
+    // 每个部门取一位代表，拼出跨领域团队
+    ids = window.AGENCY_PERSONAS.filter(function(p,i,a){ return a.findIndex(function(q){ return q.dept===p.dept; })===i; }).slice(0,6);
+  } else {
+    ids=PV.experts.slice(0,3);
+  }
+  _cfg.extensions.team = ids.map(function(p){ return { id:p.id, name:(p.label||p.name), dept:(p.dept_label||p.dept), icon:(p.emoji||p.icon) }; });
   renderTeam(); saveConfig(); toast('已组建团队（'+_cfg.extensions.team.length+' 人）');
 }
 function clearTeam(){ _cfg.extensions.team=[]; renderTeam(); saveConfig(); }
@@ -2297,6 +2423,12 @@ function openChannelModal(id){
   }
   footHtml+='<button class="action primary" onclick="saveChannel()">保存</button>';
   foot.innerHTML=footHtml;
+  // 扫码类渠道：打开即自动弹出二维码（无需再点一次）
+  if(def.qrLogin){
+    if(id==='telegram') setTimeout(chStartTelegramQr,60);
+    else if(id==='whatsapp') setTimeout(chStartWhatsAppQr,60);
+    else if(id==='weixin') setTimeout(chStartWeixinQr,60);
+  }
 }
 function chToggle(path){ var el=document.getElementById('cht_'+path); if(el) el.classList.toggle('on'); }
 function closeChannelModal(){ var m=document.getElementById('channelModal'); if(m) m.style.display='none'; _currentChId=null; }
