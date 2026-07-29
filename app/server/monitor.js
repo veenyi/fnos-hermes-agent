@@ -3157,6 +3157,45 @@ async function handleFetch(req) {
     return out.join("\n");
   }
 
+  // ── 健壮替换/删除 config.yaml 顶层块（消除重复顶层键，根因修复）──
+  // newBlock 为空（falsy 或纯空白）表示「删除该顶层块」；否则整体替换为 newBlock（不含尾随换行）。
+  // 同时兼容 block 形态（key: 换行缩进）与 inline 形态（key: {…} / key: value），
+  // 并跳过所有重复的顶层键——重复的 model:/providers: 正是网关报
+  // "No inference provider configured" 进而 Dashboard 502 的根因。
+  function _isTopLevelKey(line, key) {
+    if (/^\s/.test(line)) return false;          // 缩进的行不是顶层键
+    if (line === key + ":") return true;
+    if (line.startsWith(key + ":")) return true; // 含 inline 形态 key: value / key: {…}
+    return false;
+  }
+  function _setTopLevelBlock(content, key, newBlock) {
+    const lines = content.split("\n");
+    const out = [];
+    let inserted = false;
+    const removeOnly = !newBlock || !String(newBlock).trim();
+    let firstIdx = -1;
+    for (let k = 0; k < lines.length; k++) {
+      if (_isTopLevelKey(lines[k], key)) { firstIdx = k; break; }
+    }
+    for (let k = 0; k < lines.length; k++) {
+      const line = lines[k];
+      if (_isTopLevelKey(line, key)) {
+        const isFirst = (k === firstIdx);
+        if (isFirst && !inserted && !removeOnly) { out.push(newBlock); inserted = true; }
+        // 跳过该顶层块的整段（block: 后续缩进行；inline: 仅本行）
+        if (line === key + ":") {
+          let j = k + 1;
+          while (j < lines.length && (lines[j].startsWith(" ") || lines[j].startsWith("\t"))) j++;
+          k = j - 1; // for 循环会执行 k++
+        }
+        continue;
+      }
+      out.push(line);
+    }
+    if (!inserted && !removeOnly) out.push(newBlock); // 无任何现存块：追加到末尾
+    return out.join("\n");
+  }
+
   function _expandHome(p){
     if (!p) return p;
     if (p === "~") return (process.env.HOME || process.env.USERPROFILE || "");
@@ -4522,13 +4561,17 @@ async function handleFetch(req) {
         return new Response(JSON.stringify({ ok: false, error: "invalid JSON body" }), { status: 400, headers: jsonHeaders() });
       }
 
-      // ── 找到 active provider ─────────────────────────────────────────────────
-      const activeProv = (body.providers || []).find(p =>
-        p.name === body.active_provider
+      // ── 找到 active provider（按 name 或 id 匹配；有 provider 时兜底取第一个，
+      // 避免「no active provider」导致配置完全不落盘、网关一直 502）──
+      let activeProv = (body.providers || []).find(p =>
+        p.name === body.active_provider || String(p.id) === String(body.active_provider)
       );
+      if (!activeProv && (body.providers || []).length) activeProv = (body.providers || [])[0];
       if (!activeProv || !activeProv.id) {
         return new Response(JSON.stringify({ ok: false, error: "no active provider" }), { status: 400, headers: jsonHeaders() });
       }
+      // 同步修正 body.active_provider，保证 providers-state.yaml / chat/config.json 一致
+      if (body.active_provider !== activeProv.name) body.active_provider = activeProv.name;
       const providerId = String(activeProv.id).trim();
 
       // ── 收集所有 provider 的模型 + base_url + 自定义名称 ────────────────────────
@@ -4682,47 +4725,12 @@ async function handleFetch(req) {
         let ymlContent = existsSync(yamlPath) ? readFileSync(yamlPath, "utf8") : "";
         // model.provider 经 PROVIDER_HERMES_IDS 映射（openai → openai-api，其余用自身 id）
         const hermesProvider = PROVIDER_HERMES_IDS[providerId] || providerId;
-        const newModel = `model:\n  provider: ${hermesProvider}\n  default: ${resolvedModel}\n`;
-        const modelRegex = /^model:[\t ]*\n(?:[\t ]+[^\n]*\n)*/m;
-        if (ymlContent.match(modelRegex)) {
-          ymlContent = ymlContent.replace(modelRegex, newModel);
-        } else {
-          ymlContent = newModel + "\n" + ymlContent;
-        }
-
-        // 同步 providers: 段——兼容模板里的 `providers: {}` 空映射与已存在的多行块两种形态，
-        // 避免产生重复的 providers 顶层键。无非 hermes 条目时整段删除 providers 节。
-        const _NL = String.fromCharCode(10);
-        const _TAB = String.fromCharCode(9);
-        const _yl = ymlContent.split(_NL);
-        let _ps = -1;
-        for (let _i = 0; _i < _yl.length; _i++) {
-          if (_yl[_i].indexOf("providers:") === 0) { _ps = _i; break; }
-        }
-        if (_ps >= 0) {
-          let _pe = _ps + 1;
-          while (_pe < _yl.length && (_yl[_pe].startsWith(" ") || _yl[_pe].startsWith(_TAB))) _pe++;
-          const _before = _yl.slice(0, _ps).join(_NL);
-          const _after = _yl.slice(_pe).join(_NL);
-          if (providersBlock) {
-            ymlContent = (_before ? _before + _NL : "") + providersBlock + _after;
-          } else {
-            // 无 B/custom 条目：纯删除原 providers 段，仅拼接 _before + _after
-            ymlContent = _before + (_after ? _NL + _after : _NL);
-          }
-        } else if (providersBlock) {
-          // 将 providers 段插入 model 段正下方（而非追加到文件末尾）
-          const _modelBlockRe = /(^model:[\t ]*\n(?:[\t ]+[^\n]*\n)*)/m;
-          const _modelMatch = ymlContent.match(_modelBlockRe);
-          if (_modelMatch) {
-            const _insertPos = _modelMatch.index + _modelMatch[0].length;
-            ymlContent = ymlContent.slice(0, _insertPos) + providersBlock + ymlContent.slice(_insertPos);
-          } else {
-            // model 段也不存在时，退化为插到文件开头
-            ymlContent = providersBlock + ymlContent;
-          }
-        }
-
+        const newModel = `model:\n  provider: ${hermesProvider}\n  default: ${resolvedModel}`;
+        // 用单一可靠函数替换 model / providers 顶层块：兼容 inline 与 block 两种形态，
+        // 且无论文件里残留多少重复顶层键（重复 model:/providers: 是「No inference provider configured」的根因），
+        // 都只保留我们写入的这一份，彻底消除配置漂移导致的网关 502。
+        ymlContent = _setTopLevelBlock(ymlContent, "model", newModel);
+        ymlContent = _setTopLevelBlock(ymlContent, "providers", providersBlock ? providersBlock.trimEnd() : "");
         writeFileSync(yamlPath, ymlContent);
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: "write config.yaml: " + e.message }), { status: 500, headers: jsonHeaders() });
