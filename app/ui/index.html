@@ -4629,44 +4629,32 @@ PV.experts = [
   {id:'e8',name:'数据分析师',dept:'数据',icon:'📊'}
 ];
 
+// 仅保留 Hermes 消息网关官方支持的斜杠命令（来源：hermesagent.org.cn/docs/reference/slash-commands）
+// 移除所有不存在的伪命令（/token /continue /compact /list /switch /rename /delete /pin /clear /tools /skills /agents /personas /memory /config /debug /channels /broadcast /mcp /version /history）
 PV.quickGroups = [
-  {title:'核心命令',commands:[
-    {ico:'📊',title:'会话状态',cmd:'/status',sub:'查看当前会话元数据'},
-    {ico:'🎛️',title:'切换模型',cmd:'/model [provider:model]',sub:'临时切换模型'},
-    {ico:'💬',title:'新对话',cmd:'/new [title]',sub:'创建新会话'},
-    {ico:'🗜️',title:'压缩记忆',cmd:'/compact',sub:'压缩长期记忆'},
+  {title:'会话控制',commands:[
+    {ico:'💬',title:'新对话',cmd:'/new [title]',sub:'开始新对话'},
+    {ico:'🔄',title:'重置会话',cmd:'/reset',sub:'重置对话历史'},
     {ico:'🛑',title:'停止生成',cmd:'/stop',sub:'终止当前输出'},
-    {ico:'📈',title:'对话统计',cmd:'/history',sub:'查看本轮对话统计'},
-    {ico:'🪙',title:'Token 用量',cmd:'/token',sub:'查看 token 消耗'},
-    {ico:'🔁',title:'重新生成',cmd:'/retry',sub:'重新生成最后回复'},
-    {ico:'▶️',title:'继续生成',cmd:'/continue',sub:'继续被截断的回复'},
-    {ico:'🔄',title:'重置会话',cmd:'/reset',sub:'重置当前会话上下文'}
+    {ico:'🔁',title:'重新生成',cmd:'/retry',sub:'重试上一条消息'},
+    {ico:'↩️',title:'撤销',cmd:'/undo',sub:'删除最后一条交互'},
+    {ico:'🗜️',title:'压缩上下文',cmd:'/compress',sub:'手动压缩对话上下文'},
+    {ico:'🏷️',title:'设置标题',cmd:'/title [名称]',sub:'设置或显示会话标题'}
   ]},
-  {title:'会话管理',commands:[
-    {ico:'📋',title:'会话列表',cmd:'/list',sub:'列出所有会话'},
-    {ico:'🔀',title:'切换会话',cmd:'/switch <short_id>',sub:'切换到指定会话'},
-    {ico:'📂',title:'恢复会话',cmd:'/resume [short_id]',sub:'恢复历史会话'},
-    {ico:'🏷️',title:'设置标题',cmd:'/title <text>',sub:'修改当前会话标题'},
-    {ico:'✏️',title:'重命名',cmd:'/rename <text>',sub:'重命名当前会话'},
-    {ico:'🗑️',title:'删除会话',cmd:'/delete <short_id>',sub:'删除指定会话'},
-    {ico:'📌',title:'置顶会话',cmd:'/pin',sub:'置顶当前会话'},
-    {ico:'🧹',title:'清空历史',cmd:'/clear',sub:'清空当前会话历史'}
+  {title:'模型与个性化',commands:[
+    {ico:'📊',title:'会话状态',cmd:'/status',sub:'显示会话信息'},
+    {ico:'🎛️',title:'切换模型',cmd:'/model [provider:model]',sub:'显示或更改模型'},
+    {ico:'🏭',title:'提供方状态',cmd:'/provider',sub:'显示提供者可用性'},
+    {ico:'🎭',title:'设置人格',cmd:'/personality [名称]',sub:'为会话设置个性叠加层'},
+    {ico:'🧠',title:'推理强度',cmd:'/reasoning [level|show|hide]',sub:'更改推理强度或显示'}
   ]},
-  {title:'工具与技能',commands:[
-    {ico:'🧰',title:'列出工具',cmd:'/tools',sub:'查看可用工具'},
-    {ico:'🎨',title:'列出技能',cmd:'/skills',sub:'查看可用技能'},
-    {ico:'🧑‍💻',title:'列出专家',cmd:'/agents',sub:'查看可用专家'},
-    {ico:'🎭',title:'列出角色',cmd:'/personas',sub:'查看可用角色'},
-    {ico:'🧠',title:'查看记忆',cmd:'/memory',sub:'查看长期记忆摘要'},
-    {ico:'⚙️',title:'查看配置',cmd:'/config',sub:'查看当前配置'}
-  ]},
-  {title:'系统',commands:[
-    {ico:'❓',title:'帮助',cmd:'/help',sub:'显示命令帮助'},
-    {ico:'🐛',title:'调试信息',cmd:'/debug',sub:'输出调试信息'},
-    {ico:'📡',title:'通讯渠道',cmd:'/channels',sub:'查看渠道状态'},
-    {ico:'📢',title:'广播消息',cmd:'/broadcast <msg>',sub:'向所有渠道广播'},
-    {ico:'🔌',title:'MCP 服务器',cmd:'/mcp',sub:'查看 MCP 服务器状态'},
-    {ico:'ℹ️',title:'版本信息',cmd:'/version',sub:'查看 Hermes 版本'}
+  {title:'工具与信息',commands:[
+    {ico:'🪙',title:'Token 用量',cmd:'/usage',sub:'显示令牌使用情况'},
+    {ico:'📈',title:'使用洞察',cmd:'/insights [天数]',sub:'显示使用情况分析'},
+    {ico:'📝',title:'编写计划',cmd:'/plan [请求]',sub:'加载 plan 技能编写计划'},
+    {ico:'🔌',title:'重载 MCP',cmd:'/reload-mcp',sub:'从配置重新加载 MCP 服务器'},
+    {ico:'⚡',title:'YOLO 模式',cmd:'/yolo',sub:'跳过危险命令确认'},
+    {ico:'❓',title:'帮助',cmd:'/help',sub:'显示命令帮助'}
   ]}
 ];
 
@@ -5462,29 +5450,16 @@ function handleSlashCommand(cmd){
     return;
   }
   if(base==='/help'){
-    appendSystemMessage('可用快捷指令：/new 新对话、/stop 停止生成、/reset 重置会话、/status 查看状态、/help 帮助。其他命令将直接发送给 AI。');
+    appendSystemMessage('可用命令（与 Hermes 消息网关一致）：/new 新对话、/reset 重置、/stop 停止生成、/retry 重生成、/undo 撤销、/compress 压缩上下文、/title 设置标题、/status 状态、/model 切换模型、/provider 提供方、/personality 人格、/reasoning 推理、/usage 用量、/insights 洞察、/plan 计划、/reload-mcp 重载MCP、/yolo YOLO、/help 帮助。未在此列出的命令将直接转发给 Hermes 网关按斜杠命令执行。');
     return;
   }
-  // 其余命令直接发送给 AI（带提示前缀以便模型理解）
-  sendRaw('执行命令：' + cmd);
+  // 其余为 Hermes 真实斜杠命令，原样转发给网关执行（不加“执行命令：”前缀，避免被当作普通文本）
+  sendRaw(cmd);
 }
 function appendSystemMessage(text){
   var body=document.getElementById('chatBody'); if(!body) return;
   var div=document.createElement('div'); div.className='system-tip'; div.textContent=text;
   body.appendChild(div); body.scrollTop=body.scrollHeight;
-}
-function quickReply(cmd){
-  if(cmd==='/status') return '当前会话状态：模型=自动，记忆=开启，工具集=hermes-cli+delegation。';
-  if(cmd==='/stop') return '已停止当前生成。';
-  if(cmd==='/compact') return '记忆已压缩。';
-  if(cmd==='/history') return '本轮会话：用户 3 条，助手 3 条，工具调用 1 次。';
-  if(cmd==='/token') return '本轮 token：输入 1.2k，输出 0.8k，累计 2.0k。';
-  if(cmd==='/new') return '已创建新会话。';
-  if(cmd==='/retry') return '正在重新生成上一条回复...';
-  if(cmd==='/continue') return '继续之前的回复...';
-  if(cmd==='/reset') return '当前会话上下文已重置。';
-  if(cmd==='/help') return '可用命令：/status /model /new /compact /stop /history /list /switch /clear /tools /skills /agents /memory /config /help 等。';
-  return '收到命令 <code>'+esc(cmd)+'</code>，正在处理...';
 }
 
 /* ============================ Router ============================ */
