@@ -441,7 +441,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
     <header class="global-topbar">
       <div class="left">
         <div class="brand-logo">Hermes</div>
-        <span class="brand-ver">v0.20.43</span>
+        <span class="brand-ver" id="brandVer">--</span>
       </div>
       <div class="right">
         <button class="glob-btn" title="在新标签打开" onclick="openNewWindow()">
@@ -538,10 +538,10 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <button class="ov-refresh" onclick="refreshSysInfo()" title="刷新">↻</button>
       </div>
       <div class="ov-card-body sys-metrics">
-        <div class="ov-metric"><span>运行</span><strong id="sysUptime">8小时 0分钟</strong></div>
-        <div class="ov-metric"><span>内存</span><strong id="sysMem">82 MB</strong></div>
-        <div class="ov-metric"><span>Hermes 版本</span><strong>v0.19.0 (2026.7.20)</strong></div>
-        <div class="ov-metric"><span>应用版本</span><strong>v0.20.43</strong></div>
+        <div class="ov-metric"><span>运行</span><strong id="sysUptime">--</strong></div>
+        <div class="ov-metric"><span>内存</span><strong id="sysMem">--</strong></div>
+        <div class="ov-metric"><span>Hermes 版本</span><strong id="sysHermesVer">--</strong></div>
+        <div class="ov-metric"><span>应用版本</span><strong id="sysAppVer">--</strong></div>
       </div>
       <div class="ov-logbar">
         <button class="ov-logbtn" onclick="appendLog('monitor','Monitor 日志')">Monitor 日志</button>
@@ -591,9 +591,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <div class="ov-refresh-toggle"><span>开启刷新</span><div class="toggle" id="logRefreshToggle" onclick="toggleLogRefresh()"></div></div>
       </div>
     </div>
-    <pre class="ov-logpre" id="logPre">[monitor] 2026-07-29 00:42:05 Monitor ready — unix:/vol1/@appcenter/hermes-agent/hermes-agent.sock (base=/app/hermes-agent)
-[dashboard] proxied at /proxy/dashboard/
-[monitor] 2026-07-29 00:42:05 【启动检测】Hermes Agent 版本：v0.19.0 (2026.7.20)</pre>
+    <pre class="ov-logpre" id="logPre">[ 加载日志中… ]</pre>
   </div>
 </div>
           </div>
@@ -750,13 +748,13 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
             <div class="update-grid">
   <div class="update-card">
     <div class="update-title">Hermes 核心</div>
-    <div class="update-ver">当前 <strong>v0.19.0</strong> · 最新 <strong id="hermesLatest">v0.19.0</strong></div>
+    <div class="update-ver">当前 <strong id="hermesCurrent">--</strong> · 最新 <strong id="hermesLatest">--</strong></div>
     <button class="ov-actbtn" onclick="checkHermesUpdate()">检查更新</button>
     <button class="ov-actbtn start" id="hermesUpdateBtn" style="display:none" onclick="confirmHermesUpdate()">更新到最新</button>
   </div>
   <div class="update-card">
     <div class="update-title">Hermes Agent 应用</div>
-    <div class="update-ver">当前 <strong>v0.20.43</strong> · 最新 <strong id="appLatest">v0.20.43</strong></div>
+    <div class="update-ver">当前 <strong id="appCurrent">--</strong> · 最新 <strong id="appLatest">--</strong></div>
     <button class="ov-actbtn" onclick="checkAppUpdate()">检查更新</button>
     <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">更新到最新</button>
   </div>
@@ -5269,7 +5267,7 @@ function switchPage(name){
   if(name==='overview') renderOverview();
   if(name==='models') renderProviders();
   if(name==='extensions') renderExtensions();
-  if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); }
+  if(name==='updates'){ renderOverview(); checkHermesUpdate(); checkAppUpdate(); }
   if(name==='settings') renderSettings();
 }
 
@@ -5307,15 +5305,25 @@ function renderOverview(){
     var dsp=document.getElementById('dbStateText'); if(dsp) dsp.textContent= db?'运行中':'未启动';
     var gp=document.getElementById('gwPid'); if(gp) gp.textContent= gwPid?gwPid:'--';
     var dp=document.getElementById('dbPid'); if(dp) dp.textContent= dbPid?dbPid:'--';
-    var hv=document.querySelector('#page-overview .ov-metric strong'); // 版本占位
-    if(s.gateway && s.gateway.version){
-      var vm=document.querySelectorAll('#page-overview .ov-metric strong');
-      if(vm[2]) vm[2].textContent = fmtHermesVer(s.gateway.version, s.hermes_version_date);
+    // 系统信息：统一走 ID，避免 querySelectorAll 索引错位；优先使用服务端已格式化的 s.uptime
+    var upEl=document.getElementById('sysUptime');
+    if(upEl){
+      if(s.uptime!=null){ upEl.textContent=s.uptime; }
+      else if(s.uptimeMs!=null){ upEl.textContent=fmtUptime(s.uptimeMs); }
     }
-    if(s.app_version){ var am=document.querySelectorAll('#page-overview .ov-metric strong'); if(am[3]) am[3].textContent=s.app_version; }
-    if(s.memoryKB){ var mm=document.querySelectorAll('#page-overview .ov-metric strong'); if(mm[1]) mm[1].textContent=Math.round(s.memoryKB/1024)+' MB'; }
-    if(s.uptimeMs!=null){ var um=document.querySelectorAll('#page-overview .ov-metric strong'); if(um[0]) um[0].textContent=fmtUptime(s.uptimeMs); }
-    else if(s.uptime!=null){ var um2=document.querySelectorAll('#page-overview .ov-metric strong'); if(um2[0]) um2[0].textContent=s.uptime; }
+    var memEl=document.getElementById('sysMem');
+    if(memEl && s.memoryKB!=null){ memEl.textContent=Math.round(s.memoryKB/1024)+' MB'; }
+    var hvEl=document.getElementById('sysHermesVer');
+    if(hvEl && s.gateway && s.gateway.version){ hvEl.textContent=fmtHermesVer(s.gateway.version, s.hermes_version_date); }
+    var avEl=document.getElementById('sysAppVer');
+    if(avEl && s.app_version){ avEl.textContent=s.app_version; }
+    // 顶栏与更新页当前版本同步
+    var brand=document.getElementById('brandVer');
+    if(brand && s.app_version){ brand.textContent='v'+s.app_version; }
+    var hermCur=document.getElementById('hermesCurrent');
+    if(hermCur && s.gateway && s.gateway.version){ hermCur.textContent=fmtHermesVer(s.gateway.version, s.hermes_version_date); }
+    var appCur=document.getElementById('appCurrent');
+    if(appCur && s.app_version){ appCur.textContent='v'+s.app_version; }
   }).catch(function(){ setStatusOffline(); });
 }
 function setStatusOffline(){
@@ -5334,11 +5342,17 @@ function fmtHermesVer(ver, date){
   if(date && ver.indexOf(date)===-1) return ver+' ('+date+')';
   return ver;
 }
-function fmtUptime(sec){
-  sec = Number(sec)||0;
-  var h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60);
-  if(h>0) return h+'小时 '+m+'分钟';
-  return m+'分钟';
+function fmtUptime(ms){
+  // 服务端 uptimeMs 为毫秒；统一转换为秒再格式化
+  var sec = Math.floor((Number(ms)||0)/1000);
+  var d=Math.floor(sec/86400); sec%=86400;
+  var h=Math.floor(sec/3600); sec%=3600;
+  var m=Math.floor(sec/60);
+  var parts=[];
+  if(d>0) parts.push(d+'天');
+  if(h>0) parts.push(h+'小时');
+  parts.push(m+'分钟');
+  return parts.join(' ');
 }
 function setToggle(id, on){ var t=document.getElementById(id); if(t) t.classList.toggle('on', !!on); }
 function toggleService(name){
@@ -5381,10 +5395,13 @@ function openDashboard(){ window.open(BASE + '/proxy/dashboard/', '_blank'); }
 function refreshSysInfo(){
   apiGet('/api/status').then(function(s){
     if(!s || s.error) return;
-    var mm=document.querySelectorAll('#page-overview .ov-metric strong');
-    if(s.memoryKB && mm[1]) mm[1].textContent=Math.round(s.memoryKB/1024)+' MB';
-    if(s.uptimeMs!=null && mm[0]) mm[0].textContent=fmtUptime(s.uptimeMs);
-    else if(s.uptime!=null && mm[0]) mm[0].textContent=s.uptime;
+    var upEl=document.getElementById('sysUptime');
+    if(upEl){
+      if(s.uptime!=null){ upEl.textContent=s.uptime; }
+      else if(s.uptimeMs!=null){ upEl.textContent=fmtUptime(s.uptimeMs); }
+    }
+    var memEl=document.getElementById('sysMem');
+    if(memEl && s.memoryKB!=null){ memEl.textContent=Math.round(s.memoryKB/1024)+' MB'; }
   }).catch(function(){});
 }
 function appendLog(tag, msg){
