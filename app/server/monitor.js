@@ -3073,14 +3073,16 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ error: "disallowed" }), { headers: jsonHeaders() });
     }
     const fp = file === "hermes.log" ? `${VAR_DIR}/${file}` : `${DATA_DIR}/logs/${file}`;
+    const rawLines = url.searchParams.get("lines") || "200";
+    const limit = Math.min(Math.max(parseInt(rawLines, 10) || 200, 10), 2000);
     let lines = [], size = 0;
     try {
       if (existsSync(fp)) {
         size = statSync(fp).size;
-        lines = readFileSync(fp, "utf8").split("\n").filter(l => l.trim()).slice(-200);
+        lines = readFileSync(fp, "utf8").split("\n").filter(l => l.trim()).slice(-limit);
       }
     } catch {}
-    return new Response(JSON.stringify({ lines, size }), { headers: jsonHeaders() });
+    return new Response(JSON.stringify({ lines, size, limit }), { headers: jsonHeaders() });
   }
 
   // ─── 清空（截断）日志文件 ──────────────────────────────────────────────
