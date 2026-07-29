@@ -251,6 +251,21 @@
     .connector-card .status.off, .ext-card .status.off{color:var(--text3)}
     .connector-card .action, .ext-card .action, .ov-logbtn{margin-top:auto;width:100%;padding:7px 0;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);text-align:center}
     .connector-card .action:hover, .ext-card .action:hover, .ov-logbtn:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
+    .ext-card .desc{font-size:12px;color:var(--text2);line-height:1.45;margin:-2px 0 10px}
+    .ext-card .tools{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .ext-card .tools code{font-size:11px;background:var(--bg2);padding:2px 6px;border-radius:4px;color:var(--text3)}
+    .ext-card .actions{display:flex;gap:8px;margin-top:auto}
+    .ext-card .actions .action{flex:1;margin-top:0}
+    .ext-card .action.secondary{background:transparent}
+    .skill-config-provider{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:var(--bg1)}
+    .skill-config-provider .prov-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .skill-config-provider .prov-name{font-weight:600;font-size:14px}
+    .skill-config-provider .prov-badge{font-size:11px;padding:2px 8px;border-radius:4px;background:var(--bg2);color:var(--text3)}
+    .skill-config-provider .prov-desc{font-size:12px;color:var(--text2);margin-bottom:10px}
+    .skill-config-field{margin-bottom:12px}
+    .skill-config-field label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--text2)}
+    .skill-config-field input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg0);color:var(--text);font-size:13px}
+    .skill-config-field input:focus{outline:none;border-color:var(--accent)}
     .ov-logbtn{margin-top:0;width:auto;padding:6px 12px}
     .connector-card .badge{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:500;background:var(--bg3);color:var(--text3)}
     .conn-badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid transparent;vertical-align:middle}
@@ -347,9 +362,13 @@
 .sys-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start}
 .ov-metric{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--text3)}
 .ov-metric strong{font-size:14px;color:var(--text);font-weight:600}
-.ov-logbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.ov-logbtn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);font-size:12px;cursor:pointer;color:var(--text2)}
-.ov-logbtn:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
+.ov-logbar{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.log-filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.log-filter-row .ov-logbtn{padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);font-size:11px;cursor:pointer;color:var(--text2);min-width:48px}
+.log-filter-row .ov-logbtn:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
+.log-filter-label{font-size:11px;color:var(--text3);min-width:34px;text-align:right;margin-right:2px}
+.log-keyword{padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);font-size:12px;color:var(--text);width:160px}
+.log-keyword:focus{outline:none;border-color:var(--accent)}
 .service-list{display:flex;flex-direction:column}
 .service-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
 .service-row:last-child{border-bottom:none}
@@ -372,7 +391,10 @@
 .ov-logbox-ctrl{display:flex;align-items:center;gap:10px}
 .ov-refresh-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3)}
 .ov-logpre{margin:0;padding:12px 14px;flex:1;min-height:0;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.6;color:#c9cdd4;background:#0f1115;white-space:pre-wrap;word-break:break-word}
-.ov-logpre .log-error{color:#ef4444}
+.ov-logpre .log-debug{color:#9ca3af}
+.ov-logpre .log-info{color:#4ade80}
+.ov-logpre .log-warning{color:#fbbf24}
+.ov-logpre .log-error{color:#f87171;font-weight:600}
 .ov-logbtn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);font-weight:600}
 .msg-bubble .error-text{color:#ef4444}
 .settings-section{display:flex;flex-direction:column;gap:14px}
@@ -590,15 +612,42 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <div class="ov-metric"><span>Hermes 版本</span><strong id="sysHermesVer">--</strong></div>
         <div class="ov-metric"><span>应用版本</span><strong id="sysAppVer">--</strong></div>
       </div>
-      <div class="ov-logbar">
-        <button class="ov-logbtn" onclick="appendLog('monitor','Monitor 日志')">Monitor 日志</button>
-        <button class="ov-logbtn" onclick="appendLog('agent','Agent 日志')">Agent 日志</button>
-        <button class="ov-logbtn" onclick="appendLog('gui','GUI 日志')">GUI 日志</button>
-        <button class="ov-logbtn" onclick="appendLog('error','错误日志')">错误日志</button>
-        <button class="ov-logbtn" onclick="appendLog('gateway','Gateway 日志')">Gateway 日志</button>
-        <button class="ov-logbtn" onclick="appendLog('gateway_restart','Gateway 重启记录')">Gateway 重启记录</button>
-        <button class="ov-logbtn" onclick="appendLog('gateway_close','Gateway 关闭诊断')">Gateway 关闭诊断</button>
-        <button class="ov-logbtn" onclick="appendLog('gateway_exit','Gateway 退出诊断')">Gateway 退出诊断</button>
+      <div class="ov-logbar" id="ovLogBar">
+        <div class="log-filter-row">
+          <span class="log-filter-label">来源</span>
+          <button class="ov-logbtn active" data-log-source="monitor" onclick="setLogSource('monitor')">Monitor</button>
+          <button class="ov-logbtn" data-log-source="agent" onclick="setLogSource('agent')">AGENT</button>
+          <button class="ov-logbtn" data-log-source="gateway" onclick="setLogSource('gateway')">GATEWAY</button>
+          <button class="ov-logbtn" data-log-source="error" onclick="setLogSource('error')">ERRORS</button>
+          <button class="ov-logbtn" data-log-source="gui" onclick="setLogSource('gui')">GUI</button>
+          <button class="ov-logbtn" data-log-source="all" onclick="setLogSource('all')">全部</button>
+        </div>
+        <div class="log-filter-row">
+          <span class="log-filter-label">级别</span>
+          <button class="ov-logbtn active" data-log-level="all" onclick="setLogLevel('all')">ALL</button>
+          <button class="ov-logbtn" data-log-level="debug" onclick="setLogLevel('debug')">DEBUG</button>
+          <button class="ov-logbtn" data-log-level="info" onclick="setLogLevel('info')">INFO</button>
+          <button class="ov-logbtn" data-log-level="warning" onclick="setLogLevel('warning')">WARNING</button>
+          <button class="ov-logbtn" data-log-level="error" onclick="setLogLevel('error')">ERROR</button>
+        </div>
+        <div class="log-filter-row">
+          <span class="log-filter-label">组件</span>
+          <button class="ov-logbtn active" data-log-comp="all" onclick="setLogComponent('all')">ALL</button>
+          <button class="ov-logbtn" data-log-comp="gateway" onclick="setLogComponent('gateway')">GATEWAY</button>
+          <button class="ov-logbtn" data-log-comp="agent" onclick="setLogComponent('agent')">AGENT</button>
+          <button class="ov-logbtn" data-log-comp="tools" onclick="setLogComponent('tools')">TOOLS</button>
+          <button class="ov-logbtn" data-log-comp="cli" onclick="setLogComponent('cli')">CLI</button>
+          <button class="ov-logbtn" data-log-comp="cron" onclick="setLogComponent('cron')">CRON</button>
+        </div>
+        <div class="log-filter-row log-filter-tools">
+          <span class="log-filter-label">行数</span>
+          <button class="ov-logbtn" data-log-lines="50" onclick="setLogLines(50)">50</button>
+          <button class="ov-logbtn active" data-log-lines="100" onclick="setLogLines(100)">100</button>
+          <button class="ov-logbtn" data-log-lines="200" onclick="setLogLines(200)">200</button>
+          <button class="ov-logbtn" data-log-lines="500" onclick="setLogLines(500)">500</button>
+          <input type="text" id="logKeyword" class="log-keyword" placeholder="关键词过滤…" oninput="applyLogFilters()">
+          <button class="ov-logbtn" onclick="clearLogKeyword()">清除</button>
+        </div>
       </div>
     </div>
     <div class="ov-card ov-card-services" id="cardServices">
@@ -782,6 +831,16 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
                 <div class="modal-foot" id="connModalFoot">
                   <button class="action" onclick="testConnector()">测试连接</button>
                   <button class="action primary" onclick="saveConnector()">保存</button>
+                </div>
+              </div>
+            </div>
+            <div id="skillConfigModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeSkillConfigModal()">
+              <div class="modal-panel" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+                <div class="modal-head"><h3 id="skillCfgTitle">技能配置</h3><button class="modal-close" onclick="closeSkillConfigModal()">×</button></div>
+                <div class="modal-body" id="skillCfgBody" style="overflow:auto"></div>
+                <div class="modal-foot" id="skillCfgFoot">
+                  <button class="action" onclick="runSkillSetup()" id="skillCfgSetupBtn" style="display:none">>_ Run setup</button>
+                  <button class="action primary" onclick="saveSkillConfig()">保存配置</button>
                 </div>
               </div>
             </div>
@@ -4529,6 +4588,21 @@ PV.ICONS = {
   tencentLexiang: '<svg viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="20" rx="3" fill="#00C1DE"/><path fill="#fff" d="M7 6h10v2H7zm0 4h10v2H7zm0 4h6v2H7z"/><circle cx="17" cy="16" r="2" fill="#fff"/></svg>',
 };
 
+// 技能图标回退表：当后端未返回 icon/emoji 时，按技能名匹配 emoji（还原旧版图标表现）
+PV.skillIcons = {
+  'web':'🌐','browser':'🌐','web-search':'🔍','search':'🔍','file':'📁','files':'📁','terminal':'⌨️','shell':'⌨️',
+  'code':'💻','coding':'💻','code-execution':'💻','vision':'👁️','image':'🖼️','images':'🖼️','ocr':'👁️',
+  'memory':'🧠','remember':'🧠','todo':'✅','tasks':'✅','calendar':'📅','email':'✉️','mail':'✉️',
+  'pdf':'📄','docs':'📚','documents':'📚','youtube':'▶️','video':'🎬','audio':'🔊','music':'🎵',
+  'data-analysis':'📊','data':'📊','excel':'📊','csv':'📊','github':'🐙','git':'🔧','gitlab':'🦊',
+  'translator':'🌍','translate':'🌍','weather':'🌤️','maps':'🗺️','finance':'💰','stock':'📈',
+  'cron':'⏰','scheduler':'⏰','timer':'⏰','notification':'🔔','notification':'🔔','slack':'💬',
+  'telegram':'✈️','discord':'💬','whatsapp':'💬','database':'🗄️','sql':'🗄️','api':'🔌',
+  'scraper':'🕷️','crawler':'🕷️','agent':'🤖','subagent':'🤖','orchestrator':'🎯','planner':'📝',
+  'research':'🔬','summarizer':'📝','summary':'📝','rag':'📚','embeddings':'🔗','speech':'🎙️',
+  'math':'➗','calculator':'🧮','draw':'🎨','design':'🎨','ppt':'📊','presentation':'📊',
+};
+
 PV.agents = [
   {id:'default',name:'默认主力助手',desc:'通用、不限领域',icon:'🤖',sessions:[
     {id:'s1',title:'项目规划讨论'},{id:'s2',title:'重构方案梳理'},{id:'s3',title:'本周排期'}
@@ -5641,46 +5715,107 @@ function refreshSysInfo(){
     if(memEl && s.memoryKB!=null){ memEl.textContent=Math.round(s.memoryKB/1024)+' MB'; }
   }).catch(function(){});
 }
-var _currentLogTag = 'monitor';
-var _logFileMap = {
-  monitor: 'hermes.log',
-  agent: 'agent.log',
-  gui: 'gui.log',
-  error: 'errors.log',
-  gateway: 'gateway.log',
-  gateway_restart: 'gateway-restart.log',
-  gateway_close: 'gateway-shutdown-diag.log',
-  gateway_exit: 'gateway-exit-diag.log'
+// 日志查看器状态：与 dashboard/logs 对齐（来源、级别、组件、行数、关键词）
+var _logState = {
+  source: 'monitor',
+  level: 'all',
+  component: 'all',
+  lines: 100,
+  keyword: '',
+  rawLines: [],
+  titleMap: { monitor:'Monitor 日志', agent:'Agent 日志', gui:'GUI 日志', error:'错误日志', gateway:'Gateway 日志', gateway_restart:'Gateway 重启记录', gateway_close:'Gateway 关闭诊断', gateway_exit:'Gateway 退出诊断', all:'全部日志' },
+  fileMap: { monitor:'hermes.log', agent:'agent.log', gui:'gui.log', error:'errors.log', gateway:'gateway.log', gateway_restart:'gateway-restart.log', gateway_close:'gateway-shutdown-diag.log', gateway_exit:'gateway-exit-diag.log' },
+  sourceFiles: {
+    monitor: ['monitor'], agent: ['agent'], gateway: ['gateway'], error: ['error'], gui: ['gui'],
+    gateway_restart: ['gateway_restart'], gateway_close: ['gateway_close'], gateway_exit: ['gateway_exit'],
+    all: ['monitor','agent','gateway','error','gui','gateway_restart','gateway_close','gateway_exit']
+  }
 };
-function appendLog(tag, msg){
-  _currentLogTag = tag || 'monitor';
+function setLogSource(s){ _logState.source=s||'monitor'; applyLogFilters(true); }
+function setLogLevel(l){ _logState.level=l||'all'; applyLogFilters(false); }
+function setLogComponent(c){ _logState.component=c||'all'; applyLogFilters(false); }
+function setLogLines(n){ _logState.lines=parseInt(n)||100; applyLogFilters(true); }
+function clearLogKeyword(){ var k=document.getElementById('logKeyword'); if(k) k.value=''; _logState.keyword=''; applyLogFilters(false); }
+function applyLogFilters(refetch){
+  var k=document.getElementById('logKeyword');
+  _logState.keyword = k ? k.value : '';
+  updateLogFilterUI();
+  if(refetch){ fetchLogLines(); return; }
+  renderLogLines();
+}
+function updateLogFilterUI(){
+  document.querySelectorAll('[data-log-source]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-log-source')===_logState.source); });
+  document.querySelectorAll('[data-log-level]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-log-level')===_logState.level); });
+  document.querySelectorAll('[data-log-comp]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-log-comp')===_logState.component); });
+  document.querySelectorAll('[data-log-lines]').forEach(function(b){ b.classList.toggle('active', parseInt(b.getAttribute('data-log-lines'))===_logState.lines); });
+}
+function fetchLogLines(){
   var pre=document.getElementById('logPre'); if(!pre) return;
-  var titleEl=document.getElementById('logBoxTitle'); if(titleEl) titleEl.textContent = msg || '日志';
-  // 按钮高亮
-  document.querySelectorAll('.ov-logbtn').forEach(function(b){ b.classList.remove('active'); });
-  var activeBtn = Array.from(document.querySelectorAll('.ov-logbtn')).find(function(b){ return b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'"+tag+"'")>=0; });
-  if(activeBtn) activeBtn.classList.add('active');
-  pre.innerHTML = '[ 加载日志中… ]';
-  var file = _logFileMap[tag] || 'hermes.log';
-  fetch(apiUrl('/api/logs/read?file='+encodeURIComponent(file)), { cache:'no-store', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var lines=(d && d.lines) || [];
-      if(!lines.length){ pre.textContent = '[ 无 '+msg+' 日志，或后端未提供该分类 ]'; return; }
-      pre.innerHTML = lines.map(function(l){
-        var lower = String(l).toLowerCase();
-        var isError = lower.indexOf('error')>=0 || lower.indexOf('failed')>=0 || lower.indexOf('失败')>=0 || lower.indexOf('exception')>=0 || lower.indexOf('fatal')>=0 || lower.indexOf('uncaught')>=0;
-        return isError ? '<span class="log-error">'+esc(l)+'</span>' : esc(l);
-      }).join('\n');
-      pre.scrollTop = pre.scrollHeight;
-    })
-    .catch(function(){ pre.textContent = '[ 日志加载失败：无法连接后端 ]'; });
+  pre.innerHTML='[ 加载日志中… ]';
+  var files = _logState.sourceFiles[_logState.source] || [_logState.source];
+  var pending = files.length;
+  var all = [];
+  files.forEach(function(tag){
+    var file = _logState.fileMap[tag] || 'hermes.log';
+    fetch(apiUrl('/api/logs/read?file='+encodeURIComponent(file)+'&lines='+encodeURIComponent(_logState.lines)), { cache:'no-store', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+      .then(function(r){ return r.json(); })
+      .then(function(d){ (d && d.lines||[]).forEach(function(l){ all.push({tag:tag, line:l}); }); })
+      .catch(function(){})
+      .finally(function(){ pending--; if(pending===0){ _logState.rawLines=all; renderLogLines(); } });
+  });
+}
+function detectLogLevel(line){
+  var m = String(line).match(/\b(DEBUG|INFO|WARNING|WARN|ERROR|CRITICAL|FATAL)\b/i);
+  if(!m) return '';
+  var lvl = m[1].toLowerCase();
+  if(lvl==='warn') return 'warning';
+  if(lvl==='critical' || lvl==='fatal') return 'error';
+  return lvl;
+}
+function detectLogComponent(line){
+  var s = String(line);
+  var m = s.match(/\b(?:DEBUG|INFO|WARNING|WARN|ERROR|CRITICAL|FATAL)\s+([a-zA-Z0-9_\.]+)/i);
+  var logger = m ? m[1].toLowerCase() : '';
+  if(logger.indexOf('gateway')>=0) return 'gateway';
+  if(logger.indexOf('agent')>=0) return 'agent';
+  if(logger.indexOf('cron')>=0) return 'cron';
+  if(logger.indexOf('cli')>=0 || logger.indexOf('hermes_cli')>=0) return 'cli';
+  if(logger.indexOf('tool')>=0 || /\b(tool_|plugin|mcp)\b/i.test(s)) return 'tools';
+  return '';
+}
+function renderLogLines(){
+  var pre=document.getElementById('logPre'); if(!pre) return;
+  var titleEl=document.getElementById('logBoxTitle'); if(titleEl) titleEl.textContent = _logState.titleMap[_logState.source] || '日志';
+  var kwLower = (_logState.keyword||'').toLowerCase();
+  var filtered = _logState.rawLines.filter(function(item){
+    var lvl = detectLogLevel(item.line);
+    var comp = detectLogComponent(item.line) || item.tag;
+    if(_logState.level!=='all' && lvl!==_logState.level) return false;
+    if(_logState.component!=='all' && comp!==_logState.component) return false;
+    if(kwLower && String(item.line).toLowerCase().indexOf(kwLower)<0) return false;
+    return true;
+  });
+  if(!filtered.length){ pre.innerHTML = '[ 无匹配日志 ]'; return; }
+  pre.innerHTML = filtered.map(function(item){
+    var lvl = detectLogLevel(item.line);
+    return lvl ? '<span class="log-'+lvl+'">'+esc(item.line)+'</span>' : esc(item.line);
+  }).join('\n');
+  pre.scrollTop = pre.scrollHeight;
+}
+function appendLog(tag, msg){
+  // 兼容旧入口：设置来源并重新拉取
+  _logState.source = tag || 'monitor';
+  var k=document.getElementById('logKeyword'); if(k) k.value='';
+  _logState.keyword='';
+  applyLogFilters(true);
 }
 function clearLog(){
-  var file = _logFileMap[_currentLogTag] || 'hermes.log';
-  apiPost('/api/logs/clear', { file: file }).then(function(){
-    var pre=document.getElementById('logPre'); if(pre) pre.textContent='';
-  }).catch(function(){ toast('清除日志失败'); });
+  var files = _logState.sourceFiles[_logState.source] || [_logState.source];
+  files.forEach(function(tag){
+    var file = _logState.fileMap[tag] || 'hermes.log';
+    apiPost('/api/logs/clear', { file: file }).catch(function(){});
+  });
+  var pre=document.getElementById('logPre'); if(pre) pre.textContent='';
 }
 function toggleLogRefresh(){
   var t=document.getElementById('logRefreshToggle');
@@ -5710,6 +5845,7 @@ function loadConfig(){
       if(!_cfg.extensions) _cfg.extensions = { toolsets:{}, mcp_servers:[], skills_dirs:[], persona:'default', memory:{enabled:true,char_limit:2200}, team:[], team_name:'' };
       if(!_cfg.extensions.toolsets) _cfg.extensions.toolsets = {};
       if(!_cfg.extensions.memory) _cfg.extensions.memory = {enabled:true,char_limit:2200};
+      if(!_cfg.extensions.skills_config) _cfg.extensions.skills_config = {};
       if(_cfg.extensions.persona) _persona = _cfg.extensions.persona;
       _settingsLoaded = true;
       applySettingsToggles();
@@ -5718,6 +5854,9 @@ function loadConfig(){
     }
     return _cfg;
   }).catch(function(e){ toast('读取配置失败：'+e.message); return _cfg; });
+}
+function saveConfig(){
+  apiPost('/api/config', _cfg).catch(function(e){ console.error('saveConfig failed', e); });
 }
 function renderProviders(){
   var grid=document.getElementById('providerGrid'); if(!grid) return;
@@ -5934,6 +6073,14 @@ function toggleToolset(id){
   ts[id] = !ts[id]; newOn = ts[id];
   renderToolsets(); saveConfig();
 }
+function skillIcon(s){
+  if(!s) return '📦';
+  if(s.icon) return s.icon;
+  if(s.emoji) return s.emoji;
+  var nm = s.name || '';
+  if(window.PV && PV.skillIcons && PV.skillIcons[nm]) return PV.skillIcons[nm];
+  return '📦';
+}
 function renderSkills(kind){
   var el=document.getElementById('skillGrid'); if(!el) return;
   if(kind==='native'){
@@ -5944,9 +6091,16 @@ function renderSkills(kind){
         if(!_skillNative.length){ el.innerHTML='<div class="empty-state">未获取到原生技能（请先启动仪表盘）。</div>'; return; }
         el.innerHTML = _skillNative.map(function(s){
           var on=!!s.enabled; var nm=(s.name||'').replace(/'/g,"\\'");
-          return '<div class="ext-card" onclick="toggleNativeSkill(\''+nm+'\')">'+
-            '<div class="top"><div class="icon">📦</div><div><div class="name">'+esc(s.name||'')+'</div><div class="status '+(on?'on':'off')+'">'+(on?'已启用':'关闭')+'</div></div></div>'+
-            '<button class="action" onclick="event.stopPropagation();toggleNativeSkill(\''+nm+'\')">'+(on?'关闭':'启用')+'</button></div>';
+          var desc = esc((s.description||s.desc||'').slice(0,80));
+          var tools = Array.isArray(s.tools) ? s.tools.slice(0,4).map(function(t){ return '<code>'+esc(typeof t==='string'?t:(t.name||''))+'</code>'; }).join(' ') : '';
+          return '<div class="ext-card" data-skill="'+nm+'">'+
+            '<div class="top"><div class="icon">'+skillIcon(s)+'</div><div><div class="name">'+esc(s.name||'')+'</div><div class="status '+(on?'on':'off')+'">'+(on?'已启用':'未启用')+'</div></div></div>'+
+            (desc?'<div class="desc">'+desc+'</div>':'')+
+            (tools?'<div class="tools">'+tools+'</div>':'')+
+            '<div class="actions">'+
+              '<button class="action" onclick="event.stopPropagation();toggleNativeSkill(\''+nm+'\')">'+(on?'关闭':'启用')+'</button>'+
+              '<button class="action secondary" onclick="event.stopPropagation();openSkillConfig(\''+nm+'\')">配置</button>'+
+            '</div></div>';
         }).join('');
       })
       .catch(function(){ el.innerHTML='<div class="empty-state">加载原生技能失败（请先启动仪表盘）。</div>'; });
@@ -5957,9 +6111,15 @@ function renderSkills(kind){
         if(!_skillLocal.length){ el.innerHTML='<div class="empty-state">尚未发现已安装技能。</div>'; return; }
         el.innerHTML = _skillLocal.map(function(s, i){
           var on=!!(s.status==='enabled'||s.enabled);
-          return '<div class="ext-card" onclick="toggleSkill('+i+')">'+
-            '<div class="top"><div class="icon">'+(s.emoji||'📦')+'</div><div><div class="name">'+esc(s.name||'未命名')+'</div><div class="status '+(on?'on':'off')+'">'+(on?'已启用':'未启用')+'</div></div></div>'+
-            '<button class="action" onclick="event.stopPropagation();toggleSkill('+i+')">'+(on?'关闭':'启用')+'</button></div>';
+          var nm=(s.name||'').replace(/'/g,"\\'");
+          var desc = esc((s.description||s.desc||'').slice(0,80));
+          return '<div class="ext-card" data-skill="'+nm+'">'+
+            '<div class="top"><div class="icon">'+skillIcon(s)+'</div><div><div class="name">'+esc(s.name||'未命名')+'</div><div class="status '+(on?'on':'off')+'">'+(on?'已启用':'未启用')+'</div></div></div>'+
+            (desc?'<div class="desc">'+desc+'</div>':'')+
+            '<div class="actions">'+
+              '<button class="action" onclick="event.stopPropagation();toggleSkill('+i+')">'+(on?'关闭':'启用')+'</button>'+
+              '<button class="action secondary" onclick="event.stopPropagation();openSkillConfigLocal('+i+')">配置</button>'+
+            '</div></div>';
         }).join('');
       } else {
         el.innerHTML='<div class="empty-state">加载本地技能失败，请部署后重试。</div>';
@@ -5979,6 +6139,98 @@ function toggleSkill(i){
   var s=_skillLocal[i]; if(!s) return;
   toast('本地技能启停需重启 Hermes 后生效（已记录）');
   // 本地仅做 UI 标记，真实启停由后端安装/重启决定
+}
+var _skillCfgCurrent = null; // { kind:'native'|'local', index, name }
+function openSkillConfig(name){
+  var list=_skillNative||[]; var s=null;
+  for(var i=0;i<list.length;i++){ if(list[i].name===name){ s=list[i]; _skillCfgCurrent={kind:'native',index:i,name:name}; break; } }
+  if(!s){ toast('未找到该技能'); return; }
+  renderSkillConfigModal(s);
+}
+function openSkillConfigLocal(i){
+  var s=_skillLocal[i]; if(!s) return;
+  _skillCfgCurrent={kind:'local',index:i,name:s.name};
+  renderSkillConfigModal(s);
+}
+function closeSkillConfigModal(){ document.getElementById('skillConfigModal').style.display='none'; _skillCfgCurrent=null; }
+function renderSkillConfigModal(s){
+  var title = document.getElementById('skillCfgTitle');
+  var body = document.getElementById('skillCfgBody');
+  var setupBtn = document.getElementById('skillCfgSetupBtn');
+  if(title) title.textContent = (s.name||'未命名') + ' 配置';
+  if(!body) return;
+  var icon = skillIcon(s);
+  var on = !!(s.enabled || s.status==='enabled');
+  var html = '<div class="setting-row" style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:10px"><div style="font-size:28px">'+icon+'</div><div><div style="font-weight:600">'+esc(s.name||'')+'</div><div class="status '+(on?'on':'off')+'">'+(on?'已启用':'未启用')+'</div></div></div><div class="toggle '+(on?'on':'')+'" onclick="toggleSkillCfgEnabled()"></div></div>';
+  html += '<div class="setting-row" style="margin-bottom:14px"><div><div class="label">Disabled for CLI</div><div class="desc">在 CLI 中禁用此技能</div></div><div class="toggle" id="skillCfgCliToggle" onclick="toggleSkillCfgCli()"></div></div>';
+  if(s.description||s.desc) html += '<p class="conn-desc">'+esc(s.description||s.desc)+'</p>';
+  // 工具列表
+  if(Array.isArray(s.tools) && s.tools.length){
+    html += '<div class="conn-section-title">工具</div><div class="conn-tools">'+s.tools.map(function(t){ var n=typeof t==='string'?t:(t.name||''); return '<code>'+esc(n)+'</code>'; }).join(' ')+'</div>';
+  }
+  // 配置字段（优先用后端给出的 config/schema）
+  var cfgFields = s.config_fields || s.configFields || (s.config && s.config.fields) || (s.schema && s.schema.fields);
+  var providers = s.providers || s.config_options || (s.config && s.config.providers);
+  if(providers && providers.length){
+    html += '<div class="conn-section-title">选择提供商</div>';
+    providers.forEach(function(p, idx){
+      var pid = 'skillProv_'+idx;
+      html += '<div class="skill-config-provider">'+
+        '<div class="prov-head"><div><span class="prov-name">'+esc(p.name||p.label||('方案 '+(idx+1)))+'</span> '+(p.badge?'<span class="prov-badge">'+esc(p.badge)+'</span>':'')+'</div><button class="action" style="width:auto;padding:5px 12px" onclick="selectSkillProvider('+idx+')">Select</button></div>'+
+        (p.description||p.desc?'<div class="prov-desc">'+esc(p.description||p.desc)+'</div>':'')+
+        '<div id="'+pid+'"></div></div>';
+    });
+  } else if(cfgFields && cfgFields.length){
+    html += '<div class="conn-section-title">配置参数</div>'+renderSkillConfigFields(cfgFields, s.config_values||{});
+  } else {
+    html += '<div class="conn-hint">该技能未暴露可配置参数，或参数需通过 Hermes 仪表盘/CLI 配置。</div>';
+  }
+  body.innerHTML = html;
+  if(setupBtn) setupBtn.style.display = (s.needs_setup || s.setup_command) ? 'inline-block' : 'none';
+  document.getElementById('skillConfigModal').style.display='flex';
+}
+function renderSkillConfigFields(fields, values){
+  return fields.map(function(f, i){
+    var key = f.key || f.name || ('field_'+i);
+    var val = esc(values[key] || f.default || '');
+    var ph = esc(f.placeholder || f.label || '');
+    return '<div class="skill-config-field"><label>'+esc(f.label||key)+(f.required?' *':'')+'</label><input type="'+(f.type==='password'?'password':'text')+'" data-key="'+esc(key)+'" value="'+val+'" placeholder="'+ph+'"></div>';
+  }).join('');
+}
+function toggleSkillCfgEnabled(){
+  if(!_skillCfgCurrent) return;
+  if(_skillCfgCurrent.kind==='native'){ toggleNativeSkill(_skillCfgCurrent.name); renderSkillConfigModal(_skillNative[_skillCfgCurrent.index]); }
+}
+function toggleSkillCfgCli(){
+  var t=document.getElementById('skillCfgCliToggle'); if(t) t.classList.toggle('on');
+}
+function selectSkillProvider(idx){ toast('已选择提供商方案 '+(idx+1)+'，请填写下方密钥后保存'); }
+function saveSkillConfig(){
+  if(!_skillCfgCurrent){ closeSkillConfigModal(); return; }
+  var values={}; var inputs=document.querySelectorAll('#skillCfgBody input[data-key]');
+  for(var i=0;i<inputs.length;i++){ values[inputs[i].getAttribute('data-key')] = inputs[i].value; }
+  var cliDisabled = document.getElementById('skillCfgCliToggle') && document.getElementById('skillCfgCliToggle').classList.contains('on');
+  // 尝试写入仪表盘
+  var payload = { name:_skillCfgCurrent.name, config:values, cli_disabled:cliDisabled };
+  fetch(apiUrl('/proxy/dashboard/api/skills/config'), { method:'PUT', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body:JSON.stringify(payload) })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(){ toast('技能配置已保存'); closeSkillConfigModal(); renderSkills(_skillCfgCurrent.kind==='native'?'native':'local'); })
+    .catch(function(){
+      // 仪表盘无此端点则落本地缓存，并提示用户
+      if(!_cfg.extensions.skills_config) _cfg.extensions.skills_config={};
+      _cfg.extensions.skills_config[_skillCfgCurrent.name] = payload;
+      saveConfig();
+      toast('已保存到本地配置（若仪表盘支持在线配置，请确保 dashboard 已启动）');
+      closeSkillConfigModal();
+    });
+}
+function runSkillSetup(){
+  if(!_skillCfgCurrent) return;
+  var s = _skillCfgCurrent.kind==='native' ? _skillNative[_skillCfgCurrent.index] : _skillLocal[_skillCfgCurrent.index];
+  if(!s || !s.setup_command){ toast('该技能无需安装'); return; }
+  toast('正在执行安装：'+s.setup_command);
+  fetch(apiUrl('/proxy/dashboard/api/skills/setup'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body:JSON.stringify({name:s.name, command:s.setup_command}) })
+    .then(function(r){ return r.json(); }).then(function(d){ toast(d.message||'安装完成'); }).catch(function(){ toast('安装请求失败（请检查 dashboard 是否启动）'); });
 }
 function renderMemory(){
   setToggle('memToggle', !!(_cfg.extensions.memory && _cfg.extensions.memory.enabled));
