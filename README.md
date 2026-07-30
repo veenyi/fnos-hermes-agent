@@ -127,6 +127,7 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 
 ### v0.20.x
 
+- **v0.20.66** — 六项体验修复：① toolsets GET 请求 401 根治（移除自定义 `X-Monitor-Token` 头避免 CORS 预检触发 fnOS 应用中心 OPTIONS 401）；② 工具/技能/工作流配置弹窗从 `page-connectors` section 移至 body 顶层，解决扩展页点击「配置」需切到连接器页才弹出的嵌套隐藏问题；③ 会话树默认展开（`localStorage` 未显式记录 `false` 时均展开，修复用户反馈 5+ 次的默认隐藏问题）；④ 专家选中态高亮（`pickItem` expert 分支加 `active` class）；⑤ 专家团按钮风格统一（新增 `.team-cta` CSS 三段式布局替代原 `.action primary`）；⑥ 专家团空团队自动组建（`useExpertTeam` 检测 team 为空时自动调 `buildTeam` 按部门各取 1 位组建跨部门团队）。
 - **v0.20.65** — 端口迁移根治网关抢占：网关 `8642→8742`、仪表盘 `9119→9219`（均支持环境变量 `GATEWAY_PORT`/`DASHBOARD_PORT` 覆盖）；彻底规避同机 hermes-studio 网关对 8642 的 `--replace` 抢占，导致聊天被随机路由到无 provider 的 studio 网关（`No inference provider configured` / 自称「人类学家」）。前端 `ensureDefaultSession` 保存模型后默认建立「默认助手」会话并激活网关；`/api/status` 新增 `dashboard.port`，端口显示改为由 `api_server_port` 动态渲染。
 - **v0.20.64** — 配置弹窗与专家选择器交互细节优化，部署稳定性加固。
 - **v0.20.63** — 工具/技能配置弹窗与专家团自动建团体验打磨。
