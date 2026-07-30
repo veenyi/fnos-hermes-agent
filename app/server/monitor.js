@@ -198,14 +198,14 @@ function formatUptime(ms) {
   return parts.join(" ");
 }
 
-const GATEWAY_PORT   = 8642;
+const GATEWAY_PORT   = Number(process.env.GATEWAY_PORT || "8742");
 const SOCKET_PATH    = (process.env.MONITOR_SOCKET_PATH || "").trim();
 if (!SOCKET_PATH) {
   console.error("[FATAL] MONITOR_SOCKET_PATH is required — unix socket mode only");
   process.exit(1);
 }
 const BASE_PATH      = (process.env.BASE_PATH || "").replace(/\/+$/, "");
-const DASHBOARD_PORT = Number(process.env.DASHBOARD_PORT || "9119");
+const DASHBOARD_PORT = Number(process.env.DASHBOARD_PORT || "9219");
 const STATIC_DIR     = `${APP_DIR}/ui`;
 const VENV_BIN       = `${DATA_DIR}/venv/bin`;
 const HERMES_BIN     = `${VENV_BIN}/hermes`;
@@ -331,12 +331,15 @@ const CHANNEL_DEFS = {
     note: "微信个人号通过腾讯 iLink 扫码登录，无需自备 App。点击下方「微信扫码登录」完成关联。",
   },
   wecom: {
-    name: "企业微信 (WeCom)", icon: "💼",
+    name: "企业微信 (WeCom)", icon: "💼", qrLogin: true,
     fields: [
+      { env: "WECOM_CORP_ID", path: "extra.corp_id", label: "Corp ID", placeholder: "企业微信 Corp ID（扫码授权需要）" },
+      { env: "WECOM_AGENT_ID", path: "extra.agent_id", label: "Agent ID", placeholder: "自建应用 Agent ID" },
       { env: "WECOM_BOT_ID", path: "extra.bot_id", label: "Bot ID", placeholder: "..." },
       { env: "WECOM_SECRET", path: "extra.secret", label: "Secret", placeholder: "...", secret: true },
     ],
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
+    note: "企业微信支持「扫码授权自建应用」：先填写 Corp ID / Agent ID / Secret，再点「企业微信扫码登录」用企业微信扫码授权。",
   },
 };
 
@@ -397,6 +400,7 @@ function generateApiKey() {
 
 mkdirSync(VAR_DIR, { recursive: true });
 initChatData();
+migrateDisplayMarkdown();
 
 // ─── TUI shim 初始化：确保 TUI_DIR/dist/entry.js 可用 ──────────────────
 try {
@@ -584,6 +588,30 @@ function initChatData() {
       log(`initChatData warning: unable to write ${CONFIG_FILE}: ${e.message}`);
     }
   }
+}
+
+// ── 启动迁移：强制 display.final_response_markdown = gfm（Issue #12）────────
+// 旧版本默认 strip，会导致网关剥离所有 Markdown 格式；升级后自动修正。
+function migrateDisplayMarkdown() {
+  try {
+    const yamlPath = `${DATA_DIR}/config.yaml`;
+    if (!existsSync(yamlPath)) return;
+    let y = readFileSync(yamlPath, "utf8");
+    const dm = y.match(/^display:[\s\S]*?^  final_response_markdown:\s*(\S+)/m);
+    const current = dm ? dm[1] : "";
+    if (current === "gfm") return;
+    if (dm) {
+      const before = y.slice(0, dm.index + dm[0].indexOf("final_response_markdown:"));
+      const after = y.slice(dm.index + dm[0].length);
+      y = before + "final_response_markdown: gfm" + after;
+    } else if (y.match(/^display:/m)) {
+      y = y.replace(/^display:/m, "display:\n  final_response_markdown: gfm");
+    } else {
+      y = y.trimEnd() + "\n\ndisplay:\n  final_response_markdown: gfm\n";
+    }
+    writeFileSync(yamlPath, y);
+    log("启动迁移：已自动校正 display.final_response_markdown → gfm");
+  } catch (e) { log("启动迁移 display.final_response_markdown 失败: " + e.message); }
 }
 
 function readJSON(path) {
@@ -1777,7 +1805,7 @@ async function portAlive(port, host = "localhost", timeoutMs = 2000) {
 }
 
 // 直接读 /proc/net/tcp[6] 判断本机是否有进程在指定端口 LISTEN。
-// 适用于非 HTTP 的内部端口（如 8642 网关通信端口），不受 HTTP 探活失败或
+// 适用于非 HTTP 的内部端口（如 8742 网关通信端口），不受 HTTP 探活失败或
 // localhost 解析为 IPv6 影响，比 portAlive 的 HTTP OPTIONS 探测更可靠。
 function isPortListening(port) {
   const suffix = ":" + Number(port).toString(16).toUpperCase().padStart(4, "0");
@@ -1834,6 +1862,32 @@ function findGatewayPid() {
     }
     return null;
   } catch { return null; }
+}
+
+// 端口冲突防护（P0 修复 v0.20.65）：本包网关端口已从默认 8642 迁移到 8742、仪表盘从 9119 迁移到 9219，
+// 以彻底规避同机 hermes-studio 等同类应用对其 8642 网关的 `--replace` 抢占（跨用户进程无法被本包 kill 清除）。
+// 下面这段进程清理作为冗余兜底：尽力清掉同端口的其他 hermes 进程，但主要依赖端口迁移来避免冲突。
+// 典型旧场景：同机并装 hermes-studio，其网关带 `--replace` 抢占 8642，导致本包聊天被
+// 路由到「无 provider 配置 + 不同默认角色」的 studio 网关，表现为间歇
+// "No inference provider configured" / 回复自称「人类学家」等。
+// 仅针对二进制路径 != HERMES_BIN 的进程，绝不误杀本包自身进程。
+function killForeignHermesProcesses() {
+  try {
+    const dirs = readdirSync("/proc").filter(d => /^\d+$/.test(d));
+    for (const dir of dirs) {
+      const pid = Number(dir);
+      if (!pid) continue;
+      try {
+        const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8").replace(/\0/g, " ").trim();
+        if (cmdline.includes("hermes") &&
+            /(gateway\s+run|hermes\s+dashboard|dashboard\s+--host)/.test(cmdline) &&
+            !cmdline.includes(HERMES_BIN)) {
+          log(`[port-guard] 发现外来 hermes 进程 pid=${pid}（${cmdline.slice(0, 90)}），杀除以独占本包端口`);
+          try { process.kill(pid, "KILL"); } catch {}
+        }
+      } catch {}
+    }
+  } catch {}
 }
 
 async function waitForExit(pid, timeoutMs = 5000) {
@@ -1898,7 +1952,34 @@ let gatewayCrashLoop  = false;
 const CRASH_WINDOW_MS  = 60000;
 const CRASH_LOOP_MAX   = 3;
 
+// 将 .env 风格文件中的 KEY=value 行并入 env 对象（忽略注释/空行，支持引号包裹）。
+function mergeEnvFile(env, path) {
+  try {
+    if (!existsSync(path)) return;
+    const content = readFileSync(path, "utf8");
+    content.split("\n").forEach((line) => {
+      const s = line.trim();
+      if (!s || s.startsWith("#")) return;
+      const idx = s.indexOf("=");
+      if (idx < 0) return;
+      const key = s.slice(0, idx).trim();
+      if (!key) return;
+      let val = s.slice(idx + 1).trim();
+      if ((val[0] === '"' && val[val.length - 1] === '"') || (val[0] === "'" && val[val.length - 1] === "'")) {
+        val = val.slice(1, -1);
+      }
+      env[key] = val;
+    });
+  } catch (e) { /* 非致命 */ }
+}
+
 function spawnHermes(name, pidPath, args) {
+  // P0 修复（v0.20.65）：拉起本包网关/仪表盘前，先清掉抢占本包端口的外来 hermes 进程，
+  // 并让网关以 --replace 接管本包端口（8742），作为冗余兜底；主要冲突规避已靠端口迁移实现。
+  if (name === "gateway" || name === "dashboard") {
+    killForeignHermesProcesses();
+    if (name === "gateway" && !args.includes("--replace")) args = [...args, "--replace"];
+  }
   if (pidPath === PID_GATEWAY && gatewayCrashLoop) {
     log(`Gateway 启动被阻止 — 已检测到崩溃循环（需配置消息平台或先停止再启动）`);
     return { ok: false, error: "crash_loop" };
@@ -1920,7 +2001,7 @@ function spawnHermes(name, pidPath, args) {
     HERMES_TUI_DIR: TUI_DIR,
     GATEWAY_ALLOW_ALL_USERS: "true",
     API_SERVER_ENABLED: "true",
-    API_SERVER_PORT:   "8642",
+    API_SERVER_PORT:   String(GATEWAY_PORT),
     API_SERVER_HOST:    "0.0.0.0",
     API_SERVER_KEY:     MONITOR_TOKEN,
     HERMES_YOLO_MODE:   "1",
@@ -1931,6 +2012,14 @@ function spawnHermes(name, pidPath, args) {
     // 固定仪表盘会话令牌，使 monitor 代理转发时能通过鉴权（见 proxyDashboard）
     env.HERMES_DASHBOARD_SESSION_TOKEN = DASHBOARD_SESSION_TOKEN;
   }
+
+  // 关键修复（Issue #3）：网关进程继承 process.env，但控制面板把 API key 写在
+  // ${VAR_DIR}/.env.providers，Hermes config.yaml 用 ${ENV_VAR} 引用。若只传 process.env，
+  // 网关拿不到真实 key，会报 "No inference provider configured"。这里把 .env.providers
+  // 与 Hermes 的 ${DATA_DIR}/.env 一并并入 spawn 环境，确保 SENSENOVA_API_KEY /
+  // OPENAI_API_KEY / CUSTOM_*_API_KEY 等对网关可见。
+  mergeEnvFile(env, `${VAR_DIR}/.env.providers`);
+  mergeEnvFile(env, `${DATA_DIR}/.env`);
 
   const logFd = openSync(logPath, "a");
   const p = spawn(HERMES_BIN, args, {
@@ -1991,7 +2080,7 @@ async function getStatus() {
   }
 
   // 先检测端口是否在监听（Dashboard 内部重启时 gateway 可能在 Dashboard 进程里，PID 文件不更新）
-  // 8642 为非 HTTP 内部端口，优先用 /proc 的 LISTEN 判据，HTTP 探活作兜底
+  // 8742 为非 HTTP 内部端口，优先用 /proc 的 LISTEN 判据，HTTP 探活作兜底
   const gwListening = isPortListening(GATEWAY_PORT);
   const gwPortAlive = gwListening || await portAlive(GATEWAY_PORT);
 
@@ -2020,7 +2109,7 @@ async function getStatus() {
   let gwHealthy = false;
   let dbHealthy = false;
 
-  // 健康检查：TCP 处于 LISTEN 即视为健康（8642 非 HTTP，OPTIONS 探测不可靠，仅作兜底）
+  // 健康检查：TCP 处于 LISTEN 即视为健康（8742 非 HTTP，OPTIONS 探测不可靠，仅作兜底）
   if (gwListening) {
     gwHealthy = true;
   } else if (gp || gwPortAlive) {
@@ -2065,7 +2154,7 @@ async function getStatus() {
 
   return {
     gateway:   { running: gwRunning, healthy: gwHealthy, pid: gp, port: GATEWAY_PORT, crash_loop: gatewayCrashLoop, version: HERMES_VERSION },
-    dashboard: { running: dbRunning, healthy: dbHealthy, pid: dp },
+    dashboard: { running: dbRunning, healthy: dbHealthy, pid: dp, port: DASHBOARD_PORT },
     lastLog,
   };
 }
@@ -2194,7 +2283,7 @@ async function proxyDashboard(req) {
           // 以「用户最近一次点击重启」或「首次观测到 running」中较晚者为起点计 settle
           const startedMs = Math.max(restartFirstSeen.ts, lastGatewayRestartTs || 0);
           const settled = (now - startedMs) > RESTART_SETTLE_MS;
-          // 8642 为非 HTTP 内部端口，优先用 /proc 的 LISTEN 判据，HTTP 探活作兜底
+          // 8742 为非 HTTP 内部端口，优先用 /proc 的 LISTEN 判据，HTTP 探活作兜底
           const listening = isPortListening(GATEWAY_PORT);
           const alive = settled && (listening || await portAlive(GATEWAY_PORT));
           if (settled && alive) {
@@ -2463,9 +2552,44 @@ async function proxyDashboard(req) {
       headers: respHeaders,
     });
   } catch (e) {
-    // 连接拒绝/Dashboard 未就绪属正常现象（启动期间），仅非预期错误才记录
     const msg = e?.message || '';
-    if (msg && !/connect|refused|abort|ECONN/i.test(msg)) log(`proxy error: ${msg}`);
+    const isConnErr = /connect|refused|abort|ECONN/i.test(msg);
+
+    // 若 Dashboard 未运行，尝试自动拉起并最多重试一次（自愈 502）
+    if (isConnErr || /fetch failed|undici/i.test(msg)) {
+      const dp = readPid(PID_DASHBOARD);
+      if (!dp || !pidAlive(dp)) {
+        log(`[proxyDashboard] Dashboard 无响应且未运行，尝试自动拉起…`);
+        try {
+          spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
+          // 等待 dashboard ready（最多 5 秒）
+          const deadline = Date.now() + 5000;
+          while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, 250));
+            try {
+              const probe = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/`, { signal: AbortSignal.timeout(300) });
+              if (probe.ok || probe.status < 500) break;
+            } catch {}
+          }
+          // 重试原请求
+          const headers2 = new Headers(req.headers);
+          headers2.delete("host");
+          headers2.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
+          const init2 = { method: req.method, headers: headers2, signal: AbortSignal.timeout(10000) };
+          if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
+            init2.body = req.body;
+            init2.duplex = "half";
+          }
+          const upstream2 = await fetch(target, init2);
+          return new Response(upstream2.body, { status: upstream2.status, headers: upstream2.headers });
+        } catch (e2) {
+          log(`[proxyDashboard] 自动拉起 Dashboard 后重试失败：${e2?.message || e2}`);
+        }
+      }
+    }
+
+    // 连接拒绝/Dashboard 未就绪属正常现象（启动期间），仅非预期错误才记录
+    if (msg && !isConnErr) log(`proxy error: ${msg}`);
     return new Response(JSON.stringify({ error: "Dashboard unavailable" }), {
       status:  502,
       headers: { "Content-Type": "application/json" },
@@ -2552,8 +2676,12 @@ function serveFile(filePath, contentType) {
 // ─── 请求处理器 ─────────────────────────────────────────────────────────
 async function handleFetch(req) {
   const url  = new URL(req.url);
-  // fnOS gateway 反向代理不剥路径前缀（/app/{appname}/），这里手动剥离
-  const path = url.pathname.replace(/^\/app\/[^/]+/, "") || "/";
+  // fnOS gateway 反向代理不剥路径前缀（BASE_PATH），这里按实际 BASE_PATH 剥离
+  let path = url.pathname;
+  if (BASE_PATH && BASE_PATH !== "/") {
+    if (path.startsWith(BASE_PATH + "/")) path = path.slice(BASE_PATH.length);
+    else if (path === BASE_PATH) path = "/";
+  }
 
   // CORS 预检
   if (req.method === "OPTIONS") {
@@ -2593,7 +2721,7 @@ async function handleFetch(req) {
     });
   }
 
-  // 实时探测 8642 网关健康状态，前端 chat 页用这个判断"是否连接"
+  // 实时探测 8742 网关健康状态，前端 chat 页用这个判断"是否连接"
   if (path === "/api/gateway/health") {
     const t0 = Date.now();
     let ok = false, err = null;
@@ -2651,8 +2779,8 @@ async function handleFetch(req) {
       token: MONITOR_TOKEN,
       transport: SOCKET_PATH ? "unix" : "tcp",
       socket_path: SOCKET_PATH || null,
-      api_server_port: 8642,
-      api_server_url: `http://${getLANIP()}:8642`,
+      api_server_port: GATEWAY_PORT,
+      api_server_url: `http://${getLANIP()}:${GATEWAY_PORT}`,
       app_version: APP_VERSION,
       hermes_version_date: HERMES_VERSION_DATE,
     }), { headers: jsonHeaders() });
@@ -3008,16 +3136,28 @@ async function handleFetch(req) {
     return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
   }
 
+  // 重启网关 + 仪表盘（P0 修复 v0.20.65：配置落盘后必须重启网关以使 provider/API key 生效，
+  // 并在拉起前清掉抢占端口的外来 hermes 进程（legacy 兜底；当前主要靠端口迁移到 8742 规避 studio 网关冲突）。
+  async function restartHermesServices() {
+    try {
+      await stopPid(PID_GATEWAY);
+      await stopPid(PID_DASHBOARD);
+      await forceKillHermes();
+      resetGatewayCrashLoop();
+      await new Promise(r => setTimeout(r, 1500));
+      const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run"]);
+      const r2 = spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
+      return { gateway: r1, dashboard: r2 };
+    } catch (e) {
+      log("重启网关/仪表盘失败: " + (e && e.message));
+      return { error: String(e && e.message) };
+    }
+  }
+
   if (path === "/api/restart" && req.method === "POST") {
     log("Restarting gateway ...");
-    await stopPid(PID_GATEWAY);
-    await stopPid(PID_DASHBOARD);
-    await forceKillHermes();
-    resetGatewayCrashLoop();
-    await new Promise(r => setTimeout(r, 1500));
-    const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run"]);
-    const r2 = spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
-    return new Response(JSON.stringify({ gateway: r1, dashboard: r2 }), { headers: jsonHeaders() });
+    const res = await restartHermesServices();
+    return new Response(JSON.stringify(res), { headers: jsonHeaders() });
   }
 
   // Dashboard 独立启停
@@ -4032,6 +4172,15 @@ async function handleFetch(req) {
         });
       }
 
+      // ── 读取完整模型列表（provider-models.json）────────────────────────
+      let provModelsMap = {};
+      try {
+        const modelsPath = `${VAR_DIR}/provider-models.json`;
+        if (existsSync(modelsPath)) {
+          provModelsMap = JSON.parse(readFileSync(modelsPath, "utf8"));
+        }
+      } catch (e) { provModelsMap = {}; }
+
       // ── 构建返回的 provider 列表 ────────────────────────────────────
       Object.entries(provModelMap).forEach(([id, info]) => {
         const preset = PROVIDER_PRESETS[id];
@@ -4050,6 +4199,7 @@ async function handleFetch(req) {
           type: "openai-compatible",
           base_url: preset ? preset.base_url : baseUrl,
           model,
+          models: Array.isArray(provModelsMap[id]) ? provModelsMap[id] : [],
           temperature: info.temperature ?? 0.7,
           max_tokens: info.max_tokens ?? 4096,
           api_key_masked: maskedKey,
@@ -4359,6 +4509,29 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ ok: true, status }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+  // 企业微信扫码授权：按已配置的 Corp ID / Agent ID / Secret 生成网页授权二维码（与 Octop 一致）
+  if (path === "/api/channels/wecom/qr" && req.method === "GET") {
+    try {
+      const pc = (_readPlatformConfig ? _readPlatformConfig("wecom") : {}) || {};
+      const extra = pc.extra || {};
+      const corpId = extra.corp_id || process.env.WECOM_CORP_ID || "";
+      const agentId = extra.agent_id || process.env.WECOM_AGENT_ID || "";
+      const secret = extra.secret || process.env.WECOM_SECRET || "";
+      if (!corpId || !agentId || !secret) {
+        return new Response(JSON.stringify({ ok: false, error: "请先在「手动输入」中填写企业微信 Corp ID / Agent ID / Secret 后再扫码授权。" }), { status: 400, headers: jsonHeaders() });
+      }
+      const origin = (req.headers.get("origin") || "").replace(/\/+$/, "") || (req.headers.get("referer") || "").replace(/\/+$/, "");
+      const redirect = (origin ? origin : "http://localhost") + (BASE_PATH || "") + "/api/channels/wecom/qr/callback";
+      const state = "hermes_wecom_" + Date.now();
+      const authUrl = "https://open.weixin.qq.com/connect/oauth2/authorize?appid=" + encodeURIComponent(corpId) +
+        "&redirect_uri=" + encodeURIComponent(redirect) +
+        "&response_type=code&scope=snsapi_base&agentid=" + encodeURIComponent(agentId) +
+        "&state=" + encodeURIComponent(state) + "#wechat_redirect";
+      return new Response(JSON.stringify({ ok: true, qr_payload: authUrl, qr_url: authUrl, deep_link: authUrl }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
   }
 
@@ -4776,6 +4949,20 @@ async function handleFetch(req) {
         // 非致命错误
       }
 
+      // ── 持久化完整模型列表（models 数组）到 provider-models.json ─────────────
+      // providers-state.yaml 只存当前默认模型，模型多选列表单独存 VAR_DIR，升级不丢失
+      try {
+        const modelsPath = `${VAR_DIR}/provider-models.json`;
+        const incomingModels = {};
+        (body.providers || []).forEach(p => {
+          if (!p.id || !Array.isArray(p.models)) return;
+          incomingModels[p.id] = p.models;
+        });
+        writeFileSync(modelsPath, JSON.stringify(incomingModels, null, 2));
+      } catch (e) {
+        // 非致命错误
+      }
+
       // ── 同步 model section + 自定义 provider 到 Hermes config.yaml ───────────
       const resolvedModel = allProvConfig[providerId]?.model || "auto";
       const yamlPath = `${DATA_DIR}/config.yaml`;
@@ -4890,6 +5077,29 @@ async function handleFetch(req) {
           log("extensions/config.yaml write failed: " + e.message);
         }
       }
+
+      // ── 强制 Markdown 格式输出（Issue #12）：网关默认 strip 会剥离所有格式 ──
+      try {
+        const yamlPath = `${DATA_DIR}/config.yaml`;
+        if (existsSync(yamlPath)) {
+          let y = readFileSync(yamlPath, "utf8");
+          const dm = y.match(/^display:[\s\S]*?^  final_response_markdown:\s*(\S+)/m);
+          const current = dm ? dm[1] : "";
+          if (current !== "gfm") {
+            if (dm) {
+              const before = y.slice(0, dm.index + dm[0].indexOf("final_response_markdown:"));
+              const after = y.slice(dm.index + dm[0].length);
+              y = before + "final_response_markdown: gfm" + after;
+            } else if (y.match(/^display:/m)) {
+              y = y.replace(/^display:/m, "display:\n  final_response_markdown: gfm");
+            } else {
+              y = y.trimEnd() + "\n\ndisplay:\n  final_response_markdown: gfm\n";
+            }
+            writeFileSync(yamlPath, y);
+            log("已自动校正 display.final_response_markdown → gfm");
+          }
+        }
+      } catch (e) { log("校正 display.final_response_markdown 失败: " + e.message); }
 
       // ── 保存 API key 到控制面板专属 .env.providers ────────────────────
       const envUpdates = [];
@@ -5569,7 +5779,11 @@ function startServer() {
 
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url, "http://localhost");
-    const wsPath = url.pathname.replace(/^\/app\/[^/]+/, "") || "/";
+    let wsPath = url.pathname;
+    if (BASE_PATH && BASE_PATH !== "/") {
+      if (wsPath.startsWith(BASE_PATH + "/")) wsPath = wsPath.slice(BASE_PATH.length);
+      else if (wsPath === BASE_PATH) wsPath = "/";
+    }
     // 聊天 WS：/api/chat/ws?session_id=xxx&token=xxx
     if (wsPath === "/api/chat/ws") {
       const token = url.searchParams.get("token") || "";
@@ -5675,3 +5889,20 @@ setInterval(() => {
     log(`[self-heal] 重建失败: ${e?.message || e}`);
   }
 }, 10000);
+
+// 端口守卫（P0 修复 v0.20.65，legacy 冗余）：周期性清理「非本包」的外来 hermes 网关/仪表盘进程。
+// 历史上 hermes-studio 以其 `--replace` 网关抢占 8642，导致本包聊天被路由到无 provider 的网关；
+// 当前本包已迁移到 8742/9219 从根本上规避该冲突，此守卫作为同端口场景下的兜底。
+// 仅当本包已配置真实 provider 时才防守，
+// 未配置时不干扰其它 hermes 应用。
+setInterval(() => {
+  try {
+    const statePath = `${VAR_DIR}/providers-state.yaml`;
+    if (!existsSync(statePath)) return;
+    const content = readFileSync(statePath, "utf8");
+    const ids = [...content.matchAll(/^  ([a-zA-Z0-9_-]+):\s*$/gm)].map(m => m[1]);
+    const hasReal = ids.some(id => id !== "hermes");
+    if (!hasReal) return;
+    killForeignHermesProcesses();
+  } catch (e) {}
+}, 60000);
