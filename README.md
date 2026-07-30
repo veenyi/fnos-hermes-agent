@@ -103,7 +103,7 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
                                          ├─► Unix socket: /var/apps/hermes-agent/hermes-agent.sock
                                          │                 └─► 控制面板前端 (app/ui/index.html)
                                          │
-                                         └─► HTTP 代理 → Hermes Gateway (:8642)
+                                         └─► HTTP 代理 → Hermes Gateway (:8742)
                                                           └─► 模型供应商 API / WS 消息通道
 ```
 
@@ -113,12 +113,12 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 
 ### 端口说明
 
-- **8642** — Hermes Gateway 通信端口（内部使用，不对外暴露）
-- **9119** — Dashboard 仪表板端口（本地回环访问）
+- **8742** — Hermes Gateway 通信端口（内部使用，不对外暴露；原 8642，环境变量 `GATEWAY_PORT` 可覆盖）
+- **9219** — Dashboard 仪表板端口（本地回环访问；原 9119，环境变量 `DASHBOARD_PORT` 可覆盖）
 
 ## 架构设计
 
-控制面板通过基于 HTTP 的 Node.js 服务器（Monitor）通信，该服务器监听 Unix socket（`/var/apps/hermes-agent/hermes-agent.sock`）。消息被代理至端口 8642 上的 Hermes Gateway 进程。Python 虚拟环境使用 `uv` 作为包管理器，依赖项在安装时从 PyPI 镜像源拉取（阿里云镜像优先，GitHub 备用）。
+控制面板通过基于 HTTP 的 Node.js 服务器（Monitor）通信，该服务器监听 Unix socket（`/var/apps/hermes-agent/hermes-agent.sock`）。消息被代理至端口 8742 上的 Hermes Gateway 进程。Python 虚拟环境使用 `uv` 作为包管理器，依赖项在安装时从 PyPI 镜像源拉取（阿里云镜像优先，GitHub 备用）。
 
 监控令牌（Token）位于 `/vol1/@appdata/hermes-agent/monitor.token`，每次应用启动时生成随机字符串，前后端通过此 Token 鉴权。写操作（配置修改、进程重启）必须携带有效 Token，只读查询（状态、日志）免鉴权。
 
@@ -127,6 +127,30 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 
 ### v0.20.x
 
+- **v0.20.65** — 端口迁移根治网关抢占：网关 `8642→8742`、仪表盘 `9119→9219`（均支持环境变量 `GATEWAY_PORT`/`DASHBOARD_PORT` 覆盖）；彻底规避同机 hermes-studio 网关对 8642 的 `--replace` 抢占，导致聊天被随机路由到无 provider 的 studio 网关（`No inference provider configured` / 自称「人类学家」）。前端 `ensureDefaultSession` 保存模型后默认建立「默认助手」会话并激活网关；`/api/status` 新增 `dashboard.port`，端口显示改为由 `api_server_port` 动态渲染。
+- **v0.20.64** — 配置弹窗与专家选择器交互细节优化，部署稳定性加固。
+- **v0.20.63** — 工具/技能配置弹窗与专家团自动建团体验打磨。
+- **v0.20.62** — 四项体验/稳定性修复：① #8 静态脚本 404 根治（注入 `<base href>` + monitor 按 BASE_PATH 剥离）；② #4/#5 工具·技能「配置」按钮——jsdom 验证源码弹窗正常，重建即解；③ #6 选中专家时若专家团为空自动组建团队；④ #7 会话→角色分组映射 `_sessionAgent`/`_agents` 服务端持久化，清缓存/换浏览器后 `loadConfig` 自动恢复。已构建 v0.20.62.fpk 真机验证。
+- **v0.20.61** — 真机 6 类回归：专家库缺失、日志倒序、会话归属错误、专家团/专家选择器、手机端交互等修复，提升多智能体可用性。
+- **v0.20.60** — 手机端概览/会话树/模型选择器交互修复，移动端体验打磨。
+- **v0.20.59** — WebChat 输出 Markdown 格式修复（表格/换行丢失、`[object Object]`）。
+- **v0.20.58** — 二维码与扩展页图标/配置弹窗修复，通讯扫码体验加固。
+- **v0.20.57** — 专家团/专家库加载与切换稳定性修复。
+- **v0.20.56** — 专家团多智能体协作打磨与全能大脑回归修复。
+- **v0.20.55** — 全能大脑 + 专家团：集成 LightAgent 全能大脑，专家团升级为原生 `delegate_task` 真多智能体协作，单人/团队模式一键切换。
+- **v0.20.54** — 聊天窗口支持 Ctrl+V 粘贴图片（粘图）。
+- **v0.20.53** — Provider 模型列表获取与启用管理（Dashboard 式模型列表）。
+- **v0.20.52** — 技能图标/配置弹窗 + Dashboard 风格日志查看器（来源/级别/组件/行数/关键词 + 级别配色）。
+- **v0.20.51** — 会话窗口快捷指令对齐 Hermes 官方斜杠命令集。
+- **v0.20.50** — 会话列表标题/日期、快捷技能生效、重启/启动/停止乐观反馈（不再长时间等待）。
+- **v0.20.49** — WebChat 消息输出格式与工具卡片渲染修复。
+- **v0.20.48** — 工具/技能配置弹窗与扩展页交互优化。
+- **v0.20.47** — 修复添加模型后网关 502 / `No inference provider configured`（Provider 落盘与网关重启修复）。
+- **v0.20.46** — Provider 模型列表与启用状态持久化修复。
+- **v0.20.45** — 清除概览页所有硬编码/虚假状态数据，修复 uptime 单位错乱等状态显示 bug。
+- **v0.20.44** — 修复 V17 模型 preset/工作流/扫码 QR 三项回归问题。
+- **v0.20.43** — V17.1 修复 10 项 UI 缺陷（模型预设/获取、黄色栏、测试残留、卡片对齐、工作流/专家/角色入口、QR 弹窗）。
+- **v0.20.42** — V17 单文件控制台稳定性与 Provider 落盘、WebChat 格式、工具/技能配置弹窗、专家团/专家库、二维码、手机端交互等逐版迭代修复的起点。
 - **v0.20.41** — 修复移动端「添加模型服务」弹窗选择「自定义」后无法滚动到底部按钮的问题。
 - **v0.20.40** — 扩展页原生工具集 API 返回英文时强制中文映射，覆盖 25 个工具集的 label/description/icon。
 - **v0.20.39** — 修复 Dashboard 启动失败：root/hermes-agent 文件属主漂移导致 EACCES、多 monitor 实例冲突。

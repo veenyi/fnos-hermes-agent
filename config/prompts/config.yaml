@@ -213,7 +213,7 @@ display:
   show_reasoning: false
   streaming: false
   timestamps: false
-  final_response_markdown: strip
+  final_response_markdown: gfm
   persistent_output: true
   persistent_output_max_lines: 200
   inline_diffs: true
