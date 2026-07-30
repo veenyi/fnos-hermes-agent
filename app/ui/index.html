@@ -5339,10 +5339,9 @@ function renderRail(){
   var html = '';
   _agents.forEach(function(agent){
     var isActiveAgent = (currentAgent === agent.id);
-    // 默认所有 agent 分组都【展开】，方便用户看到会话列表；
-    // 仅当 localStorage 显式记录为 'false' 才折叠。
-    // 之前默认折叠导致用户反复反馈「左侧会话树默认隐藏，已要求修复超过 5 次」。
-    var open = (localStorage.getItem('hermes_rail_open_'+agent.id) !== 'false');
+    // 默认所有 agent 分组都【折叠】，用户点击才展开。
+    // 仅当 localStorage 显式记录为 'true' 才展开。
+    var open = (localStorage.getItem('hermes_rail_open_'+agent.id) === 'true');
     // 归属映射若指向不存在的 agent（如本地存储被部分清理），回退到 default，避免会话丢失
     var sessIds = _sessions.filter(function(s){
       var aid = _sessionAgent[s.id] || 'default';
