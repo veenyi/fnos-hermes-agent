@@ -565,9 +565,17 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 .selected-expert-bar .action{margin-top:0;width:auto;padding:3px 12px;font-size:12px;background:var(--bg2)}
 .action.sm{padding:4px 10px;font-size:12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text)}
 .action.sm:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
-.ext-card .action.danger{color:var(--red);border-color:var(--red)}
-.ext-card .action.danger:hover{background:rgba(239,68,68,.1)}
-.skill-config-provider.selected{border-color:var(--accent);background:var(--accent-bg)}
+    .ext-card .action.danger{color:var(--red);border-color:var(--red)}
+    .ext-card .action.danger:hover{background:rgba(239,68,68,.1)}
+    .skill-config-provider.selected{border-color:var(--accent);background:var(--accent-bg)}
+    /* 专家团 CTA 按钮（替代原 .action.primary 大块按钮）— 跟 pop-item 同一设计语言 */
+    .team-cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 14px;margin-top:6px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+    .team-cta:hover{opacity:.92;transform:translateY(-1px);box-shadow:0 4px 12px rgba(99,102,241,.25)}
+    .team-cta:active{transform:translateY(0)}
+    .team-cta.on{background:var(--accent);color:#fff}
+    .team-cta.off{background:var(--bg1);color:var(--accent);border-color:var(--accent)}
+    .team-cta .ico{font-size:15px;line-height:1}
+    .team-cta .hint{font-weight:400;font-size:11px;opacity:.85;margin-left:2px}
 /* 工具调用卡片容器（Fix #1：作为可滚动叠层，避免长输出淹没聊天） */
 /* 工具调用集合：Octop 风格紧凑摘要条（Issue #8） */
 .tool-calls{margin-top:8px;display:block;padding:0;border:none;background:transparent;overflow:visible;max-height:none}
@@ -1046,46 +1054,6 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
                 </div>
               </div>
             </div>
-            <div id="skillConfigModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeSkillConfigModal()">
-              <div class="modal-panel" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
-                <div class="modal-head"><h3 id="skillCfgTitle">技能配置</h3><button class="modal-close" onclick="closeSkillConfigModal()">×</button></div>
-                <div class="modal-body" id="skillCfgBody" style="overflow:auto"></div>
-                <div class="modal-foot" id="skillCfgFoot">
-                  <button class="action" onclick="runSkillSetup()" id="skillCfgSetupBtn" style="display:none">>_ Run setup</button>
-                  <button class="action primary" onclick="saveSkillConfig()">保存配置</button>
-                </div>
-              </div>
-            </div>
-<!-- 工具配置（T2 P0-2） -->
-<div id="toolConfigModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeToolConfigModal()">
-  <div class="modal-panel" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
-    <div class="modal-head"><h3 id="toolCfgTitle">工具配置</h3><button class="modal-close" onclick="closeToolConfigModal()">×</button></div>
-    <div class="modal-body" id="toolCfgBody" style="overflow:auto"></div>
-    <div class="modal-foot">
-      <button class="action" onclick="closeToolConfigModal()">取消</button>
-      <button class="action primary" onclick="saveToolConfig()">保存配置</button>
-    </div>
-  </div>
-</div>
-<!-- 工作流 DAG 编辑器（T4 P0-4） -->
-<div id="workflowEditorModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeWorkflowEditor()">
-  <div class="modal-panel" style="max-width:680px;max-height:88vh;display:flex;flex-direction:column">
-    <div class="modal-head"><h3>工作流 DAG 编辑器</h3><button class="modal-close" onclick="closeWorkflowEditor()">×</button></div>
-    <div class="modal-body" style="overflow:auto">
-      <div class="field-row">
-        <div class="field"><label>工作流名称</label><input type="text" id="wfNameModal" placeholder="我的工作流"></div>
-        <div class="field"><label>并行度</label><input type="number" id="wfConcModal" min="1" value="2"></div>
-      </div>
-      <div class="conn-section-title">步骤（DAG）</div>
-      <div id="wfStepsModal" class="wf-steps"></div>
-      <button class="action secondary" style="width:100%;margin-top:10px;border-radius:10px;padding:10px" onclick="addWfStep('Modal')">+ 添加步骤</button>
-    </div>
-    <div class="modal-foot">
-      <button class="action" onclick="closeWorkflowEditor()">取消</button>
-      <button class="action primary" onclick="setCurrentWorkflow()">▶ 设为当前工作流并使用</button>
-    </div>
-  </div>
-</div>
           </div>
         </section>
 
@@ -1130,6 +1098,49 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 
   <!-- 移动端会话树遮罩 -->
   <div class="chat-rail-overlay" id="chatRailOverlay" onclick="closeRailDrawer()"></div>
+
+  <!-- ===== 全局模态（必须在 page/section 之外，避免被隐藏页面遮挡） ===== -->
+  <!-- 技能配置 -->
+  <div id="skillConfigModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeSkillConfigModal()">
+    <div class="modal-panel" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-head"><h3 id="skillCfgTitle">技能配置</h3><button class="modal-close" onclick="closeSkillConfigModal()">×</button></div>
+      <div class="modal-body" id="skillCfgBody" style="overflow:auto"></div>
+      <div class="modal-foot" id="skillCfgFoot">
+        <button class="action" onclick="runSkillSetup()" id="skillCfgSetupBtn" style="display:none">>_ Run setup</button>
+        <button class="action primary" onclick="saveSkillConfig()">保存配置</button>
+      </div>
+    </div>
+  </div>
+  <!-- 工具配置 -->
+  <div id="toolConfigModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeToolConfigModal()">
+    <div class="modal-panel" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-head"><h3 id="toolCfgTitle">工具配置</h3><button class="modal-close" onclick="closeToolConfigModal()">×</button></div>
+      <div class="modal-body" id="toolCfgBody" style="overflow:auto"></div>
+      <div class="modal-foot">
+        <button class="action" onclick="closeToolConfigModal()">取消</button>
+        <button class="action primary" onclick="saveToolConfig()">保存配置</button>
+      </div>
+    </div>
+  </div>
+  <!-- 工作流 DAG 编辑器 -->
+  <div id="workflowEditorModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeWorkflowEditor()">
+    <div class="modal-panel" style="max-width:680px;max-height:88vh;display:flex;flex-direction:column">
+      <div class="modal-head"><h3>工作流 DAG 编辑器</h3><button class="modal-close" onclick="closeWorkflowEditor()">×</button></div>
+      <div class="modal-body" style="overflow:auto">
+        <div class="field-row">
+          <div class="field"><label>工作流名称</label><input type="text" id="wfNameModal" placeholder="我的工作流"></div>
+          <div class="field"><label>并行度</label><input type="number" id="wfConcModal" min="1" value="2"></div>
+        </div>
+        <div class="conn-section-title">步骤（DAG）</div>
+        <div id="wfStepsModal" class="wf-steps"></div>
+        <button class="action secondary" style="width:100%;margin-top:10px;border-radius:10px;padding:10px" onclick="addWfStep('Modal')">+ 添加步骤</button>
+      </div>
+      <div class="modal-foot">
+        <button class="action" onclick="closeWorkflowEditor()">取消</button>
+        <button class="action primary" onclick="setCurrentWorkflow()">▶ 设为当前工作流并使用</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 统一小浮层 -->
   <div class="mini-popup" id="miniPopup">
@@ -5328,9 +5339,10 @@ function renderRail(){
   var html = '';
   _agents.forEach(function(agent){
     var isActiveAgent = (currentAgent === agent.id);
-    // 默认所有 agent 分组都【折叠】；仅当 localStorage 显式记录为 'true' 才展开
-    // 切换页面/刷新时不自动展开，必须用户手动点击
-    var open = (localStorage.getItem('hermes_rail_open_'+agent.id) === 'true');
+    // 默认所有 agent 分组都【展开】，方便用户看到会话列表；
+    // 仅当 localStorage 显式记录为 'false' 才折叠。
+    // 之前默认折叠导致用户反复反馈「左侧会话树默认隐藏，已要求修复超过 5 次」。
+    var open = (localStorage.getItem('hermes_rail_open_'+agent.id) !== 'false');
     // 归属映射若指向不存在的 agent（如本地存储被部分清理），回退到 default，避免会话丢失
     var sessIds = _sessions.filter(function(s){
       var aid = _sessionAgent[s.id] || 'default';
@@ -6011,21 +6023,27 @@ function buildMiniPopupBody(key,d){
     if(_expertPickerTab==='team'){
       var team=_cfg.extensions.team||[];
       if(!team.length){
-        body='<div class="pick-list"><div class="empty-state" style="padding:20px 0;text-align:center;color:var(--text3)">专家团为空。<br>请到「扩展 → 团队」组建团队后再使用。</div></div>';
+        body='<div class="pick-list"><div class="empty-state" style="padding:20px 0;text-align:center;color:var(--text3)">专家团为空。<br>点击下方「使用专家团」将自动按部门组建跨领域团队。</div></div>';
       } else {
         body='<div class="pick-list">';
         team.forEach(function(m){
-          body+='<div class="pop-item">'+
+          body+='<div class="pop-item" data-id="'+esc(m.id||'')+'">'+
             '<div class="ico">'+(m.icon||'🎯')+'</div><div class="txt"><div class="t">'+esc(m.name||'')+'</div><div class="d">'+esc(m.dept||'')+'</div></div>'+
+            '<button class="action sm" onclick="event.stopPropagation();removeTeamMember(\''+esc(m.id)+'\')" style="margin-top:0;flex:none">移除</button>'+
             '</div>';
         });
-        body+='</div><div style="padding:8px 4px 0"><button class="action primary" style="width:100%" onclick="useExpertTeam()">'+
-          (_cfg.extensions.team_enabled?'已启用专家团（点击重新应用）':'使用专家团')+'</button></div>';
+        body+='</div><div class="team-cta-wrap"><button class="team-cta '+(_cfg.extensions.team_enabled?'on':'off')+'" onclick="useExpertTeam()">'+
+          '<span class="ico">'+( _cfg.extensions.team_enabled?'✓':'👥' )+'</span>'+
+          '<span>'+(_cfg.extensions.team_enabled?'已启用专家团':'使用专家团')+'</span>'+
+          '<span class="hint">'+( _cfg.extensions.team_enabled?'点击重新应用':'多智能体协作' )+'</span>'+
+          '</button></div>';
       }
     } else {
       body='<div class="pick-list">';
       (d.items||[]).forEach(function(it){
-        body+='<div class="pop-item" data-id="'+esc(it.id||'')+'" onclick="pickItem(\'expert\',this)">'+
+        // 选中态：与「单专家注入对象」_selectedExpert 比对
+        var selExpert = (_selectedExpert && _selectedExpert.id===(it.id||''));
+        body+='<div class="pop-item'+(selExpert?' active':'')+'" data-id="'+esc(it.id||'')+'" onclick="pickItem(\'expert\',this)">'+
           '<div class="ico">'+it.ico+'</div><div class="txt"><div class="t">'+esc(it.t)+'</div><div class="d">'+esc(it.d)+'</div></div><div class="check"></div></div>';
       });
       body+='</div>';
@@ -6150,7 +6168,17 @@ function agencyIdByName(name){
 /* 启用专家团模式（从工具栏弹窗触发）：开启委派并切到默认 agent，后续发送走专家团注入 */
 function useExpertTeam(){
   var team=_cfg.extensions.team||[];
-  if(!team.length){ toast('专家团为空，请先组建团队'); return; }
+  // 专家团为空时不再只 toast 提示后退出，而是自动按部门各取 1 位组建一个跨领域团队，
+  // 否则用户「启用专家团」后实际仍只走单专家分支。
+  if(!team.length){
+    if(typeof buildTeam==='function') buildTeam();
+    team=_cfg.extensions.team||[];
+    if(!team.length){
+      // 连 buildTeam 都没有数据来源（AGENCY_PERSONAS 也没加载），给个明确提示
+      toast('专家团为空且无专家数据，请先在「扩展→专家」加载专家库');
+      return;
+    }
+  }
   _cfg.extensions.team_enabled=true;
   if(!_cfg.extensions.toolsets) _cfg.extensions.toolsets={};
   _cfg.extensions.toolsets.delegation=true;
@@ -6907,7 +6935,10 @@ function renderExtensions(){
 }
 function renderToolsets(){
   var el=document.getElementById('toolsetList'); if(!el) return;
-  fetch(apiUrl('/proxy/dashboard/api/tools/toolsets'), { cache:'no-store', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+  // GET /proxy/dashboard/* 不带 X-Monitor-Token：proxy 会自动注入 X-Hermes-Session-Token，
+  // 自带 X-Monitor-Token 会触发 CORS 预检，app-center/trim_app_center 对 OPTIONS 返 401，
+  // 导致浏览器控制台出现 401 噪音。这里保持「无自定义头」=简单请求=不预检。
+  fetch(apiUrl('/proxy/dashboard/api/tools/toolsets'), { cache:'no-store' })
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(list){
       _toolNative = {};
@@ -6919,7 +6950,7 @@ function renderToolsets(){
       }).join('');
     })
     .catch(function(){
-      // 仪表盘未启动：回退到 config.extensions.toolsets
+      // 仪表盘未启动 / 网络异常：回退到 config.extensions.toolsets（静默）
       var ts = _cfg.extensions.toolsets || {};
       var keys = Object.keys(ts);
       if(!keys.length) keys = PV.toolsets.map(function(t){ return t.id; });
