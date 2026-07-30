@@ -363,8 +363,13 @@
       .ov-head-actions .ov-openbtn{flex:1;text-align:center}
       .sys-metrics{grid-template-columns:1fr 1fr;gap:8px}
       .ov-metric strong{font-size:13px}
-      .ov-logbar{gap:6px;margin-top:8px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-      .ov-logbar::-webkit-scrollbar{display:none}
+      .ov-logbar{display:none;gap:6px;margin-top:8px;padding:10px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;flex-direction:column;align-items:stretch;max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+      .ov-logbar.open{display:flex}
+      .log-filter-toggle{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:100%;margin-top:8px;padding:7px 10px;border-radius:7px;border:1px dashed var(--border);background:var(--bg1);color:var(--text2);font-size:11px;cursor:pointer;transition:all .15s}
+      .log-filter-toggle:hover{border-color:var(--accent);color:var(--accent)}
+      .log-filter-toggle .arrow{transition:transform .2s}
+      .log-filter-toggle.on .arrow{transform:rotate(180deg)}
+      .ov-logbar .log-filter-row{flex-wrap:wrap}
       .log-filter-row{gap:5px;flex-wrap:nowrap;white-space:nowrap}
       .log-filter-label{font-size:10px;min-width:30px}
       .log-filter-row .ov-logbtn{padding:3px 7px;font-size:10px;min-width:auto;white-space:nowrap}
@@ -402,6 +407,7 @@
 .ov-metric{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--text3)}
 .ov-metric strong{font-size:14px;color:var(--text);font-weight:600}
 .ov-logbar{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.log-filter-toggle{display:none}
 .log-filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .log-filter-row .ov-logbtn{padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);font-size:11px;cursor:pointer;color:var(--text2);min-width:48px}
 .log-filter-row .ov-logbtn:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
@@ -776,6 +782,9 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <div class="ov-metric"><span>Hermes 版本</span><strong id="sysHermesVer">--</strong></div>
         <div class="ov-metric"><span>应用版本</span><strong id="sysAppVer">--</strong></div>
       </div>
+      <button class="log-filter-toggle" id="ovLogFilterToggle" onclick="toggleLogFilters()" type="button">
+        <span>🔧</span><span id="ovLogFilterToggleLabel">显示日志过滤</span><span class="arrow">▾</span>
+      </button>
       <div class="ov-logbar" id="ovLogBar">
         <div class="log-filter-row">
           <span class="log-filter-label">来源</span>
@@ -6375,6 +6384,8 @@ function renderOverview(){
   apiGet('/api/status').then(function(s){
     if(!s || s.error){ setStatusOffline(); return; }
     applyServiceState(s);
+    // 初始化日志过滤区折叠状态（手机端默认收起，电脑端始终展开）
+    initLogFilterToggle();
     // 默认加载 Monitor 日志（仅首次）
     if(!_logInited){ _logInited=true; setTimeout(function(){ appendLog('monitor','Monitor 日志'); }, 100); }
   }).catch(function(){ setStatusOffline(); });
@@ -6489,6 +6500,31 @@ function setLogLevel(l){ _logState.level=l||'all'; applyLogFilters(false); }
 function setLogComponent(c){ _logState.component=c||'all'; applyLogFilters(false); }
 function setLogLines(n){ _logState.lines=parseInt(n)||100; applyLogFilters(true); }
 function clearLogKeyword(){ var k=document.getElementById('logKeyword'); if(k) k.value=''; _logState.keyword=''; applyLogFilters(false); }
+
+// 手机端折叠/展开日志过滤区（电脑端无按钮，过滤区始终可见）
+function toggleLogFilters(){
+  var bar=document.getElementById('ovLogBar');
+  var btn=document.getElementById('ovLogFilterToggle');
+  var lbl=document.getElementById('ovLogFilterToggleLabel');
+  if(!bar||!btn) return;
+  var open=!bar.classList.contains('open');
+  bar.classList.toggle('open', open);
+  btn.classList.toggle('on', open);
+  if(lbl) lbl.textContent = open ? '收起日志过滤' : '显示日志过滤';
+  try { localStorage.setItem('hermes_log_filter_open', open?'true':'false'); } catch(e){}
+}
+// 启动时根据 localStorage + 屏幕宽度决定初始状态
+function initLogFilterToggle(){
+  var bar=document.getElementById('ovLogBar');
+  var btn=document.getElementById('ovLogFilterToggle');
+  var lbl=document.getElementById('ovLogFilterToggleLabel');
+  if(!bar||!btn) return;
+  var open=false;
+  try { open = localStorage.getItem('hermes_log_filter_open')==='true'; } catch(e){}
+  bar.classList.toggle('open', open);
+  btn.classList.toggle('on', open);
+  if(lbl) lbl.textContent = open ? '收起日志过滤' : '显示日志过滤';
+}
 function applyLogFilters(refetch){
   var k=document.getElementById('logKeyword');
   _logState.keyword = k ? k.value : '';
