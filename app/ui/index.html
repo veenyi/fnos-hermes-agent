@@ -83,6 +83,9 @@
     .agent-row .info{flex:1;min-width:0}
     .agent-row .name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .agent-row .desc{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .agent-del{width:22px;height:22px;border-radius:5px;border:1px solid transparent;background:transparent;color:var(--text3);font-size:13px;cursor:pointer;opacity:0;transition:all .15s;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;margin-left:2px}
+    .agent-row:hover .agent-del{opacity:1}
+    .agent-del:hover{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.4);color:#dc2626}
     .session-list{padding-left:24px;overflow:hidden;max-height:0;transition:max-height .25s ease}
     .session-list.open{max-height:400px}
     .session-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text2);transition:background .15s}
@@ -201,7 +204,15 @@
     .input-outer{background:var(--bg2);border:1px solid var(--border);border-radius:22px;padding:12px 14px 10px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
     body.theme-dark .input-outer{box-shadow:0 2px 8px rgba(0,0,0,.2)}
     .input-outer:focus-within{border-color:var(--accent)}
-    .skill-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 8px}
+    /* chat composer 顶部 chip 行：persona + 专家团 + 工作流 */
+.chat-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 8px;align-items:center;min-height:0}
+.chat-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;font-size:12px;border-radius:16px;border:1px solid var(--border);background:var(--bg1);color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;font-family:inherit;line-height:1}
+.chat-chip:hover{border-color:var(--accent);color:var(--accent)}
+.chat-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500}
+.chat-chip.active:hover{opacity:.92;color:#fff}
+.chat-chip.delimiter::before{content:"";display:inline-block;width:1px;height:14px;background:var(--border);margin:0 4px}
+.chat-chips:empty{display:none}
+.skill-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 8px}
     .skill-chip{display:inline-flex;align-items:center;gap:5px;background:var(--accent-bg);color:var(--accent);border-radius:12px;padding:2px 9px;font-size:11px;cursor:pointer;line-height:1.6}
     .skill-chip .x{font-weight:700;opacity:.65}
     .skill-chip:hover .x{opacity:1}
@@ -245,16 +256,17 @@
     .pop-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;transition:all .15s;background:var(--bg1);border:1px solid var(--border);margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
     .pop-item:last-child{margin-bottom:0}
     .pop-item:hover{background:var(--bg3);border-color:var(--border2)}
-    .pop-item.active{background:#eef2ff;border-color:#c7d2fe}
-    body.theme-dark .pop-item.active{background:#1e233a;border-color:#4b5563}
-    .pop-item .ico{width:34px;height:34px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;font-weight:600;color:var(--text2)}
-    .pop-item.active .ico{background:var(--accent);color:#fff}
+    .pop-item.active{background:#eef2ff;border-color:var(--accent);box-shadow:0 0 0 2px rgba(99,102,241,.18)}
+    body.theme-dark .pop-item.active{background:#1e233a;border-color:var(--accent);box-shadow:0 0 0 2px rgba(99,102,241,.35)}
+    .pop-item .ico{width:34px;height:34px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;font-weight:600;color:var(--text2);transition:all .15s}
+    .pop-item.active .ico{background:var(--accent);color:#fff;transform:scale(1.05)}
     .pop-item .txt{flex:1;min-width:0}
     .pop-item .t{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pop-item.active .t{color:var(--accent)}
     .pop-item .d{font-size:11px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pop-item .check{width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center}
-    .pop-item.active .check{border-color:var(--accent);background:var(--accent)}
-    .pop-item.active .check::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
+    .pop-item .check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--bg1);transition:all .15s}
+    .pop-item.active .check{border-color:var(--accent);background:var(--accent);transform:scale(1.1)}
+    .pop-item.active .check::after{content:"";width:8px;height:8px;border-radius:50%;background:#fff}
 
     .pick-groups{display:flex;flex-direction:column;gap:10px}
     .pick-group{display:flex;flex-direction:column;gap:6px}
@@ -515,6 +527,8 @@
 .provider-actions .action.warn{color:#d97706;border-color:rgba(245,158,11,.4)}
 .provider-actions .action.warn:hover{background:rgba(245,158,11,.1)}
 .provider-actions .action.disabled{opacity:.6;cursor:not-allowed;color:var(--text3)}
+.provider-actions .action.danger{color:#dc2626;border-color:rgba(239,68,68,.4)}
+.provider-actions .action.danger:hover{background:rgba(239,68,68,.12);color:#dc2626}
 .model-manage-head{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
 .provider-model-list{display:flex;flex-direction:column;gap:6px;padding-right:4px;max-height:340px;overflow-y:auto;scrollbar-gutter:stable}
 .model-group{border:1px solid var(--border);border-radius:10px;background:var(--bg1);overflow:hidden}
@@ -586,12 +600,23 @@
     .action.primary:hover{opacity:.9;background:var(--accent);color:#fff}
     .field input, .field select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none}
     .field input:focus, .field select:focus{border-color:var(--accent)}
-    /* select 统一圆角 + 自定义下拉箭头（解决浏览器原生 select 右侧箭头不圆角的问题） */
-    .field select{appearance:none !important;-webkit-appearance:none !important;-moz-appearance:none !important;background:var(--bg1) !important;padding:8px 36px 8px 10px !important;border-radius:8px !important;text-overflow:ellipsis;border:1px solid var(--border);font-size:13px;color:var(--text);outline:none;cursor:pointer;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23888' d='M6 9L1.5 3.5h9z'/></svg>") !important;background-repeat:no-repeat !important;background-position:right 12px center !important;background-size:12px !important}
-    .field select::-ms-expand{display:none !important;width:0 !important;height:0 !important;margin:0 !important;padding:0 !important;background:transparent !important;border:0 !important}
-    .field select::-webkit-search-cancel-button,.field select::-webkit-search-decoration,.field select::-webkit-search-results-button,.field select::-webkit-search-results-decoration,.field select::-webkit-calendar-picker-indicator,.field select::-webkit-inner-spin-button,.field select::-webkit-outer-spin-button{display:none !important;-webkit-appearance:none !important;visibility:hidden !important;opacity:0 !important}
-    .field select::-moz-focus-inner{border:0 !important;padding:0 !important}
-    .field select::-ms-value{display:block !important;color:var(--text) !important}
+    /* 完全自定义 select（button + ul 弹层，WebView 兼容） */
+    .select-wrap{position:relative;display:block;width:100%}
+    .cs-btn{width:100%;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg1);font-size:13px;color:var(--text);cursor:pointer;font-family:inherit;text-align:left;transition:border-color .15s}
+    .cs-btn:hover,.cs-btn:focus{border-color:var(--accent);outline:none}
+    .cs-btn .cs-value{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cs-btn .cs-arrow{font-size:10px;color:var(--text3);transition:transform .2s;flex-shrink:0;margin-left:8px}
+    .cs-btn[aria-expanded="true"] .cs-arrow{transform:rotate(180deg)}
+    .cs-options{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:100;max-height:260px;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:4px;display:none;margin:0;list-style:none}
+    .cs-options.open{display:block}
+    .cs-options li{padding:8px 12px;border-radius:6px;font-size:13px;color:var(--text);cursor:pointer;transition:background .12s}
+    .cs-options li:hover{background:var(--bg3)}
+    .cs-options li.active{background:var(--accent-bg);color:var(--accent);font-weight:500}
+    .select-wrap select option{background:var(--bg2);color:var(--text);padding:8px}
+    /* 兼容：没有 .select-wrap 包裹的 .field select（依然尝试屏蔽） */
+    .field select{appearance:none !important;-webkit-appearance:none !important;-moz-appearance:none !important;background-color:var(--bg1) !important;padding:8px 36px 8px 10px !important;border-radius:8px !important;text-overflow:ellipsis;border:1px solid var(--border);font-size:13px;color:var(--text);outline:none;cursor:pointer;color-scheme:light}
+    .field select::-ms-expand{display:none !important;width:0 !important;height:0 !important;background:transparent !important;border:0 !important}
+    .field select::-webkit-calendar-picker-indicator,.field select::-webkit-search-cancel-button,.field select::-webkit-search-decoration{display:none !important;visibility:hidden !important;opacity:0 !important}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .key-wrap{display:flex;gap:6px}
 .key-wrap input{flex:1}
@@ -663,11 +688,11 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 .chip{padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:var(--bg1);font-size:13px;cursor:pointer;color:var(--text2);transition:all .15s}
 .chip:hover{border-color:var(--accent)}
 .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-.wf-steps{display:flex;flex-direction:column;gap:12px;margin:6px 0 4px}
-.wf-step-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg1);box-sizing:border-box}
-.wf-step-card input,.wf-step-card textarea{width:100%;box-sizing:border-box;max-width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
+.wf-steps{display:flex;flex-direction:column;gap:14px;margin:6px 0 4px}
+.wf-step-card{border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg1);box-sizing:border-box;display:flex;flex-direction:column;gap:10px}
+.wf-step-card input,.wf-step-card textarea{width:100%;box-sizing:border-box;max-width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
 .wf-step-card input:focus,.wf-step-card textarea:focus{border-color:var(--accent)}
-'.wf-step-card textarea{resize:vertical;min-height:36px;max-height:100px;font-family:inherit}'
+.wf-step-card textarea{resize:vertical;min-height:64px;max-height:160px;font-family:inherit;line-height:1.5}
 .wf-step-head{display:flex;align-items:center;justify-content:space-between;font-weight:600;margin-bottom:8px;gap:8px}
 .wf-step-head .action{margin-top:0;width:auto;padding:3px 10px;font-size:12px}
 .wf-step-card .action.danger{color:var(--red);border-color:var(--red)}
@@ -998,7 +1023,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
     <div class="modal-head"><h3>模型设置</h3><button class="modal-close" onclick="closeProviderModal()">×</button></div>
     <div class="modal-body">
       <input type="hidden" id="providerId">
-      <div class="field"><label>类型</label><select id="providerPreset" onchange="onProviderPresetChange()"><option value="">自定义</option></select></div>
+      <div class="field"><label>类型</label><div class="select-wrap" id="providerPresetWrap"><button type="button" class="cs-btn" id="providerPresetBtn" onclick="openCustomSelect('providerPreset')"><span class="cs-value">自定义</span><span class="cs-arrow">▾</span></button><ul class="cs-options" id="providerPresetList"></ul><select id="providerPreset" onchange="onProviderPresetChange()" style="display:none"><option value="">自定义</option></select></div></div>
       <div class="field"><label>名称 *</label><input type="text" id="providerName" placeholder="sensenova"></div>
       <div class="field"><label>Base URL</label><input type="text" id="providerBaseUrl" placeholder="https://token.sensenova.cn/v1" onchange="autoFetchModelsDebounced()"></div>
       <div class="field"><label>API Key</label><div class="key-wrap"><input type="password" id="providerKey" placeholder="sk-..." onchange="autoFetchModelsDebounced()"><button onclick="toggleKeyVisibility()">👁</button></div></div>
@@ -1008,7 +1033,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <div class="field"><label>Max Tokens</label><input type="number" id="providerMaxTokens" min="1" max="128000" value="4096"></div>
       </div>
       <div class="model-manage-head">
-        <span class="conn-section-title">选择模型（可搜索 / 分组折叠）</span>
+        <span class="conn-section-title">模型列表</span>
       </div>
       <div class="wf-search-bar">
         <input type="text" id="providerModelSearch" placeholder="搜索模型 ID / Provider..." oninput="renderProviderModelList()">
@@ -5641,9 +5666,11 @@ function renderRail(){
       if(aid !== 'default' && !getAgent(aid)) aid = 'default';
       return aid === agent.id;
     }).map(function(s){ return s.id; });
-    html += '<div class="agent-group"><div class="agent-row'+(open?' expanded':'')+(isActiveAgent?' active':'')+'" onclick="toggleAgent(\''+esc(agent.id)+'\')">'+
+      html += '<div class="agent-group"><div class="agent-row'+(open?' expanded':'')+(isActiveAgent?' active':'')+'" onclick="toggleAgent(\''+esc(agent.id)+'\')">'+
       '<span class="chevron">▶</span><span class="avatar">'+esc(agent.icon||'🤖')+'</span>'+
-      '<span class="info"><div class="name">'+esc(agent.name)+'</div><div class="desc">'+(isActiveAgent&&agent.id==='default'?'默认主力助手':'')+'</div></span></div>'+
+      '<span class="info"><div class="name">'+esc(agent.name)+'</div><div class="desc">'+(isActiveAgent&&agent.id==='default'?'默认主力助手':'')+'</div></span>'+
+      (agent.id!=='default'?'<button class="agent-del" title="删除该角色所有会话（不可撤销）" onclick="delAgent(\''+esc(agent.id)+'\',event)">🗑</button>':'')+
+      '</div>'+
       '<div class="session-list'+(open?' open':'')+'" id="sess-'+esc(agent.id)+'">';
     if(sessIds.length){
       html += sessIds.map(function(sid){
@@ -5694,6 +5721,46 @@ function delSession(aid, sid, e){
       else { var b = document.getElementById('chatBody'); if(b) b.innerHTML = '<div class="system-tip">没有打开的会话，点击右上角 + 新建</div>'; }
     })
     .catch(function(){ toast('删除会话失败'); });
+}
+/* 删除整个角色（含该角色下所有子会话）。先弹确认。 */
+function delAgent(agentId, e){
+  if(e) e.stopPropagation();
+  if(agentId === 'default'){ toast('默认助手不能删除'); return; }
+  var agent = getAgent(agentId);
+  var sessIds = _sessions.filter(function(s){ return (_sessionAgent[s.id] || 'default') === agentId; }).map(function(s){ return s.id; });
+  if(!sessIds.length){
+    if(!confirm('角色「'+(agent?agent.name:agentId)+'」下无会话，是否仍删除该角色？')) return;
+    finishDelAgent(agentId, []);
+    return;
+  }
+  if(!confirm('确定删除角色「'+(agent?agent.name:agentId)+'」及其所有会话？\n\n该角色下共有 '+sessIds.length+' 个会话将被删除（不影响其他角色）。\n\n此操作不可撤销！')) return;
+  var pending = sessIds.length;
+  sessIds.forEach(function(sid){
+    fetch(apiUrl('/api/sessions/'+encodeURIComponent(sid)), { method:'DELETE', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+      .then(function(){ if(--pending===0) finishDelAgent(agentId, sessIds); })
+      .catch(function(){ if(--pending===0) finishDelAgent(agentId, sessIds); });
+  });
+}
+function finishDelAgent(agentId, sessIds){
+  _sessions = _sessions.filter(function(s){ return sessIds.indexOf(s.id)<0; });
+  sessIds.forEach(function(sid){
+    delete _sessionAgent[sid];
+    var ti = _openTabs.indexOf(sid);
+    if(ti!==-1) _openTabs.splice(ti,1);
+    delete _tabDrafts[sid]; delete _tabStreaming[sid];
+    var ds = _chatHistory[sid]; if(ds) { delete _chatHistory[sid]; }
+  });
+  persistSessionAgent(); persistTabs();
+  if(agentId !== 'default'){
+    _agents = _agents.filter(function(a){ return a.id !== agentId; });
+    delete _agentPicked[agentId];
+    try { localStorage.removeItem('hermes_rail_open_'+agentId); } catch(e){}
+    if(currentAgent === agentId) currentAgent = 'default';
+    try { if(_cfg.extensions && _cfg.extensions.session_agent) { delete _cfg.extensions.session_agent; _saveConfigDebounced(); } } catch(e){}
+  }
+  renderSessionTabs(); renderRail(); updateHeader();
+  var ag = getAgent(agentId);
+  toast('已删除角色「' + (ag?ag.name:agentId) + '」及其所有会话');
 }
 function newSession(){
   newTab();
@@ -6278,7 +6345,8 @@ function openMini(btn, key){
   if(key==='expert'){
     tabs.style.display='flex';
     tabs.innerHTML='<div class="mini-popup-tab '+(_expertPickerTab==='single'?'active':'')+'" onclick="switchExpertPickerTab(\'single\')">专家</div>'+
-      '<div class="mini-popup-tab '+(_expertPickerTab==='team'?'active':'')+'" onclick="switchExpertPickerTab(\'team\')">专家团</div>';
+      '<div class="mini-popup-tab '+(_expertPickerTab==='team'?'active':'')+'" onclick="switchExpertPickerTab(\'team\')">专家团</div>'+
+      '<div class="mini-popup-tab '+(_expertPickerTab==='workflow'?'active':'')+'" onclick="switchExpertPickerTab(\'workflow\')">工作流</div>';
   } else {
     tabs.style.display='none'; tabs.innerHTML='';
   }
@@ -6291,7 +6359,8 @@ function openMini(btn, key){
 function switchExpertPickerTab(tab){
   _expertPickerTab=tab;
   var tabs=document.getElementById('popupTabs');
-  Array.from(tabs.children).forEach(function(el){ el.classList.toggle('active', el.textContent===(tab==='single'?'专家':'专家团')); });
+  var labels={single:'专家',team:'专家团',workflow:'工作流'};
+  Array.from(tabs.children).forEach(function(el){ el.classList.toggle('active', el.textContent===labels[tab]); });
   document.getElementById('popupBody').innerHTML=buildMiniPopupBody('expert', buildMiniData().expert);
 }
 function buildMiniPopupBody(key,d){
@@ -6338,6 +6407,37 @@ function buildMiniPopupBody(key,d){
           '<span class="hint">'+( _cfg.extensions.team_enabled?'点击重新应用':'多智能体协作' )+'</span>'+
           '</button></div>';
       }
+    } else if(_expertPickerTab==='workflow'){
+      // 工作流 tab：仅显示预设列表（已应用的标 active），避免与下方预设重复
+      var wf=_cfg.extensions.workflow||{name:'',enabled:false,steps:[]};
+      var presets=(window.AO_WORKFLOW_PRESETS||[]).slice(0,12);
+      body='<div class="empty-state" style="padding:10px 12px;font-size:12px;color:var(--text3);text-align:left;border-bottom:1px solid var(--border);margin-bottom:6px;background:var(--bg2);border-radius:6px">';
+      if(wf.enabled && wf.name){
+        body+='<span style="color:var(--accent);font-weight:600">当前：'+esc(wf.name)+'</span> · '+((wf.steps||[]).length)+' 个步骤 · 发送消息即按 DAG 顺序执行';
+      } else {
+        body+='点下方模板一键应用当前工作流，或到「扩展 → 工作流」自定义 DAG。';
+      }
+      body+='</div>';
+      body+='<div class="pick-list">';
+      // 预设模板列表（已应用的标 active）
+      presets.forEach(function(p){
+        var applied = p.key===wf.key;
+        body+='<div class="pop-item'+(applied?' active':'')+'" data-wfkey="'+esc(p.key)+'" onclick="pickItem(\'workflow\',this)">'+
+          '<div class="ico">🎛️</div>'+
+          '<div class="txt"><div class="t">'+esc(p.name)+'</div><div class="d">'+esc(p.category||'通用')+(applied?' · 已应用':'')+'</div></div>'+
+          '<div class="check"></div>'+
+          '</div>';
+      });
+      body+='</div>';
+      body+='<div class="team-cta-wrap">'+
+        '<button class="team-cta '+(wf.enabled?'on':'off')+'" onclick="pickWorkflowAndSend()">'+
+        '<span class="ico">'+(wf.enabled?'✓':'⚙')+'</span>'+
+        '<span>'+(wf.enabled?'工作流已激活（发送消息触发）':'应用当前工作流')+'</span>'+
+        '<span class="hint">'+(wf.enabled?'自动按 DAG 顺序执行':'点选预设后开启')+'</span>'+
+        '</button>'+
+        '<button class="team-cta" style="margin-top:6px" onclick="openWorkflowEditor()">'+
+        '<span class="ico">⚙</span><span>打开工作流编排器</span><span class="hint">自定义 DAG</span>'+
+        '</button></div>';
     } else {
       body='<div class="pick-list">';
       (d.items||[]).forEach(function(it){
@@ -6410,6 +6510,14 @@ function pickItem(key, el){
     var b2=document.getElementById('btnSkill'); if(b2) b2.classList.toggle('active', _activeSkills.length>0);
     renderSkillChips();
     return; // 保持弹窗打开，可继续勾选多个技能
+  } else if(key==='workflow'){
+    // 工作流：应用预设模板到当前工作流
+    var wfkey = el.getAttribute('data-wfkey');
+    if(wfkey){ applyWorkflow(wfkey); closeMini(); toast('已应用工作流：'+name); }
+    return;
+  } else if(key==='workflow-apply'){
+    // 工作流 tab 的 CTA 按钮：仅刷新 popup，不关闭
+    return;
   }
   closeMini();
 }
@@ -7002,6 +7110,7 @@ function renderProviders(){
       }
     }
     buttons += '<button class="action" data-provider-action="edit" data-idx="'+i+'">编辑</button>';
+    buttons += '<button class="action danger" data-provider-action="delete" data-idx="'+i+'">删除</button>';
     buttons += '</div>';
 
     return '<div class="provider-card '+(isActive?'active':'')+'">'+
@@ -7029,8 +7138,24 @@ function renderProviders(){
       else if (action === 'set-fallback') setFallbackProvider(idx);
       else if (action === 'unset-fallback') unsetFallbackProvider(idx);
       else if (action === 'edit') editProvider(idx);
+      else if (action === 'delete') deleteProvider(idx);
     });
   }
+}
+function deleteProvider(i){
+  var p=_cfg.providers[i]; if(!p) return;
+  var pname = p.name || p.id || '未命名';
+  if(_cfg.active_provider === pname){ toast('当前使用中的模型不可删除，请先切换到其他模型'); return; }
+  var msg = '确定删除模型「'+pname+'」？\n\n';
+  if(p.base_url) msg += 'Base URL: '+p.base_url+'\n';
+  msg += '该模型下 '+((p.models||[]).length)+' 个模型配置将被移除。\n\n此操作不可撤销！';
+  if(!confirm(msg)) return;
+  _cfg.providers.splice(i, 1);
+  // 同时从回退列表移除
+  if(_cfg.fallback_providers && _cfg.fallback_providers.length){
+    _cfg.fallback_providers = _cfg.fallback_providers.filter(function(n){ return n !== pname; });
+  }
+  saveConfig(); renderProviders(); toast('已删除模型：'+pname);
 }
 function activateProvider(i){
   var p=_cfg.providers[i]; if(!p) return;
@@ -7054,6 +7179,57 @@ function unsetFallbackProvider(i){
   apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已取消回退：'+pname); }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 function openProviderModal(){ editProvider(null); }
+/* 完全自定义 select：读取原生 select 的 options，渲染成 button + ul 弹层（彻底解决 WebView 原生下拉按钮问题） */
+function initCustomSelect(selId, options){
+  var sel=document.getElementById(selId); if(!sel) return;
+  var btnId=selId+'Btn'; var listId=selId+'List';
+  var btn=document.getElementById(btnId); var list=document.getElementById(listId);
+  if(!btn||!list) return;
+  // 渲染 options
+  list.innerHTML = (options||[]).map(function(o){
+    var active = (sel.value===o.value);
+    return '<li data-value="'+esc(o.value)+'" class="'+(active?'active':'')+'" onclick="pickCustomSelect(\''+selId+'\',this)">'+esc(o.label)+'</li>';
+  }).join('');
+  // 显示当前值
+  var cur = (options||[]).find(function(o){ return o.value===sel.value; });
+  var valEl = btn.querySelector('.cs-value');
+  if(valEl) valEl.textContent = cur ? cur.label : (sel.value || '—');
+  // 监听 select 变化时同步 button 显示
+  sel.addEventListener('change', function(){
+    var c = (options||[]).find(function(o){ return o.value===sel.value; });
+    if(valEl) valEl.textContent = c ? c.label : (sel.value || '—');
+    list.querySelectorAll('li').forEach(function(li){
+      li.classList.toggle('active', li.getAttribute('data-value')===sel.value);
+    });
+  });
+}
+function openCustomSelect(selId){
+  var list = document.getElementById(selId+'List');
+  var btn = document.getElementById(selId+'Btn');
+  if(!list||!btn) return;
+  // 关闭其他打开的
+  document.querySelectorAll('.cs-options.open').forEach(function(o){
+    if(o.id!==selId+'List'){ o.classList.remove('open'); var b=document.getElementById(o.id.replace('List','Btn')); if(b) b.setAttribute('aria-expanded','false'); }
+  });
+  var open = list.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function pickCustomSelect(selId, li){
+  var sel=document.getElementById(selId); if(!sel) return;
+  var value = li.getAttribute('data-value');
+  // 同步原生 select
+  sel.value = value;
+  // 触发 onchange（模拟原生）
+  sel.dispatchEvent(new Event('change'));
+  // 关闭弹层
+  var list=document.getElementById(selId+'List'); var btn=document.getElementById(selId+'Btn');
+  if(list) list.classList.remove('open'); if(btn) btn.setAttribute('aria-expanded','false');
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.select-wrap')){
+    document.querySelectorAll('.cs-options.open').forEach(function(o){ o.classList.remove('open'); var b=document.getElementById(o.id.replace('List','Btn')); if(b) b.setAttribute('aria-expanded','false'); });
+  }
+});
 function addProvider(){
   // 添加模型服务：默认选第一个云端预设（让用户编辑）
   openProviderModal();
@@ -7085,12 +7261,21 @@ function editProvider(idx){
     Object.keys(PV.providerPresets).forEach(function(k){
       var o=document.createElement('option'); o.value=k; o.textContent=PV.providerPresets[k].name; presetSel.appendChild(o);
     });
+    // 初始化自定义下拉 UI（隐藏原生 select，用 button+ul 渲染）
+    initCustomSelect('providerPreset', [{value:'',label:'自定义'}].concat(
+      Object.keys(PV.providerPresets).map(function(k){ return {value:k,label:PV.providerPresets[k].name}; })
+    ));
   }
   var p = (idx!=null && _cfg.providers[idx]) ? _cfg.providers[idx] : null;
   document.getElementById('providerId').value = p ? (p.id||idx) : '';
   document.getElementById('providerName').value = p ? (p.name||'') : '';
   document.getElementById('providerBaseUrl').value = p ? (p.base_url||'') : '';
-  document.getElementById('providerKey').value = p ? (p.api_key&&String(p.api_key).indexOf('****')!==0 ? p.api_key : '') : '';
+  // API Key：后端 GET 只返回 api_key_masked（不返回真实 key），input 留空 + placeholder 提示
+  var keyEl = document.getElementById('providerKey');
+  keyEl.value = '';
+  keyEl.placeholder = (p && (p.api_key_masked || p.api_key_configured))
+    ? '已配置 Key（'+ (p.api_key_masked || '****') +'），修改请直接输入新 Key，留空保留原值'
+    : 'sk-...';
   document.getElementById('providerNote').value = p ? (p.note||'') : '';
   document.getElementById('providerTemp').value = p && p.temperature!=null ? p.temperature : '0.7';
   document.getElementById('providerMaxTokens').value = p && p.max_tokens!=null ? p.max_tokens : '4096';
@@ -7150,8 +7335,9 @@ function renderProviderModelList(){
   list.forEach(function(mo, idx){
     var mid = mo.id || mo.name || '';
     var sep = mid.indexOf('/');
-    var prov = sep>0 ? mid.slice(0, sep) : (mo.provider || '其他');
+    var prov = sep>0 ? mid.slice(0, sep) : (mo.provider || '模型列表');
     if(prov.indexOf('custom_')===0) prov = '自定义';
+    if(prov === '其他') prov = '模型列表';
     if(!groups[prov]) groups[prov] = [];
     groups[prov].push({ m: mo, i: idx });
   });
@@ -7354,6 +7540,29 @@ function toggleKeyVisibility(){
   var inp=document.getElementById('providerKey');
   inp.type = inp.type==='password' ? 'text' : 'password';
 }
+/* 工作流 popup CTA：应用当前工作流（如果还没启用）并切到聊天页 */
+function pickWorkflowAndSend(){
+  var wf = _cfg.extensions.workflow;
+  if(!wf || !wf.enabled){
+    toast('请先在上方选择一个工作流模板');
+    return;
+  }
+  closeMini();
+  // 切到聊天页（如果在其他页）
+  if(typeof switchPage === 'function') switchPage('chat');
+  // 预填输入框提示
+  setTimeout(function(){
+    var inp = document.getElementById('chatInput');
+    if(inp){
+      inp.value = '请用「'+wf.name+'」工作流处理：';
+      inp.focus();
+      // 把光标移到末尾
+      inp.setSelectionRange(inp.value.length, inp.value.length);
+      autoResize(inp);
+    }
+    toast('已激活工作流「'+wf.name+'」，编辑消息后按 Enter 发送（自动按 DAG 顺序执行）');
+  }, 100);
+}
 function validateProvider(){
   var provider = buildProviderObj();
   if(!provider.base_url){ toast('请先填写 Base URL 后再验证连接'); return; }
@@ -7458,6 +7667,7 @@ function extSkillSubtab(el, key){
 }
 function renderExtensions(){
   renderToolsets(); renderSkills('local'); renderPersonas(); renderExperts(); renderTeam(); renderMemory(); renderWorkflow();
+  if(typeof renderChatChips==='function') renderChatChips();
 }
 function renderToolsets(){
   var el=document.getElementById('toolsetList'); if(!el) return;
@@ -7774,6 +7984,7 @@ function renderWorkflow(){
   var c=document.getElementById('wfConcInline'); if(c) c.value=(wf.concurrency||2);
   renderWfSteps('Inline','wfStepsInline');
   renderWorkflowPresets();
+  if(typeof renderChatChips==='function') renderChatChips();
 }
 function renderWfSteps(token, cid){
   var el=document.getElementById(cid); if(!el) return;
@@ -7859,25 +8070,8 @@ function renderWorkflowPresets(){
   var presets = window.AO_WORKFLOW_PRESETS || [];
   var catLabels={
     '':'全部','data':'数据','department-collab':'部门协作','design':'设计','dev':'开发',
-    'English':'英文','hr':'人力资源','legal':'法务','marketing':'营销','ops':'运维',
+    'English':'English','hr':'人力资源','legal':'法务','marketing':'营销','ops':'运维',
     'strategy':'战略','一人公司':'一人公司'
-  };
-  // 常见英文工作流名 → 中文
-  var nameLabels={
-    'Business Plan':'商业计划书','Code Architecture Review':'代码架构审查',
-    'Competitor Analysis Report':'竞品分析报告','Customer Discovery':'客户调研',
-    'Customer Persona':'用户画像','Daily Standup':'每日站会','Data Audit':'数据审计',
-    'Data Migration':'数据迁移','Decision Memo':'决策备忘','Design Review':'设计评审',
-    'Documentation Sprint':'文档冲刺','Feature Spec':'功能规格说明书',
-    'Go-to-Market Plan':'上市推广方案','Hiring Pipeline':'招聘流程',
-    'Incident Response':'事故应急响应','Launch Checklist':'上线检查清单',
-    'Marketing Campaign':'营销活动','Onboarding Plan':'入职培训计划',
-    'OKR Setting':'OKR 制定','Performance Review':'绩效评估',
-    'Postmortem':'事后复盘','Pricing Experiment':'定价实验',
-    'Quarterly Planning':'季度规划','Release Notes':'发布说明',
-    'Roadmap':'路线图','Sprint Planning':'Sprint 计划',
-    'Stakeholder Update':'利益相关方同步','Strategy Memo':'战略备忘',
-    'User Interview Synthesis':'用户访谈汇总','一人公司:全灵大会':'一人公司:全灵大会'
   };
   var cats=[{id:'',label:catLabels['']||'全部'}];
   presets.forEach(function(p){ if(p.category && !cats.some(function(c){return c.id===p.category;})) cats.push({id:p.category,label:catLabels[p.category]||p.category}); });
@@ -7889,9 +8083,9 @@ function renderWorkflowPresets(){
   grid.innerHTML = presets.filter(function(p){ return !_wfCat || p.category===_wfCat; }).map(function(p){
     var applied = (p.key===appliedKey);
     var catLabel = catLabels[p.category]||p.category||'通用';
-    var nameZh = nameLabels[p.name] || p.name;
+    // 保持原名（不翻译英文工作流名）
     return '<div class="ext-card'+(applied?' active':'')+'">'+
-      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(nameZh)+'</div><div class="status">'+esc(catLabel)+(applied?' · 已应用':'')+'</div></div></div>'+
+      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(p.name)+'</div><div class="status">'+esc(catLabel)+(applied?' · 已应用':'')+'</div></div></div>'+
       '<div class="conn-desc">'+esc(p.description||'')+'</div>'+
       '<button class="action" onclick="applyWorkflow(\''+esc(p.key)+'\')">'+(applied?'重新应用':'应用')+'</button></div>';
   }).join('') || '<div class="empty-state">暂无工作流模板。</div>';
@@ -7920,7 +8114,31 @@ var EXT_PERSONAS = {
   coder:{emoji:'💻',label:'程序员',prompt:'你是一位资深全栈工程师。'},
   researcher:{emoji:'🔬',label:'研究员',prompt:'你是一位严谨的研究员。'},
   writer:{emoji:'✍️',label:'写作助手',prompt:'你是一位专业的写作助手。'},
-  analyst:{emoji:'📊',label:'数据分析师',prompt:'你是一位数据分析师。'}
+  analyst:{emoji:'📊',label:'数据分析师',prompt:'你是一位数据分析师。'},
+  fnos_operator:{
+    emoji:'🛠️',
+    label:'飞牛操作员',
+    prompt:
+'你是「飞牛操作员」，用户专属的 fnOS（飞牛 NAS）系统管家。\n'+
+'你熟练掌握飞牛 NAS 的全部技能，能用自然语言操控整个 NAS 系统的设置、文件、用户、应用、权限、网络、备份与服务。\n\n'+
+'【核心能力】\n'+
+'1. **文件与存储**：目录浏览/复制/移动/删除/重命名/压缩解压；权限查看/修改；空间占用分析与清理；快照与回收站管理；SMB/NFS/WebDAV/iSCSI 共享配置。\n'+
+'2. **应用管理**：查看已装应用（含 Docker、虚拟机、套件应用）；启动/停止/重启/卸载；日志查看与故障排查；端口映射、卷挂载、环境变量。\n'+
+'3. **用户与权限**：用户/用户组增删改查；共享空间配额；多因子认证；AD/LDAP 接入。\n'+
+'4. **网络与安全**：防火墙规则；DDNS、VPN、Tailscale、ZeroTier；SSL 证书申请与续签；SSH 密钥管理；IP 黑白名单；WAF。\n'+
+'5. **备份与同步**：快照计划、备份链、外置备份目的地、Rsync、Btrfs send/receive、对象存储同步。\n'+
+'6. **系统监控**：CPU/内存/磁盘/网络/温度/风扇；进程与服务；SMART 健康；定时任务。\n'+
+'7. **智能体/MCP**：调用已配置的连接器（飞牛官方 Skills、第三方 MCP、本地技能），用自然语言调度 NAS 一切操作。\n\n'+
+'【工作方式】\n'+
+'1. 用户提出需求时，先快速评估影响范围（数据风险/服务中断/权限变更），给出明确的执行步骤与回滚方案。\n'+
+'2. 删除、覆盖、回滚等高风险操作前必须先确认，绝不静默执行。\n'+
+'3. 在不确定的命令上，**先列出该命令的解释**再请求确认，不直接对生产路径动手。\n'+
+'4. 优先用飞牛原生界面/CLI/Skills；若只能 SSH 操作，提示用户开启 SSH 并说明临时风险。\n'+
+'5. 任何涉及「密码、API Key、私钥」一律本地落档 `.env.providers` 或 `~/.ssh/`，不要回显到对话。\n\n'+
+'【输出风格】\n'+
+'简洁、口语化、术语准确；带「操作清单 + 影响 + 回滚」三段式；文件路径/服务名/容器 ID 一律加反引号。\n'+
+'若用户的中文描述含糊，主动询问参数（源目录/目标目录/服务名/端口等），不臆测。'
+  }
 };
 function allPersonas(){
   var out={};
@@ -8010,6 +8228,83 @@ function selectPersona(id){
   try { localStorage.removeItem('hermes_selected_expert'); } catch(e){}
   renderSelectedExpertBar();
   renderPersonas(); saveConfig();
+}
+
+/* Chat composer 顶部 chip 行：渲染当前 persona + 工作流/专家团激活状态 */
+function renderChatChips(){
+  var box=document.getElementById('chatChips'); if(!box) return;
+  var html='';
+  // Persona chips（默认显示前 6 个：内置 + 自定义各取 3）
+  var personas=allPersonas();
+  var pKeys = Object.keys(personas);
+  var builtin = pKeys.filter(function(k){ return !!EXT_PERSONAS[k]; });
+  var custom  = pKeys.filter(function(k){ return !EXT_PERSONAS[k]; });
+  var showKeys = builtin.slice(0,4).concat(custom.slice(0,2));
+  showKeys.forEach(function(k){
+    var p=personas[k]; var active=(_persona===k);
+    html += '<button class="chat-chip'+(active?' active':'')+'" onclick="selectPersonaChip(\''+esc(k).replace(/'/g,"\\'")+'\')" title="'+(active?'当前角色: ':'切换到 ')+esc(p.label||k)+'">'+(p.emoji||'🤖')+' '+esc(p.label||k)+'</button>';
+  });
+  html += '<span class="chat-chip delimiter" style="border:none;background:transparent;padding:0 4px;cursor:default"></span>';
+  // 专家团 chip（激活状态高亮）
+  var teamOn = !!(_cfg.extensions && _cfg.extensions.team_enabled);
+  var teamCount = (_cfg.extensions && _cfg.extensions.team) ? _cfg.extensions.team.length : 0;
+  html += '<button class="chat-chip'+(teamOn?' active':'')+'" onclick="onClickTeamChip()" title="'+(teamOn?'已启用专家团（'+teamCount+' 人），点击管理':'点击启用专家团多智能体协作')+'">👥 专家团'+(teamOn?' +':'')+'</button>';
+  // 工作流 chip（激活状态高亮）
+  var wf = _cfg.extensions && _cfg.extensions.workflow;
+  var wfOn = !!(wf && wf.enabled);
+  var wfName = (wf && wf.name) ? wf.name : '';
+  html += '<button class="chat-chip'+(wfOn?' active':'')+'" onclick="onClickWorkflowChip()" title="'+(wfOn?'已应用工作流: '+esc(wfName)+'，点击查看':'点击设置工作流')+'">⚙ 工作流'+(wfOn?' · '+esc(wfName).slice(0,8):'')+'</button>';
+  box.innerHTML = html;
+}
+function selectPersonaChip(id){
+  if(_persona===id){ toast('当前已是该角色'); return; }
+  selectPersona(id);
+}
+function onClickTeamChip(){
+  // 直接打开 expert popup 并切到「专家团」tab
+  var btn = document.getElementById('btnExpert');
+  if(!btn){ switchPage('extensions'); return; }
+  closeMini();
+  _expertPickerTab = 'team';
+  activeBtn = btn; activePanel = 'expert';
+  popup = document.getElementById('miniPopup');
+  var d = buildMiniData().expert;
+  document.getElementById('popupTitle').textContent = d.title;
+  document.getElementById('popupSearchWrap').style.display = 'block';
+  document.getElementById('popupSearch').placeholder = '搜索专家';
+  var foot = document.getElementById('popupFoot'); if(foot) foot.style.display = 'none';
+  var tabs = document.getElementById('popupTabs');
+  tabs.style.display = 'flex';
+  tabs.innerHTML = '<div class="mini-popup-tab" onclick="switchExpertPickerTab(\'single\')">专家</div>'+
+    '<div class="mini-popup-tab active" onclick="switchExpertPickerTab(\'team\')">专家团</div>'+
+    '<div class="mini-popup-tab" onclick="switchExpertPickerTab(\'workflow\')">工作流</div>';
+  document.getElementById('popupBody').innerHTML = buildMiniPopupBody('expert', d);
+  popup.classList.remove('wide');
+  popup.classList.add('open');
+  positionPopup(btn);
+}
+function onClickWorkflowChip(){
+  // 直接打开 expert popup 并切到「工作流」tab
+  var btn = document.getElementById('btnExpert');
+  if(!btn){ switchPage('extensions'); return; }
+  closeMini();
+  _expertPickerTab = 'workflow';
+  activeBtn = btn; activePanel = 'expert';
+  popup = document.getElementById('miniPopup');
+  var d = buildMiniData().expert;
+  document.getElementById('popupTitle').textContent = d.title;
+  document.getElementById('popupSearchWrap').style.display = 'block';
+  document.getElementById('popupSearch').placeholder = '搜索专家';
+  var foot = document.getElementById('popupFoot'); if(foot) foot.style.display = 'none';
+  var tabs = document.getElementById('popupTabs');
+  tabs.style.display = 'flex';
+  tabs.innerHTML = '<div class="mini-popup-tab" onclick="switchExpertPickerTab(\'single\')">专家</div>'+
+    '<div class="mini-popup-tab" onclick="switchExpertPickerTab(\'team\')">专家团</div>'+
+    '<div class="mini-popup-tab active" onclick="switchExpertPickerTab(\'workflow\')">工作流</div>';
+  document.getElementById('popupBody').innerHTML = buildMiniPopupBody('expert', d);
+  popup.classList.remove('wide');
+  popup.classList.add('open');
+  positionPopup(btn);
 }
 var _expFilter=''; var _expDept='';
 function renderExperts(){
@@ -8113,6 +8408,7 @@ function renderTeam(){
       '<div class="actions"><button class="action" onclick="removeTeamMember(\''+esc(m.id)+'\')">移除</button></div>'+
       '</div>';
   }).join('') || '<div class="empty-state">团队为空，从「专家」页添加成员。</div>';
+  if(typeof renderChatChips==='function') renderChatChips();
 }
 function buildAndUseTeam(){
   buildTeam();
@@ -8131,17 +8427,94 @@ function toggleTeam(){
   saveConfig(); renderTeam();
   toast(_cfg.extensions.team_enabled?'已启用专家团（已自动开启任务委派）':'已关闭专家团');
 }
+
+/* 20 个内置专家团预设（参考 agency-agents-zh + superpowers-zh 行业场景），
+   每次点击「组建并使用专家团」随机抽一个场景，按该场景的岗位要求从 agency-agents-zh 库挑选成员。 */
+window.TEAM_PRESETS = [
+  { id:'product',name:'产品研发团队',icon:'🚀',roles:['product','engineering','design','qa','data','marketing'] },
+  { id:'frontend',name:'前端工程团队',icon:'💻',roles:['frontend','design','ux','engineering','data'] },
+  { id:'backend',name:'后端工程团队',icon:'⚙️',roles:['backend','engineering','devops','data','security'] },
+  { id:'mobile',name:'移动端团队',icon:'📱',roles:['mobile','design','ux','engineering','qa'] },
+  { id:'devops',name:'DevOps 团队',icon:'🛠️',roles:['devops','security','backend','engineering'] },
+  { id:'data',name:'数据分析师团队',icon:'📊',roles:['data','analytics','engineering','product'] },
+  { id:'ai',name:'AI / ML 团队',icon:'🤖',roles:['ai','ml','engineering','data','research'] },
+  { id:'security',name:'安全团队',icon:'🔒',roles:['security','devops','backend'] },
+  { id:'qa',name:'QA 测试团队',icon:'🧪',roles:['qa','engineering','security'] },
+  { id:'design',name:'设计创意团队',icon:'🎨',roles:['design','ux','content','marketing','branding'] },
+  { id:'marketing',name:'市场推广团队',icon:'📣',roles:['marketing','content','sales','branding','social'] },
+  { id:'sales',name:'销售转化团队',icon:'💼',roles:['sales','marketing','product','data'] },
+  { id:'content',name:'内容创作团队',icon:'✍️',roles:['content','writing','marketing','design','social'] },
+  { id:'hr',name:'HR 招聘团队',icon:'👥',roles:['hr','leadership','product','marketing'] },
+  { id:'finance',name:'财务运营团队',icon:'💰',roles:['finance','analytics','leadership','data'] },
+  { id:'legal',name:'法务合规团队',icon:'⚖️',roles:['legal','security','compliance','leadership'] },
+  { id:'strategy',name:'战略咨询团队',icon:'🎯',roles:['strategy','leadership','finance','product','analytics'] },
+  { id:'education',name:'教育培训团队',icon:'📚',roles:['education','content','design','marketing'] },
+  { id:'healthcare',name:'医疗健康团队',icon:'🏥',roles:['healthcare','data','research','product'] },
+  { id:'sustainability',name:'可持续发展团队',icon:'🌱',roles:['sustainability','research','marketing','policy'] },
+  { id:'research',name:'学术研究团队',icon:'🔬',roles:['research','data','academic','writing'] },
+  { id:'gaming',name:'游戏开发团队',icon:'🎮',roles:['gaming','design','engineering','art','narrative'] },
+  { id:'media',name:'媒体传播团队',icon:'📺',roles:['media','content','social','marketing','writing'] }
+];
+
+function pickRandomPreset(){
+  var presets = window.TEAM_PRESETS || [];
+  return presets[Math.floor(Math.random()*presets.length)];
+}
+
 function buildTeam(){
-  _cfg.extensions.team_name = (document.getElementById('teamName').value)||'我的团队';
-  var ids;
+  _cfg.extensions.team_name = (document.getElementById('teamName').value) || '我的团队';
+  var preset = pickRandomPreset();
+  _cfg.extensions.team_preset_id = preset.id;
+  _cfg.extensions.team_preset_name = preset.name;
+  var ids = [];
   if(window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length){
-    // 每个部门取一位代表，拼出跨领域团队
-    ids = window.AGENCY_PERSONAS.filter(function(p,i,a){ return a.findIndex(function(q){ return q.dept===p.dept; })===i; }).slice(0,6);
+    // 按 preset.roles 列表，每个角色在专家库中找匹配的人（按 dept_label / dept / id 关键词匹配）
+    var personas = window.AGENCY_PERSONAS;
+    var used = {};
+    (preset.roles || []).forEach(function(role){
+      var match = personas.find(function(p){
+        if(used[p.id]) return false;
+        var hay = ((p.dept_label||p.dept||'') + ' ' + (p.id||'') + ' ' + (p.label||p.name||'')).toLowerCase();
+        // 角色关键词映射
+        var keys = {
+          product:['产品','product','pm'], frontend:['前端','frontend','web','react','vue'],
+          backend:['后端','backend','server','api'], mobile:['移动','mobile','ios','android'],
+          devops:['devops','运维','sre','ops'], ai:['ai','ml','人工智能','机器学习','模型'],
+          ml:['ml','ai','机器学习','深度学习'], data:['数据','data','分析师','analytics'],
+          analytics:['分析','analytics','bi'], design:['设计','design','ui','visual'],
+          ux:['ux','用户体验','交互'], qa:['测试','qa','quality'],
+          security:['安全','security','sec'], engineering:['工程','engineer','开发'],
+          marketing:['市场','marketing','运营','推广'], sales:['销售','sales','商务'],
+          content:['内容','content','编辑','文案'], writing:['写作','writing','编辑'],
+          hr:['hr','人力','招聘'], finance:['财务','finance','会计'],
+          legal:['法务','legal','合规','律师'], compliance:['合规','compliance'],
+          strategy:['战略','strategy','咨询'], leadership:['领导','管理','leader','ceo'],
+          branding:['品牌','branding'], social:['社媒','social','社交'],
+          education:['教育','education','培训'], research:['研究','research','科研'],
+          academic:['学术','academic','学者'], healthcare:['医疗','health','医学','健康'],
+          sustainability:['可持续','sustainability','环保'], policy:['政策','policy'],
+          gaming:['游戏','gaming','game'], art:['美术','art','视觉'],
+          narrative:['叙事','narrative','剧情'], media:['媒体','media','传播']
+        }[role] || [role];
+        return keys.some(function(k){ return hay.indexOf(k)>=0; });
+      });
+      if(match) { used[match.id] = true; ids.push(match); }
+    });
+    // 兜底：不足 3 人时按部门各取 1 位
+    if(ids.length < 3){
+      personas.forEach(function(p){
+        if(ids.length >= 6) return;
+        if(used[p.id]) return;
+        if(ids.find(function(x){ return (x.dept||'') === (p.dept||''); })) return;
+        used[p.id] = true; ids.push(p);
+      });
+    }
   } else {
-    ids=PV.experts.slice(0,3);
+    ids = (PV.experts || []).slice(0, 4);
   }
   _cfg.extensions.team = ids.map(function(p){ return { id:p.id, name:(p.label||p.name), dept:(p.dept_label||p.dept), icon:(p.emoji||p.icon) }; });
-  renderTeam(); saveConfig(); toast('已组建团队（'+_cfg.extensions.team.length+' 人）');
+  renderTeam(); saveConfig();
+  toast('已组建「'+preset.name+'」共 '+ids.length+' 人');
 }
 function clearTeam(){ _cfg.extensions.team=[]; renderTeam(); saveConfig(); }
 function removeTeamMember(id){ _cfg.extensions.team=(_cfg.extensions.team||[]).filter(function(x){ return x.id!==id; }); renderTeam(); saveConfig(); }
@@ -8598,20 +8971,11 @@ function checkAppUpdate(){
   }).catch(function(){ toast('检查应用更新失败'); });
 }
 function confirmAppUpdate(){
-  if(!confirm('确认更新 Hermes Agent 应用？')) return;
-  apiPost('/api/app/update/dispatch', {}).then(function(data){
-    if(data && data.error){ toast('启动更新失败：'+data.error); return; }
-    toast('应用更新中…');
-    var tries=0;
-    (function poll(){
-      tries++;
-      apiGet('/api/app/update/status').then(function(d){
-        if(d && d.status==='done'){ toast('应用更新完成'); var btn=document.getElementById('appUpdateBtn'); if(btn) btn.style.display='none'; }
-        else if(d && d.status==='error'){ toast('更新失败'); }
-        else if(tries<40){ setTimeout(poll, 2000); }
-      }).catch(function(){ if(tries<40) setTimeout(poll,2000); });
-    })();
-  }).catch(function(e){ toast('启动更新失败：'+e.message); });
+  // 直接跳转到 GitHub releases 页面下载最新 FPK（不需要 PAT，无需触发 Actions 构建）
+  var url = 'https://github.com/veenyi/fnos-hermes-agent/releases/latest';
+  if(window.confirm('将打开 GitHub releases 页面下载最新 FPK 安装包，是否继续？\n\n下载后请通过 fnOS 应用中心上传安装。')){
+    window.open(url, '_blank');
+  }
 }
 
 /* ============================ 设置页 ============================ */
