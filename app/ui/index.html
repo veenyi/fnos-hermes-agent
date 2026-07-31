@@ -520,7 +520,7 @@
 .provider-model-row .actions{display:flex;gap:6px;flex-shrink:0}
 .provider-model-row .actions button{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;font-size:13px;color:var(--text3)}
 .provider-model-row .actions button:hover{border-color:var(--accent);color:var(--accent)}
-.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:5000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-backdrop{position:fixed;left:0;top:0;width:100vw;height:100vh;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:6000;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:auto}
 .modal-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
 .modal-head h3{margin:0;font-size:16px}
@@ -7031,7 +7031,10 @@ function addProvider(kind){
 function closeProviderModal(){ var m=document.getElementById('providerModal'); if(m) m.style.display='none'; _providerModelCache=null; }
 var _providerModelCache = null; // 编辑 Provider 时的模型列表 [{id,name,enabled,default}]
 function editProvider(idx){
-  var m=document.getElementById('providerModal'); if(!m) return; m.style.display='flex';
+  var m=document.getElementById('providerModal'); if(!m) return;
+  // Portal：移到 body 直接子元素，避开 .page.active (display:flex) 的 stacking context
+  if (m.parentElement !== document.body) document.body.appendChild(m);
+  m.style.display='flex';
   var presetSel=document.getElementById('providerPreset');
   if(presetSel){
     presetSel.innerHTML='<option value="">自定义</option>';
@@ -7113,7 +7116,9 @@ function renderProviderModels(){
 }
 function openModelEditModal(i){
   var list=_providerModelCache||[]; var m=list[i]; if(!m) return;
-  var modal=document.getElementById('modelEditModal'); if(!modal) return; modal.style.display='flex';
+  var modal=document.getElementById('modelEditModal'); if(!modal) return;
+  if (modal.parentElement !== document.body) document.body.appendChild(modal);
+  modal.style.display='flex';
   document.getElementById('modelEditIdx').value=i;
   document.getElementById('modelEditId').value=(m.id||'');
   document.getElementById('modelEditName').value=(m.name||m.id||'');
@@ -7353,7 +7358,9 @@ function toggleToolset(id){
   renderToolsets(); saveConfig();
 }
 function renderToolConfigModal(id){
-  var modal=document.getElementById('toolConfigModal'); if(!modal) return; modal.style.display='flex';
+  var modal=document.getElementById('toolConfigModal'); if(!modal) return;
+  if (modal.parentElement !== document.body) document.body.appendChild(modal);
+  modal.style.display='flex';
   _toolCfgCurrent = id;
   var native = _toolNative && _toolNative[id];
   var titleName = native ? (native.label||native.name) : id;
@@ -7533,6 +7540,8 @@ function renderSkillConfigModal(s){
   }
   body.innerHTML = html;
   if(setupBtn) setupBtn.style.display = (s.needs_setup || s.setup_command) ? 'inline-block' : 'none';
+  var scm = document.getElementById('skillConfigModal');
+  if (scm && scm.parentElement !== document.body) document.body.appendChild(scm);
   document.getElementById('skillConfigModal').style.display='flex';
 }
 function renderSkillConfigFields(fields, values){
@@ -7643,6 +7652,8 @@ function openWorkflowEditor(){
   var n=document.getElementById('wfNameModal'); if(n) n.value=wf.name||'';
   var c=document.getElementById('wfConcModal'); if(c) c.value=(wf.concurrency||2);
   renderWfSteps('Modal','wfStepsModal');
+  var wm=document.getElementById('workflowEditorModal');
+  if(wm && wm.parentElement !== document.body) document.body.appendChild(wm);
   document.getElementById('workflowEditorModal').style.display='flex';
 }
 function closeWorkflowEditor(){ var m=document.getElementById('workflowEditorModal'); if(m) m.style.display='none'; }
@@ -7774,6 +7785,8 @@ function renderPersonas(){
 function openPersonaModal(id){
   try {
     var m=document.getElementById('personaModal'); if(!m){ toast('模态未就绪'); return; }
+    // Portal 模式：把 modal 临时移到 body 直接子元素，避免嵌套在 .page.active (display:flex) 内被 stacking context 影响
+    if (m.parentElement !== document.body) document.body.appendChild(m);
     m.style.display='flex';
     document.getElementById('personaEditId').value = id||'';
     document.getElementById('personaModalTitle').textContent = id? '编辑角色' : '添加角色';
@@ -8010,7 +8023,9 @@ var _currentConnKind=null;
 function openConnectorModal(kind){
   _currentConnKind=kind;
   var c=PV.octopConnectors.find(function(x){ return x.kind===kind; });
-  var m=document.getElementById('connectorModal'); if(!m) return; m.style.display='flex';
+  var m=document.getElementById('connectorModal'); if(!m) return;
+  if (m.parentElement !== document.body) document.body.appendChild(m);
+  m.style.display='flex';
   document.getElementById('connModalTitle').innerHTML=esc(c.name)+' <span class="conn-badge" style="background:'+esc(c.color)+'20;color:'+esc(c.color)+';border-color:'+esc(c.color)+'40">'+esc(c.mcp_mode)+'</span>';
   apiGet('/api/connectors/'+encodeURIComponent(kind)).then(function(d){
     var creds=(d && d.creds_set) || {};
@@ -8144,7 +8159,9 @@ function openChannelModal(id){
   var def=_chState.defs[id];
   var c=_chState.channels[id]||{};
   if(!def) return;
-  var m=document.getElementById('channelModal'); if(!m) return; m.style.display='flex';
+  var m=document.getElementById('channelModal'); if(!m) return;
+  if (m.parentElement !== document.body) document.body.appendChild(m);
+  m.style.display='flex';
   document.getElementById('chModalTitle').textContent='配置 '+def.name;
   var html='';
   (def.fields||[]).forEach(function(f){
