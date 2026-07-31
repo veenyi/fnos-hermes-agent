@@ -587,10 +587,11 @@
     .field input, .field select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none}
     .field input:focus, .field select:focus{border-color:var(--accent)}
     /* select 统一圆角 + 自定义下拉箭头（解决浏览器原生 select 右侧箭头不圆角的问题） */
-    .field select{appearance:none !important;-webkit-appearance:none !important;-moz-appearance:none !important;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23888' d='M6 9L1.5 3.5h9z'/></svg>");background-repeat:no-repeat;background-position:right 12px center;background-size:12px;padding:8px 36px 8px 10px;cursor:pointer;border-radius:8px !important;text-overflow:ellipsis}
-    .field select::-ms-expand{display:none;width:0;height:0;margin:0;padding:0}
-    .field select::-webkit-search-cancel-button,.field select::-webkit-search-decoration,.field select::-webkit-search-results-button,.field select::-webkit-search-results-decoration,.field select::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
-    .field select::-moz-focus-inner{border:0;padding:0}
+    .field select{appearance:none !important;-webkit-appearance:none !important;-moz-appearance:none !important;background:var(--bg1) !important;padding:8px 36px 8px 10px !important;border-radius:8px !important;text-overflow:ellipsis;border:1px solid var(--border);font-size:13px;color:var(--text);outline:none;cursor:pointer;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23888' d='M6 9L1.5 3.5h9z'/></svg>") !important;background-repeat:no-repeat !important;background-position:right 12px center !important;background-size:12px !important}
+    .field select::-ms-expand{display:none !important;width:0 !important;height:0 !important;margin:0 !important;padding:0 !important;background:transparent !important;border:0 !important}
+    .field select::-webkit-search-cancel-button,.field select::-webkit-search-decoration,.field select::-webkit-search-results-button,.field select::-webkit-search-results-decoration,.field select::-webkit-calendar-picker-indicator,.field select::-webkit-inner-spin-button,.field select::-webkit-outer-spin-button{display:none !important;-webkit-appearance:none !important;visibility:hidden !important;opacity:0 !important}
+    .field select::-moz-focus-inner{border:0 !important;padding:0 !important}
+    .field select::-ms-value{display:block !important;color:var(--text) !important}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .key-wrap{display:flex;gap:6px}
 .key-wrap input{flex:1}
@@ -600,7 +601,8 @@
 .ext-pane{display:none}
 .ext-pane.active{display:block}
 .skill-subtabs{display:flex;gap:8px;margin-bottom:12px}
-.toolset-list, .skill-grid, .persona-grid, .expert-grid, .channel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+/* 工作流 preset 网格：桌面端固定 2-3 列，与下方 DAG 编辑器有视觉分隔 */
+    .toolset-list, .skill-grid, .persona-grid, .expert-grid, .channel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
 .card-item{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;align-items:flex-start;gap:10px;cursor:pointer;transition:all .15s}
 .card-item:hover{border-color:var(--accent)}
 .card-item.active{border-color:var(--accent);background:var(--accent-bg)}
@@ -611,7 +613,7 @@
 .card-item .check{margin-left:auto;width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center}
 .card-item.active .check{border-color:var(--accent);background:var(--accent)}
 .card-item.active .check::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
-.wf-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px;max-width:520px;margin:0 auto}
+.wf-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px;margin:18px 0 0;max-width:none}
 .wf-card .desc{font-size:13px;color:var(--text3);margin:8px 0 16px}
 .wf-card .field-row{grid-template-columns:1fr 120px;gap:12px}
 .wf-card input[type="number"]{max-width:120px}
@@ -665,7 +667,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 .wf-step-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg1);box-sizing:border-box}
 .wf-step-card input,.wf-step-card textarea{width:100%;box-sizing:border-box;max-width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
 .wf-step-card input:focus,.wf-step-card textarea:focus{border-color:var(--accent)}
-.wf-step-card textarea{resize:vertical;min-height:48px}
+'.wf-step-card textarea{resize:vertical;min-height:36px;max-height:100px;font-family:inherit}'
 .wf-step-head{display:flex;align-items:center;justify-content:space-between;font-weight:600;margin-bottom:8px;gap:8px}
 .wf-step-head .action{margin-top:0;width:auto;padding:3px 10px;font-size:12px}
 .wf-step-card .action.danger{color:var(--red);border-color:var(--red)}
@@ -8597,7 +8599,7 @@ function checkAppUpdate(){
 }
 function confirmAppUpdate(){
   if(!confirm('确认更新 Hermes Agent 应用？')) return;
-  apiPost('/api/app/update', {}).then(function(data){
+  apiPost('/api/app/update/dispatch', {}).then(function(data){
     if(data && data.error){ toast('启动更新失败：'+data.error); return; }
     toast('应用更新中…');
     var tries=0;
