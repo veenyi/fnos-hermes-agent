@@ -123,21 +123,21 @@
 
     /* ── 多会话标签栏（浏览器式多开） ── */
     /* 默认桌面隐藏（会话树展开时占用空间）；当 chat-rail.hidden（折叠）或移动端时显示 */
-    .session-tabs{display:none;align-items:center;gap:2px;padding:6px 12px 0;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+    .session-tabs{display:none;align-items:center;gap:8px;padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;min-height:50px}
     .session-tabs.visible{display:flex}
-    .tabs-scroll{display:flex;align-items:flex-end;gap:2px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+    .tabs-scroll{display:flex;align-items:stretch;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 0}
     .tabs-scroll::-webkit-scrollbar{display:none}
-    .session-tab{display:inline-flex;align-items:center;gap:6px;max-width:180px;padding:6px 8px 6px 12px;border-radius:8px 8px 0 0;background:var(--bg1);border:1px solid var(--border);border-bottom:none;color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s,color .15s;position:relative;user-select:none}
-    .session-tab .tab-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .2s}
-    .session-tab .tab-title{overflow:hidden;text-overflow:ellipsis;max-width:120px}
-    .session-tab .tab-close{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;color:var(--text3);font-size:13px;line-height:1;flex-shrink:0}
+    .session-tab{display:inline-flex;align-items:center;gap:8px;min-width:180px;max-width:220px;flex:0 0 auto;padding:8px 10px 8px 14px;border-radius:8px;background:var(--bg1);border:1px solid var(--border);color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s,color .15s,border-color .15s;position:relative;user-select:none}
+    .session-tab .tab-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .2s}
+    .session-tab .tab-title{overflow:hidden;text-overflow:ellipsis;max-width:140px;flex:1;min-width:0}
+    .session-tab .tab-close{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;color:var(--text3);font-size:14px;line-height:1;flex-shrink:0;margin-left:2px}
     .session-tab .tab-close:hover{background:rgba(239,68,68,.15);color:#ef4444}
     .session-tab:hover{background:var(--bg3);color:var(--text)}
     .session-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
     .session-tab.active .tab-dot{background:var(--accent)}
     .session-tab.streaming .tab-dot{background:#f59e0b;animation:tabPulse 1s infinite}
     @keyframes tabPulse{0%,100%{opacity:1}50%{opacity:.3}}
-    .tab-new{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:1px dashed var(--border);background:transparent;color:var(--text3);cursor:pointer;flex-shrink:0;transition:all .15s}
+    .tab-new{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px dashed var(--border);background:transparent;color:var(--text3);cursor:pointer;flex-shrink:0;transition:all .15s}
     .tab-new:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
     .tab-new svg{width:14px;height:14px;stroke-width:2;stroke-linecap:round;stroke:currentColor;fill:none}
 
@@ -5400,27 +5400,19 @@ function openTab(sid) {
   switchTab(sid);
 }
 
-/* 切换激活标签：允许后台流式继续（用户明确要求"并行多会话"，类比 delegation-patterns 文档的子 Agent 并行）
-   关键：切换前保存当前 chatBody → _chatHTML[currentSession]，切回时从 _chatHTML[sid] 恢复（保留流式最新内容） */
+/* 切换激活标签：流式后台继续（并行多会话）。切换前保存当前 chatBody → _chatHTML[currentSession]，切回时仍优先用缓存（流式最新） */
 function switchTab(sid) {
   if (!sid || sid === currentSession) return;
-  // 1) 把当前 chatBody 内容存到缓存（含流式中最新内容）
   var body = document.getElementById('chatBody');
   if (body && currentSession) _chatHTML[currentSession] = body.innerHTML;
-  // 2) 切换会话
   currentSession = sid;
   renderSessionTabs();
   renderRail(); updateHeader();
   restoreDraft(sid);
-  // 3) 优先从缓存恢复；缓存没有才从后端拉取
   if (body) {
-    if (_chatHTML[sid] != null) {
-      body.innerHTML = _chatHTML[sid];
-      body.scrollTop = body.scrollHeight;
-      hideScrollBtn();
-    } else {
-      loadSessionMessages(sid);
-    }
+    // 始终从后端重新拉取消息（避免缓存导致两个 tab 显示同一内容）
+    body.innerHTML = '<div class="system-tip">加载中…</div>';
+    loadSessionMessages(sid);
   }
 }
 
@@ -5530,6 +5522,17 @@ function fmtDateTime(ts){
 function renderRail(){
   var el = document.getElementById('railScroll');
   if(!el) return;
+  // 一次性清理 v0.20.66 期间 localStorage 存的旧 'true' 值（让默认折叠生效）
+  if (!_state._railOpenCleaned) {
+    try {
+      var keys = Object.keys(localStorage);
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].indexOf('hermes_rail_open_') === 0) localStorage.removeItem(keys[i]);
+      }
+      _state._railOpenCleaned = true;
+      try { localStorage.setItem('hermes_ui_flags', JSON.stringify({ railOpenCleaned: true })); } catch(e){}
+    } catch(e){ _state._railOpenCleaned = true; }
+  }
   if(!_sessions.length){
     el.innerHTML = '<div class="empty-state">暂无会话，点击右上角 + 新建。</div>';
     return;
@@ -5538,7 +5541,7 @@ function renderRail(){
   _agents.forEach(function(agent){
     var isActiveAgent = (currentAgent === agent.id);
     // 默认所有 agent 分组都【折叠】，用户点击才展开。
-    // 仅当 localStorage 显式记录为 'true' 才展开。
+    // 仅当 localStorage 显式记录为 'true' 才展开（v0.20.66 期间的旧值已被上面清理）
     var open = (localStorage.getItem('hermes_rail_open_'+agent.id) === 'true');
     // 归属映射若指向不存在的 agent（如本地存储被部分清理），回退到 default，避免会话丢失
     var sessIds = _sessions.filter(function(s){
