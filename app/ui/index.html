@@ -381,31 +381,41 @@
       .cmd-cell .sub{font-size:10px}
       .connector-grid{grid-template-columns:1fr}
       .page-body{padding:14px}
-      .ov-grid{grid-template-columns:1fr;gap:12px}
-      .ov-card{padding:12px;gap:8px;min-width:0}
+      .ov-grid{grid-template-columns:1fr;gap:10px}
+      .ov-card{padding:12px;gap:8px;min-width:0;border-radius:10px}
       .ov-card-main{overflow:hidden}
-      .ov-card-head{flex-wrap:wrap;gap:8px}
-      .ov-head-actions{width:100%;justify-content:flex-end;margin-left:0}
-      .ov-head-actions .ov-openbtn{flex:1;text-align:center}
-      .sys-metrics{grid-template-columns:1fr 1fr;gap:8px}
-      .ov-metric strong{font-size:13px}
+      .ov-card-head{flex-wrap:wrap;gap:6px;align-items:flex-start}
+      .ov-card-title{font-size:13px}
+      .ov-card-body{padding-top:4px}
+      .ov-head-actions{width:100%;justify-content:flex-end;margin-left:0;gap:6px}
+      .ov-head-actions .ov-openbtn{flex:1;text-align:center;padding:6px 8px;font-size:12px}
+      .ov-refresh{padding:4px 8px;font-size:12px}
+      .sys-metrics{grid-template-columns:1fr;gap:6px}
+      .ov-metric{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--border);font-size:12px;color:var(--text3)}
+      .ov-metric:last-child{border-bottom:none}
+      .ov-metric span{flex-shrink:0}
+      .ov-metric strong{font-size:12px;color:var(--text);font-weight:600;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+      .ov-status{font-size:11px;padding:3px 8px}
       .ov-logbar{display:none;gap:6px;margin-top:8px;padding:10px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;flex-direction:column;align-items:stretch;max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
       .ov-logbar.open{display:flex}
       .log-filter-toggle{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:100%;margin-top:8px;padding:7px 10px;border-radius:7px;border:1px dashed var(--border);background:var(--bg1);color:var(--text2);font-size:11px;cursor:pointer;transition:all .15s}
       .log-filter-toggle:hover{border-color:var(--accent);color:var(--accent)}
       .log-filter-toggle .arrow{transition:transform .2s}
       .log-filter-toggle.on .arrow{transform:rotate(180deg)}
-      .ov-logbar .log-filter-row{flex-wrap:wrap}
-      .log-filter-row{gap:5px;flex-wrap:nowrap;white-space:nowrap}
-      .log-filter-label{font-size:10px;min-width:30px}
+      .ov-logbar .log-filter-row{flex-wrap:wrap;gap:5px}
+      .log-filter-row{flex-wrap:wrap;gap:5px}
+      .log-filter-label{font-size:10px;min-width:auto}
       .log-filter-row .ov-logbtn{padding:3px 7px;font-size:10px;min-width:auto;white-space:nowrap}
-      .log-keyword{width:100px;padding:4px 8px;font-size:11px;flex-shrink:0}
-      .service-row{padding:10px 0}
+      .log-keyword{width:100%;padding:5px 8px;font-size:11px;flex-shrink:0;box-sizing:border-box}
+      .service-row{padding:8px 0;gap:8px}
       .service-title{font-size:13px}
-      .service-meta{font-size:11px}
-      .ov-logbox-head{padding:8px 12px}
-      .ov-logpre{padding:10px 12px;font-size:11px}
+      .service-meta{font-size:11px;gap:6px}
+      .service-toggle{flex-shrink:0}
+      .ov-logbox-head{padding:6px 10px;font-size:12px}
+      .ov-logpre{padding:8px 10px;font-size:10.5px;line-height:1.45}
       .settings-list{max-width:none}
+      .ov-icon{width:28px;height:28px;font-size:16px;flex-shrink:0}
+      .ov-card-head > div:first-child{width:28px;height:28px;font-size:16px;flex-shrink:0}
       .local-banner{font-size:12px}
     }
   
@@ -472,15 +482,28 @@
 .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .section-head h2{margin:0;font-size:16px}
 .provider-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.provider-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column}
+.provider-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px;transition:all .15s;display:flex;flex-direction:column;gap:8px;min-height:180px}
 .provider-card:hover{border-color:var(--accent);box-shadow:0 4px 12px rgba(0,0,0,.06)}
-.provider-card.active{border-color:var(--accent);background:var(--accent-bg)}
-.provider-card .name{font-size:14px;font-weight:600}
-.provider-card .model{font-size:12px;color:var(--text3);margin-top:4px}
-.provider-card .meta{font-size:11px;color:var(--text3);margin-top:8px;display:flex;gap:10px}
-.provider-card .status{margin-top:auto;padding-top:10px;font-size:12px}
-.provider-card .status.on{color:#16a34a}
-.provider-card .status.off{color:var(--accent);cursor:pointer}
+.provider-card.active{border-color:var(--accent);background:var(--accent-bg);box-shadow:0 0 0 1px var(--accent)}
+.provider-card-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.provider-merchant{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--accent-bg);color:var(--accent);font-weight:500}
+.provider-card.active .provider-merchant{background:var(--accent);color:#fff}
+.provider-name{font-size:14px;font-weight:600;color:var(--text)}
+.provider-card.active .provider-name{color:var(--accent)}
+.provider-status{font-size:11px;padding:2px 8px;border-radius:10px;margin-left:auto;flex-shrink:0;font-weight:500}
+.provider-status.current{background:var(--accent);color:#fff}
+.provider-status.fallback{background:rgba(245,158,11,.12);color:#d97706;border:1px solid rgba(245,158,11,.3)}
+.provider-model{font-size:12px;color:var(--text2);font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.provider-meta{font-size:11px;color:var(--text3)}
+.provider-key{font-size:11px;color:var(--text3);font-family:ui-monospace,monospace;display:inline-flex;align-items:center;gap:6px;background:var(--bg2);padding:3px 8px;border-radius:4px;width:fit-content;max-width:100%;overflow:hidden}
+.provider-key .key-dot{color:var(--text3);letter-spacing:1px}
+.provider-actions{margin-top:auto;display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border)}
+.provider-actions .action{flex:1;min-width:60px;padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text);text-align:center;transition:all .15s}
+.provider-actions .action:hover:not(.disabled){border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.provider-actions .action.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.provider-actions .action.warn{color:#d97706;border-color:rgba(245,158,11,.4)}
+.provider-actions .action.warn:hover{background:rgba(245,158,11,.1)}
+.provider-actions .action.disabled{opacity:.6;cursor:not-allowed;color:var(--text3)}
 .model-manage-head{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
 .provider-model-list{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow:auto;padding-right:4px}
 .provider-model-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg1)}
@@ -905,7 +928,13 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
           <div class="page-header"><h1>模型</h1></div>
           <div class="page-body">
             <div class="settings-section">
-  <div class="section-head"><h2>模型列表</h2><button class="ov-actbtn" onclick="openProviderModal()">+ 添加模型</button></div>
+  <div class="section-head">
+    <h2>模型服务</h2>
+    <div style="display:flex;gap:8px">
+      <button class="ov-actbtn" onclick="addProvider('local')">+ 添加本地模型</button>
+      <button class="ov-actbtn primary" onclick="addProvider('cloud')">+ 添加模型服务</button>
+    </div>
+  </div>
   <div class="provider-grid" id="providerGrid"></div>
 </div>
 <div id="providerModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeProviderModal()">
@@ -6881,26 +6910,124 @@ function renderProviders(){
   var grid=document.getElementById('providerGrid'); if(!grid) return;
   var providers = _cfg.providers || [];
   if(!providers.length){ grid.innerHTML='<div class="empty-state">暂无 Provider，点击右上角添加。</div>'; return; }
+  var fallback = _cfg.fallback_providers || [];
   grid.innerHTML = providers.map(function(p, i){
-    var active = (_cfg.active_provider === (p.name||p.id));
-    var models = p.models || [];
-    var enabled = models.filter(function(m){ return m.enabled!==false; });
-    var modelText = p.model ? esc(p.model) : (enabled.length ? esc(enabled[0].id || enabled[0].name || '') : '未选择模型');
-    var countBadge = enabled.length ? '<span class="badge on">'+enabled.length+' 个模型</span>' : '<span class="badge off">无模型</span>';
-    return '<div class="provider-card '+(active?'active':'')+'" onclick="editProvider(\''+i+'\')">'+
-      '<div class="name">'+esc(p.name||p.id||'未命名')+' '+countBadge+'</div>'+
-      '<div class="model">'+modelText+'</div>'+
-      '<div class="meta"><span>temp '+(p.temperature!=null?p.temperature:'-')+'</span><span>max '+(p.max_tokens!=null?p.max_tokens:'-')+'</span></div>'+
-      (active?'<div class="status on">当前使用</div>':'<div class="status off" onclick="event.stopPropagation();activateProvider('+i+')">设为默认</div>')+
-      '</div>';
+    var pname = p.name || p.id || '未命名';
+    var isActive = (_cfg.active_provider === pname);
+    var isFallback = fallback.indexOf(pname) >= 0;
+    var enabled = (p.models || []).filter(function(m){ return m.enabled!==false; });
+    var modelText = enabled.length ? esc(enabled[0].id || enabled[0].name || '') : '未选择模型';
+    var temp = p.temperature != null ? p.temperature : '-';
+    var maxT = p.max_tokens != null ? p.max_tokens : '-';
+    var key = p.api_key || '';
+    var keyMasked = '';
+    if (key) {
+      var tail = key.length > 4 ? key.slice(-4) : key;
+      keyMasked = '<span class="provider-key"><span class="key-dot">••••</span>'+esc(tail)+'</span>';
+    }
+    var merchant = p.preset || p.kind || (p.local ? '本地' : '自定义');
+
+    // 状态标签：当前使用（蓝紫）/ 回退模型（黄）/ 普通（无标签）
+    var statusTag = '';
+    if (isActive) statusTag = '<span class="provider-status current">当前使用</span>';
+    else if (isFallback) statusTag = '<span class="provider-status fallback">回退模型</span>';
+
+    // 操作按钮（用 data 属性 + 事件委托，避开 WebView 中失效的 stopPropagation）
+    var buttons = '<div class="provider-actions">';
+    if (isActive) {
+      buttons += '<button class="action disabled" data-provider-action="none">使用中</button>';
+    } else {
+      buttons += '<button class="action" data-provider-action="set-default" data-idx="'+i+'">设为默认</button>';
+      if (isFallback) {
+        buttons += '<button class="action warn" data-provider-action="unset-fallback" data-idx="'+i+'">取消回退</button>';
+      } else {
+        buttons += '<button class="action" data-provider-action="set-fallback" data-idx="'+i+'">设为回退</button>';
+      }
+    }
+    buttons += '<button class="action" data-provider-action="edit" data-idx="'+i+'">编辑</button>';
+    buttons += '</div>';
+
+    return '<div class="provider-card '+(isActive?'active':'')+'">'+
+      '<div class="provider-card-head">'+
+        '<span class="provider-merchant">'+esc(merchant)+'</span>'+
+        '<span class="provider-name">'+esc(pname)+'</span>'+
+        statusTag+
+      '</div>'+
+      '<div class="provider-model">'+modelText+'</div>'+
+      '<div class="provider-meta">temp '+temp+' · max '+maxT+'</div>'+
+      keyMasked+
+      buttons+
+    '</div>';
   }).join('');
+  // 一次性事件委托（不依赖 inline stopPropagation，兼容所有浏览器/WebView）
+  if (!grid._providerDelegated) {
+    grid._providerDelegated = true;
+    grid.addEventListener('click', function(ev){
+      var btn = ev.target.closest('button[data-provider-action]');
+      if (!btn || !grid.contains(btn)) return;
+      var idx = parseInt(btn.getAttribute('data-idx'));
+      var action = btn.getAttribute('data-provider-action');
+      if (isNaN(idx)) return;
+      if (action === 'set-default') activateProvider(idx);
+      else if (action === 'set-fallback') setFallbackProvider(idx);
+      else if (action === 'unset-fallback') unsetFallbackProvider(idx);
+      else if (action === 'edit') editProvider(idx);
+    });
+  }
 }
 function activateProvider(i){
   var p=_cfg.providers[i]; if(!p) return;
   _cfg.active_provider = p.name || p.id;
-  apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已设为默认：'+p.name); }).catch(function(e){ toast('保存失败：'+e.message); });
+  apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已设为默认：'+(p.name||p.id)); }).catch(function(e){ toast('保存失败：'+e.message); });
+}
+function setFallbackProvider(i){
+  var p=_cfg.providers[i]; if(!p) return;
+  var pname = p.name || p.id;
+  if(!_cfg.fallback_providers) _cfg.fallback_providers = [];
+  if(_cfg.fallback_providers.indexOf(pname)>=0){ toast('已是回退模型'); return; }
+  _cfg.fallback_providers.push(pname);
+  apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已设为回退：'+pname); }).catch(function(e){ toast('保存失败：'+e.message); });
+}
+function unsetFallbackProvider(i){
+  var p=_cfg.providers[i]; if(!p) return;
+  var pname = p.name || p.id;
+  if(!_cfg.fallback_providers) _cfg.fallback_providers = [];
+  if(_cfg.fallback_providers.indexOf(pname)<0){ toast('不是回退模型'); return; }
+  _cfg.fallback_providers = _cfg.fallback_providers.filter(function(n){ return n!==pname; });
+  apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已取消回退：'+pname); }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 function openProviderModal(){ editProvider(null); }
+function addProvider(kind){
+  // kind: 'local' 或 'cloud'
+  openProviderModal();
+  // 编辑器打开后自动选中合适的预设
+  setTimeout(function(){
+    var preset = document.getElementById('providerPreset');
+    if (kind === 'local' && preset) {
+      // 本地模型：选择第一个 local preset（如果有），否则让用户自定义
+      var localKey = null;
+      Object.keys(PV.providerPresets || {}).forEach(function(k){
+        var p = PV.providerPresets[k];
+        if (!localKey && p && (p.local || /local|ollama|vllm/i.test(k))) localKey = k;
+      });
+      if (localKey) {
+        preset.value = localKey;
+        if (typeof onProviderPresetChange === 'function') onProviderPresetChange();
+      }
+    } else if (kind === 'cloud' && preset) {
+      // 云端模型：默认选第一个云端预设（让用户编辑）
+      var cloudKey = null;
+      Object.keys(PV.providerPresets || {}).forEach(function(k){
+        var p = PV.providerPresets[k];
+        if (!cloudKey && p && !p.local) cloudKey = k;
+      });
+      if (cloudKey) {
+        preset.value = cloudKey;
+        if (typeof onProviderPresetChange === 'function') onProviderPresetChange();
+      }
+    }
+  }, 50);
+}
 function closeProviderModal(){ var m=document.getElementById('providerModal'); if(m) m.style.display='none'; _providerModelCache=null; }
 var _providerModelCache = null; // 编辑 Provider 时的模型列表 [{id,name,enabled,default}]
 function editProvider(idx){
