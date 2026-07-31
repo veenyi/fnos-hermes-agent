@@ -381,42 +381,53 @@
       .cmd-cell .sub{font-size:10px}
       .connector-grid{grid-template-columns:1fr}
       .page-body{padding:14px}
-      .ov-grid{grid-template-columns:1fr;gap:10px}
+      .ov-grid{grid-template-columns:1fr !important;gap:10px}
       .ov-card{padding:12px;gap:8px;min-width:0;border-radius:10px}
       .ov-card-main{overflow:hidden}
-      .ov-card-head{flex-wrap:wrap;gap:6px;align-items:flex-start}
-      .ov-card-title{font-size:13px}
+      /* 头部：服务状态 badge + 4 个图标按钮一行排开（去掉默认 margin-left:auto 让其紧凑） */
+      .ov-card-head{flex-wrap:nowrap;gap:6px;align-items:center;overflow-x:auto}
+      .ov-card-title{font-size:12px;flex-shrink:0}
       .ov-card-body{padding-top:4px}
-      .ov-head-actions{width:100%;justify-content:flex-end;margin-left:0;gap:6px}
-      .ov-head-actions .ov-openbtn{flex:1;text-align:center;padding:6px 8px;font-size:12px}
-      .ov-refresh{padding:4px 8px;font-size:12px}
-      .sys-metrics{grid-template-columns:1fr;gap:6px}
-      .ov-metric{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--border);font-size:12px;color:var(--text3)}
+      /* ov-card-services 头部：标题 + 4 个按钮横排（不带 margin-left:auto 拥挤） */
+      .ov-card-services .ov-card-head{flex-wrap:nowrap;gap:4px}
+      .ov-card-services .ov-head-actions{margin-left:0}
+      /* 头部按钮紧凑 */
+      .ov-head-actions{flex-shrink:0;margin-left:auto;gap:4px}
+      .ov-head-actions .ov-openbtn{flex:none;padding:5px 8px;font-size:11px}
+      .ov-head-actions .ov-iconbtn{width:26px;height:26px;font-size:11px}
+      .ov-refresh{padding:3px 6px;font-size:11px;width:26px;height:26px}
+      .ov-status{font-size:10px;padding:2px 7px;flex-shrink:0}
+      /* 系统信息：2x2 网格（4 个 metric 在手机端更清晰可读） */
+      .sys-metrics{grid-template-columns:repeat(2,1fr) !important;gap:8px}
+      .ov-metric{display:flex !important;flex-direction:column;gap:3px;padding:8px 6px;background:var(--bg2);border-radius:6px;text-align:center;font-size:11px;color:var(--text3)}
       .ov-metric:last-child{border-bottom:none}
-      .ov-metric span{flex-shrink:0}
-      .ov-metric strong{font-size:12px;color:var(--text);font-weight:600;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+      .ov-metric span{font-size:10px;color:var(--text3);order:2}
+      .ov-metric strong{font-size:13px;color:var(--text);font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;order:1;margin-bottom:2px}
       .ov-status{font-size:11px;padding:3px 8px}
-      .ov-logbar{display:none;gap:6px;margin-top:8px;padding:10px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;flex-direction:column;align-items:stretch;max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
-      .ov-logbar.open{display:flex}
-      .log-filter-toggle{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:100%;margin-top:8px;padding:7px 10px;border-radius:7px;border:1px dashed var(--border);background:var(--bg1);color:var(--text2);font-size:11px;cursor:pointer;transition:all .15s}
-      .log-filter-toggle:hover{border-color:var(--accent);color:var(--accent)}
-      .log-filter-toggle .arrow{transition:transform .2s}
-      .log-filter-toggle.on .arrow{transform:rotate(180deg)}
-      .ov-logbar .log-filter-row{flex-wrap:wrap;gap:5px}
-      .log-filter-row{flex-wrap:wrap;gap:5px}
-      .log-filter-label{font-size:10px;min-width:auto}
-      .log-filter-row .ov-logbtn{padding:3px 7px;font-size:10px;min-width:auto;white-space:nowrap}
-      .log-keyword{width:100%;padding:5px 8px;font-size:11px;flex-shrink:0;box-sizing:border-box}
-      .service-row{padding:8px 0;gap:8px}
-      .service-title{font-size:13px}
-      .service-meta{font-size:11px;gap:6px}
-      .service-toggle{flex-shrink:0}
-      .ov-logbox-head{padding:6px 10px;font-size:12px}
-      .ov-logpre{padding:8px 10px;font-size:10.5px;line-height:1.45}
+      /* 日志过滤区：手机端完全隐藏（用户反馈太占空间） */
+      .ov-logbar{display:none !important}
+      .log-filter-toggle{display:none !important}
+      .log-filter-row{display:none !important}
+      /* 运行服务：Gateway/Dashboard 一行 2 列横排（紧凑，每行只显示名称+开关） */
+      .ov-card-services .ov-card-body{display:flex;flex-direction:row;gap:6px}
+      .service-row{padding:8px 6px !important;gap:4px !important;background:var(--bg2);border-radius:6px;border-bottom:none !important;display:flex !important;flex:1;flex-wrap:nowrap;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;overflow:hidden;max-width:100%}
+      .service-row:last-child{margin-bottom:0}
+      .service-info{flex:1;min-width:0;width:100%;overflow:hidden}
+      .service-title{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;display:block}
+      .service-meta{font-size:9px;gap:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;display:block;color:var(--text3)}
+      .ov-toggle{flex-shrink:0;transform:scale(0.85);transform-origin:right top;position:absolute;top:6px;right:6px;margin-left:0}
+      .service-row{position:relative;padding-right:48px !important}
+      .ov-card-services .ov-card-body .service-row .ov-toggle{position:absolute;top:6px;right:6px;transform:scale(0.8)}
+      .ov-logbox-head{padding:8px 12px;font-size:12px}
+      .ov-logbox-ctrl{gap:6px}
+      .ov-logbox-ctrl .ov-refresh{width:24px;height:24px;font-size:10px;padding:0}
+      .ov-logpre{padding:8px 12px;font-size:10px;line-height:1.4}
       .settings-list{max-width:none}
-      .ov-icon{width:28px;height:28px;font-size:16px;flex-shrink:0}
-      .ov-card-head > div:first-child{width:28px;height:28px;font-size:16px;flex-shrink:0}
+      .ov-icon{display:none !important}
+      .ov-card-head > div:first-child{display:none !important}
       .local-banner{font-size:12px}
+      /* 日志窗口始终显示 */
+      .ov-logbox{flex:1;min-height:200px;max-height:50vh}
     }
   
 /* ---------- Modules ---------- */
@@ -505,7 +516,41 @@
 .provider-actions .action.warn:hover{background:rgba(245,158,11,.1)}
 .provider-actions .action.disabled{opacity:.6;cursor:not-allowed;color:var(--text3)}
 .model-manage-head{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
-.provider-model-list{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow:auto;padding-right:4px}
+.provider-model-list{display:flex;flex-direction:column;gap:6px;padding-right:4px;max-height:340px;overflow-y:auto;scrollbar-gutter:stable}
+.model-group{border:1px solid var(--border);border-radius:10px;background:var(--bg1);overflow:hidden}
+.model-group-head{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;user-select:none;background:var(--bg2);border-bottom:1px solid var(--border)}
+.model-group-head:hover{background:var(--bg3)}
+.model-group-head.collapsed{border-bottom:none}
+.model-group-head .chevron{font-size:10px;color:var(--text3);transition:transform .2s;flex-shrink:0}
+.model-group-head.collapsed .chevron{transform:rotate(-90deg)}
+.model-group-head .name{font-size:13px;font-weight:600;color:var(--text);flex:1}
+.model-group-head .count{font-size:11px;color:var(--text3);background:var(--bg1);padding:2px 8px;border-radius:10px;border:1px solid var(--border)}
+.model-group-body{display:flex;flex-direction:column;padding:4px}
+.model-group-head.collapsed + .model-group-body{display:none}
+.model-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text);font-family:ui-monospace,monospace;transition:background .15s}
+.model-item:hover{background:var(--bg2)}
+.model-item.applied{background:var(--accent-bg);color:var(--accent);font-weight:600}
+.model-item.disabled{opacity:.45}
+.model-item .model-id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.model-item .model-badges{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.model-mini-badge{font-size:10px;padding:1px 5px;border-radius:4px;background:var(--bg2);color:var(--text3);border:1px solid var(--border)}
+.model-cfg-btn{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text3);font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:2px}
+.model-cfg-btn:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
+.model-test-btn{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text3);font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.model-test-btn:hover{background:#dcfce7;border-color:#16a34a;color:#16a34a}
+.model-test-btn.testing{background:#fef3c7;border-color:#f59e0b;color:#f59e0b;animation:testPulse 1s infinite}
+@keyframes testPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.model-tick{color:var(--accent);font-size:14px;flex-shrink:0}
+.ctx-helper{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.chip-sm{padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text3);cursor:pointer;font-family:inherit}
+.chip-sm:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
+.wf-search-bar{margin-bottom:8px}
+.wf-search-bar input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
+.wf-search-bar input:focus{border-color:var(--accent)}
+.model-custom-row{display:flex;gap:6px;margin-top:10px;padding:10px;padding-bottom:14px;border-top:1px solid var(--border);background:var(--bg2);position:sticky;bottom:0;z-index:2;box-shadow:0 -2px 8px rgba(0,0,0,0.04)}
+.model-custom-row input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg1);font-size:12px;color:var(--text);outline:none}
+.model-custom-row input:focus{border-color:var(--accent)}
+.model-custom-row .action{flex:none;padding:7px 12px;font-size:12px}
 .provider-model-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg1)}
 .provider-model-row.disabled{opacity:.55;background:var(--bg0)}
 .provider-model-row .toggle{width:34px;height:20px;border-radius:10px;flex-shrink:0}
@@ -521,21 +566,31 @@
 .provider-model-row .actions button{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;font-size:13px;color:var(--text3)}
 .provider-model-row .actions button:hover{border-color:var(--accent);color:var(--accent)}
 .modal-backdrop{position:fixed;left:0;top:0;width:100vw;height:100vh;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:6000;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:auto}
-.modal-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow:auto;scrollbar-gutter:stable;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
 .modal-head h3{margin:0;font-size:16px}
 .modal-close{width:28px;height:28px;border-radius:6px;border:none;background:transparent;cursor:pointer;font-size:20px;color:var(--text3)}
 .modal-close:hover{background:var(--bg3);color:var(--text)}
-.modal-body{padding:16px;display:flex;flex-direction:column;gap:12px}
-.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 16px;border-top:1px solid var(--border)}
+.modal-body{padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1;min-height:0;scrollbar-gutter:stable}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 16px;border-top:1px solid var(--border);flex-shrink:0}
     .modal-foot .action{width:auto;padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text)}
     .modal-foot .action:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
     .modal-foot .action.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
     .modal-foot .action.primary:hover{opacity:.9}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:12px;color:var(--text3);font-weight:500}
-.field input, .field select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none}
-.field input:focus, .field select:focus{border-color:var(--accent)}
+/* .action 全局基础样式：所有 modal-body / modal-foot 内的按钮统一 secondary 风格 */
+    .action{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);transition:all .15s;display:inline-block;vertical-align:middle}
+    .action:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
+    .action.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .action.primary:hover{opacity:.9;background:var(--accent);color:#fff}
+    .field input, .field select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none}
+    .field input:focus, .field select:focus{border-color:var(--accent)}
+    /* select 统一圆角 + 自定义下拉箭头（解决浏览器原生 select 右侧箭头不圆角的问题） */
+    .field select{appearance:none !important;-webkit-appearance:none !important;-moz-appearance:none !important;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23888' d='M6 9L1.5 3.5h9z'/></svg>");background-repeat:no-repeat;background-position:right 12px center;background-size:12px;padding:8px 36px 8px 10px;cursor:pointer;border-radius:8px !important;text-overflow:ellipsis}
+    .field select::-ms-expand{display:none;width:0;height:0;margin:0;padding:0}
+    .field select::-webkit-search-cancel-button,.field select::-webkit-search-decoration,.field select::-webkit-search-results-button,.field select::-webkit-search-results-decoration,.field select::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
+    .field select::-moz-focus-inner{border:0;padding:0}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .key-wrap{display:flex;gap:6px}
 .key-wrap input{flex:1}
@@ -556,8 +611,10 @@
 .card-item .check{margin-left:auto;width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center}
 .card-item.active .check{border-color:var(--accent);background:var(--accent)}
 .card-item.active .check::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
-.wf-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px;max-width:500px}
+.wf-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px;max-width:520px;margin:0 auto}
 .wf-card .desc{font-size:13px;color:var(--text3);margin:8px 0 16px}
+.wf-card .field-row{grid-template-columns:1fr 120px;gap:12px}
+.wf-card input[type="number"]{max-width:120px}
 .exp-search{margin-bottom:12px}
 .exp-search input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text)}
 .exp-depts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -583,6 +640,10 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 .exp-count{font-size:12px;color:var(--text3);margin:0 0 10px}
 .exp-dept .cnt{font-size:11px;color:var(--text3);margin-left:4px}
 .wf-intro{font-size:13px;color:var(--text2);margin-bottom:12px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.5}
+.wf-cat-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:13px}
+.wf-cat-bar label{color:var(--text3);font-weight:500}
+.wf-cat-bar select{flex:1;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg1);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit}
+.wf-cat-bar select:focus{outline:none;border-color:var(--accent)}
 .ext-card.active{border-color:var(--accent);background:var(--accent-bg)}
 .persona-actions{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap}
 .persona-actions .action{margin-top:0;width:auto;flex:1;min-width:60px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:12px;cursor:pointer;color:var(--text);text-align:center}
@@ -601,8 +662,11 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 .chip:hover{border-color:var(--accent)}
 .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .wf-steps{display:flex;flex-direction:column;gap:12px;margin:6px 0 4px}
-.wf-step-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg1)}
-.wf-step-head{display:flex;align-items:center;justify-content:space-between;font-weight:600;margin-bottom:8px}
+.wf-step-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg1);box-sizing:border-box}
+.wf-step-card input,.wf-step-card textarea{width:100%;box-sizing:border-box;max-width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
+.wf-step-card input:focus,.wf-step-card textarea:focus{border-color:var(--accent)}
+.wf-step-card textarea{resize:vertical;min-height:48px}
+.wf-step-head{display:flex;align-items:center;justify-content:space-between;font-weight:600;margin-bottom:8px;gap:8px}
 .wf-step-head .action{margin-top:0;width:auto;padding:3px 10px;font-size:12px}
 .wf-step-card .action.danger{color:var(--red);border-color:var(--red)}
 .wf-step-card .action.danger:hover{background:rgba(239,68,68,.1)}
@@ -869,15 +933,6 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
           <button class="ov-logbtn" data-log-comp="cli" onclick="setLogComponent('cli')">CLI</button>
           <button class="ov-logbtn" data-log-comp="cron" onclick="setLogComponent('cron')">CRON</button>
         </div>
-        <div class="log-filter-row log-filter-tools">
-          <span class="log-filter-label">行数</span>
-          <button class="ov-logbtn" data-log-lines="50" onclick="setLogLines(50)">50</button>
-          <button class="ov-logbtn active" data-log-lines="100" onclick="setLogLines(100)">100</button>
-          <button class="ov-logbtn" data-log-lines="200" onclick="setLogLines(200)">200</button>
-          <button class="ov-logbtn" data-log-lines="500" onclick="setLogLines(500)">500</button>
-          <input type="text" id="logKeyword" class="log-keyword" placeholder="关键词过滤…" oninput="applyLogFilters()">
-          <button class="ov-logbtn" onclick="clearLogKeyword()">清除</button>
-        </div>
       </div>
     </div>
     <div class="ov-card ov-card-services" id="cardServices">
@@ -895,14 +950,14 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
         <div class="service-row">
           <div class="service-info">
             <div class="service-title">Gateway</div>
-            <div class="service-meta">Port <span id="gwPort">8742</span> · PID <span id="gwPid">--</span> · <span id="gwStateText">未启动</span></div>
+            <div class="service-meta">Port <span id="gwPort">8742</span> · <span id="gwStateText">未启动</span></div>
           </div>
           <div class="ov-toggle"><div class="toggle" id="gwToggle" onclick="toggleService('gateway')"></div></div>
         </div>
         <div class="service-row">
           <div class="service-info">
             <div class="service-title">Dashboard</div>
-            <div class="service-meta">Port <span id="dbPort">9219</span> · PID <span id="dbPid">--</span> · <span id="dbStateText">未启动</span></div>
+            <div class="service-meta">Port <span id="dbPort">9219</span> · <span id="dbStateText">未启动</span></div>
           </div>
           <div class="ov-toggle"><div class="toggle" id="dbToggle" onclick="toggleService('dashboard')"></div></div>
         </div>
@@ -931,7 +986,6 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
   <div class="section-head">
     <h2>模型服务</h2>
     <div style="display:flex;gap:8px">
-      <button class="ov-actbtn" onclick="addProvider('local')">+ 添加本地模型</button>
       <button class="ov-actbtn primary" onclick="addProvider('cloud')">+ 添加模型服务</button>
     </div>
   </div>
@@ -944,19 +998,24 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
       <input type="hidden" id="providerId">
       <div class="field"><label>类型</label><select id="providerPreset" onchange="onProviderPresetChange()"><option value="">自定义</option></select></div>
       <div class="field"><label>名称 *</label><input type="text" id="providerName" placeholder="sensenova"></div>
-      <div class="field"><label>Base URL</label><input type="text" id="providerBaseUrl" placeholder="https://token.sensenova.cn/v1"></div>
-      <div class="field"><label>API Key</label><div class="key-wrap"><input type="password" id="providerKey" placeholder="sk-..."><button onclick="toggleKeyVisibility()">👁</button></div></div>
+      <div class="field"><label>Base URL</label><input type="text" id="providerBaseUrl" placeholder="https://token.sensenova.cn/v1" onchange="autoFetchModelsDebounced()"></div>
+      <div class="field"><label>API Key</label><div class="key-wrap"><input type="password" id="providerKey" placeholder="sk-..." onchange="autoFetchModelsDebounced()"><button onclick="toggleKeyVisibility()">👁</button></div></div>
       <div class="field"><label>备注(可选)</label><textarea id="providerNote" rows="2" placeholder="自定义说明，仅在仪表盘可见"></textarea></div>
       <div class="field-row">
         <div class="field"><label>Temperature</label><input type="number" id="providerTemp" step="0.1" min="0" max="2" value="0.7"></div>
         <div class="field"><label>Max Tokens</label><input type="number" id="providerMaxTokens" min="1" max="128000" value="4096"></div>
       </div>
       <div class="model-manage-head">
-        <span class="conn-section-title">管理模型</span>
-        <button class="action" style="width:auto;padding:5px 12px" onclick="fetchProviderModels()">获取模型列表</button>
+        <span class="conn-section-title">选择模型（可搜索 / 分组折叠）</span>
+      </div>
+      <div class="wf-search-bar">
+        <input type="text" id="providerModelSearch" placeholder="搜索模型 ID / Provider..." oninput="renderProviderModelList()">
       </div>
       <div id="providerModelList" class="provider-model-list"></div>
-      <button class="action secondary" style="width:100%;margin-top:8px" onclick="addProviderModel()">+ 添加模型</button>
+      <div class="model-custom-row">
+        <input type="text" id="providerCustomModelId" placeholder="未列出的模型 ID（手动输入）">
+        <button class="action secondary" onclick="addProviderModel()">+ 添加</button>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="action" onclick="validateProvider()">验证连接</button>
@@ -982,23 +1041,26 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 <!-- 模型详情编辑（T1 P0-1） -->
 <div id="modelEditModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeModelEditModal()">
   <div class="modal-panel" style="max-width:560px">
-    <div class="modal-head"><h3>模型详情</h3><button class="modal-close" onclick="closeModelEditModal()">×</button></div>
+    <div class="modal-head"><h3>模型详情（覆盖 Provider 默认参数）</h3><button class="modal-close" onclick="closeModelEditModal()">×</button></div>
     <div class="modal-body">
       <input type="hidden" id="modelEditIdx">
       <div class="field"><label>模型 ID</label><input type="text" id="modelEditId"></div>
       <div class="field"><label>模型名称</label><input type="text" id="modelEditName"></div>
+      <div class="conn-section-title">生成参数（覆盖 Provider 默认）</div>
+      <div class="field-row">
+        <div class="field"><label>Temperature <span style="color:var(--text3);font-size:11px">(留空=用 Provider 默认)</span></label><input type="number" id="modelEditTemp" step="0.1" min="0" max="2" placeholder="默认"></div>
+        <div class="field"><label>Max Tokens <span style="color:var(--text3);font-size:11px">(留空=用 Provider 默认)</span></label><input type="number" id="modelEditMaxTokens" min="1" max="200000" placeholder="默认"></div>
+      </div>
       <div class="conn-section-title">支持的输入类型（多选）</div>
       <div class="chip-group">
         <button type="button" class="chip" id="modelInput_text" onclick="toggleModelInput(this)">文本</button>
         <button type="button" class="chip" id="modelInput_image" onclick="toggleModelInput(this)">图像</button>
         <button type="button" class="chip" id="modelInput_audio" onclick="toggleModelInput(this)">音频</button>
       </div>
-      <details class="adv">
-        <summary>高级设置（上下文 / 输出 / 推理）</summary>
-        <div class="field"><label>上下文窗口（Token 数，0=未知）</label><input type="number" id="modelEditCtx" min="0" value="0"></div>
-        <div class="field"><label>最大输出 Token</label><input type="number" id="modelEditMaxOut" min="0" value="0"></div>
+      <div class="conn-section-title">高级设置（上下文 / 输出 / 推理）</div>
+      <div class="field"><label>上下文窗口（Token 数，0=未知）</label><input type="number" id="modelEditCtx" min="0" value="0" placeholder="0"><div class="ctx-helper"><button type="button" class="chip-sm" onclick="setCtxPreset(8192,'modelEditCtx')">8K</button><button type="button" class="chip-sm" onclick="setCtxPreset(32768,'modelEditCtx')">32K</button><button type="button" class="chip-sm" onclick="setCtxPreset(131072,'modelEditCtx')">128K</button><button type="button" class="chip-sm" onclick="setCtxPreset(262144,'modelEditCtx')">256K</button><button type="button" class="chip-sm" onclick="setCtxPreset(1048576,'modelEditCtx')">1M</button></div></div>
+        <div class="field"><label>最大输出 Token</label><input type="number" id="modelEditMaxOut" min="0" value="0" placeholder="0"><div class="ctx-helper"><button type="button" class="chip-sm" onclick="setCtxPreset(4096,'modelEditMaxOut')">4K</button><button type="button" class="chip-sm" onclick="setCtxPreset(8192,'modelEditMaxOut')">8K</button><button type="button" class="chip-sm" onclick="setCtxPreset(16384,'modelEditMaxOut')">16K</button><button type="button" class="chip-sm" onclick="setCtxPreset(32768,'modelEditMaxOut')">32K</button></div></div>
         <div class="setting-row"><div><div class="label">支持推理</div><div class="desc">开启后该模型可作为推理模型使用</div></div><div class="toggle" id="modelEditReasoning" onclick="toggleModelInput(this)"></div></div>
-      </details>
     </div>
     <div class="modal-foot">
       <button class="action" onclick="validateProvider()">验证连接</button>
@@ -1034,7 +1096,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
   </div>
   <div class="ext-pane" id="ext-workflow">
     <div class="wf-intro">从下方预设模板一键应用工作流，或开启自定义 DAG 编排。点「设为当前工作流并使用」后，发送消息即按 DAG 顺序串联执行。</div>
-    <div class="ch-filterbar" id="wfCats"></div>
+    <div class="wf-cat-bar"><label>分类</label><select id="wfCats" onchange="setWfCat(this.value)"></select></div>
     <div class="channel-grid" id="wfGrid"></div>
     <div class="wf-card">
       <h3>DAG 工作流编排器</h3>
@@ -4954,7 +5016,6 @@ PV.agents = [
 
 // 常见 LLM Provider 预设（base_url 为 OpenAI 兼容接口；留空 models 时可用「获取模型」从接口拉取）
 PV.providerPresets = {
-  hermes:{name:'Hermes 本地',base_url:'http://127.0.0.1:8080/v1',models:['hermes-3-llama-3.1-8b','hermes-3-llama-3.1-70b','hermes-3-llama-3.1-405b']},
   openai:{name:'OpenAI',base_url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4-turbo','o1','o1-mini','o3','o3-mini']},
   anthropic:{name:'Anthropic',base_url:'https://api.anthropic.com/v1',models:['claude-3-5-sonnet-20241022','claude-3-5-haiku-20241022','claude-3-opus-20240229','claude-3-7-sonnet-20250219','claude-sonnet-4-20250514','claude-opus-4-20250514']},
   deepseek:{name:'DeepSeek',base_url:'https://api.deepseek.com/v1',models:['deepseek-chat','deepseek-reasoner']},
@@ -6579,12 +6640,8 @@ function applyServiceState(s){
   var brandDot=document.getElementById('brandDot');
   if(brandDot) brandDot.className='brand-dot '+(gw?'online':(db?'connecting':'offline'));
   setToggle('gwToggle', gw); setToggle('dbToggle', db);
-  var gwPid = s.gateway && s.gateway.pid;
-  var dbPid = s.dashboard && s.dashboard.pid;
   var gsp=document.getElementById('gwStateText'); if(gsp) gsp.textContent= gw?'运行中':'未启动';
   var dsp=document.getElementById('dbStateText'); if(dsp) dsp.textContent= db?'运行中':'未启动';
-  var gp=document.getElementById('gwPid'); if(gp) gp.textContent= gwPid?gwPid:'--';
-  var dp=document.getElementById('dbPid'); if(dp) dp.textContent= dbPid?dbPid:'--';
   // 端口随服务端配置动态显示（v0.20.65 端口迁移到 8742/9219，避免与同机 hermes-studio 的 8642 冲突）
   var gport = (s.gateway && s.gateway.port) || 8742;
   var dport = (s.dashboard && s.dashboard.port) || 9219;
@@ -6637,8 +6694,6 @@ function setStatusOffline(){
   setToggle('gwToggle',false); setToggle('dbToggle',false);
   var gsp=document.getElementById('gwStateText'); if(gsp) gsp.textContent='未启动';
   var dsp=document.getElementById('dbStateText'); if(dsp) dsp.textContent='未启动';
-  var gp=document.getElementById('gwPid'); if(gp) gp.textContent='--';
-  var dp=document.getElementById('dbPid'); if(dp) dp.textContent='--';
 }
 function fmtHermesVer(ver, date){
   if(!ver || ver==='--') return ver;
@@ -6997,25 +7052,12 @@ function unsetFallbackProvider(i){
   apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已取消回退：'+pname); }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 function openProviderModal(){ editProvider(null); }
-function addProvider(kind){
-  // kind: 'local' 或 'cloud'
+function addProvider(){
+  // 添加模型服务：默认选第一个云端预设（让用户编辑）
   openProviderModal();
-  // 编辑器打开后自动选中合适的预设
   setTimeout(function(){
     var preset = document.getElementById('providerPreset');
-    if (kind === 'local' && preset) {
-      // 本地模型：选择第一个 local preset（如果有），否则让用户自定义
-      var localKey = null;
-      Object.keys(PV.providerPresets || {}).forEach(function(k){
-        var p = PV.providerPresets[k];
-        if (!localKey && p && (p.local || /local|ollama|vllm/i.test(k))) localKey = k;
-      });
-      if (localKey) {
-        preset.value = localKey;
-        if (typeof onProviderPresetChange === 'function') onProviderPresetChange();
-      }
-    } else if (kind === 'cloud' && preset) {
-      // 云端模型：默认选第一个云端预设（让用户编辑）
+    if (preset) {
       var cloudKey = null;
       Object.keys(PV.providerPresets || {}).forEach(function(k){
         var p = PV.providerPresets[k];
@@ -7094,27 +7136,86 @@ function modelCapabilityBadges(mo){
   return html;
 }
 function renderProviderModels(){
+  return renderProviderModelList();
+}
+function renderProviderModelList(){
   var el=document.getElementById('providerModelList'); if(!el) return;
   var list=_providerModelCache||[];
-  if(!list.length){ el.innerHTML='<div class="conn-hint">点击「获取模型列表」或「添加模型」</div>'; return; }
-  el.innerHTML = list.map(function(mo, i){
-    var isDefault = mo.default===true;
-    var badges = modelCapabilityBadges(mo);
-    return '<div class="provider-model-row '+(mo.enabled!==false?'':'disabled')+'">'+
-      '<div class="toggle '+(mo.enabled!==false?'on':'')+'" onclick="toggleProviderModel('+i+')"></div>'+
-      '<div class="info">'+
-        '<div class="name" contenteditable="true" onblur="updateProviderModelName('+i+',this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'+esc(mo.name||mo.id||'')+'</div>'+
-        '<div class="badges">'+badges+(isDefault?'<span class="badge on">默认</span>':'')+'</div>'+
+  var search=((document.getElementById('providerModelSearch')||{}).value||'').trim().toLowerCase();
+  if(!list.length){ el.innerHTML='<div class="conn-hint">点击右上「获取模型列表」或下方「+ 添加」手动新增。</div>'; return; }
+  // 按 Provider（id 前缀）分组；custom_* 归入「自定义」
+  var groups = {};
+  list.forEach(function(mo, idx){
+    var mid = mo.id || mo.name || '';
+    var sep = mid.indexOf('/');
+    var prov = sep>0 ? mid.slice(0, sep) : (mo.provider || '其他');
+    if(prov.indexOf('custom_')===0) prov = '自定义';
+    if(!groups[prov]) groups[prov] = [];
+    groups[prov].push({ m: mo, i: idx });
+  });
+  var html = '';
+  Object.keys(groups).sort().forEach(function(prov){
+    var items = groups[prov];
+    var filtered = !search ? items : items.filter(function(it){
+      var mid = (it.m.id||it.m.name||'').toLowerCase();
+      var mname = (it.m.name||'').toLowerCase();
+      return mid.indexOf(search)>=0 || mname.indexOf(search)>=0 || prov.toLowerCase().indexOf(search)>=0;
+    });
+    if(!filtered.length) return;
+    html += '<div class="model-group" data-prov="'+esc(prov)+'">'+
+      '<div class="model-group-head" onclick="toggleModelGroup(this)">'+
+        '<span class="chevron">▾</span>'+
+        '<span class="name">'+esc(prov)+'</span>'+
+        '<span class="count">'+filtered.length+'</span>'+
       '</div>'+
-      '<div class="actions">'+
-        '<button title="编辑详情" onclick="openModelEditModal('+i+')">⚙</button>'+
-        '<button title="设为默认" onclick="setDefaultProviderModel('+i+')">⚡</button>'+
-        '<button title="删除" onclick="deleteProviderModel('+i+')">🗑</button>'+
+      '<div class="model-group-body">'+
+        filtered.map(function(it){
+          var m = it.m; var i = it.i;
+          var isDefault = m.default===true;
+          var mid = esc(m.id||m.name||'');
+          var mname = esc(m.name||m.id||'');
+          var tempBadge = m.temperature!=null ? '<span class="model-mini-badge">t='+m.temperature+'</span>' : '';
+          var maxBadge = m.max_tokens!=null ? '<span class="model-mini-badge">m='+m.max_tokens+'</span>' : '';
+          var ctxBadge = m.context_window ? '<span class="model-mini-badge">'+ (m.context_window>=1000000?'1M':(m.context_window>=256000?'256K':(m.context_window/1000+'K'))) +'</span>' : '';
+          return '<div class="model-item '+(m.enabled===false?'disabled':'')+(isDefault?' applied':'')+'" data-idx="'+i+'">'+
+            '<span class="model-id" onclick="selectModelInList('+i+', event)">'+mid+'</span>'+
+            '<span class="model-badges">'+
+              (isDefault?'<span class="model-tick">✓</span>':'')+
+              tempBadge+maxBadge+ctxBadge+
+              '<button class="model-cfg-btn" title="独立配置（覆盖 Provider 默认参数）" onclick="openModelEditModal('+i+', event)">⚙</button>'+
+              '<button class="model-test-btn" title="测试该模型连通性" onclick="testProviderModel('+i+', event)">⚡</button>'+
+            '</span>'+
+          '</div>';
+        }).join('')+
       '</div>'+
-      '</div>';
-  }).join('');
+    '</div>';
+  });
+  el.innerHTML = html || '<div class="conn-hint">没有匹配的模型。</div>';
 }
-function openModelEditModal(i){
+function toggleModelGroup(headEl){
+  var body = headEl.nextElementSibling; if(!body) return;
+  var collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  headEl.classList.toggle('collapsed', !collapsed);
+  headEl.querySelector('.chevron').textContent = collapsed ? '▾' : '▸';
+}
+function selectModelInList(i, ev){
+  ev && ev.stopPropagation();
+  setDefaultProviderModel(i);
+  // 单击自动收起其他 group
+  var el=document.getElementById('providerModelList');
+  if(el){
+    el.querySelectorAll('.model-group').forEach(function(g){
+      var body=g.querySelector('.model-group-body');
+      if(body && g.getAttribute('data-prov')!==el.querySelector('.model-item.applied')?.closest('.model-group')?.getAttribute('data-prov')){
+        // keep others as-is
+      }
+    });
+  }
+  toast('已应用模型：'+((_providerModelCache[i]||{}).id||''));
+}
+function openModelEditModal(i, ev){
+  if(ev) ev.stopPropagation();
   var list=_providerModelCache||[]; var m=list[i]; if(!m) return;
   var modal=document.getElementById('modelEditModal'); if(!modal) return;
   if (modal.parentElement !== document.body) document.body.appendChild(modal);
@@ -7122,6 +7223,8 @@ function openModelEditModal(i){
   document.getElementById('modelEditIdx').value=i;
   document.getElementById('modelEditId').value=(m.id||'');
   document.getElementById('modelEditName').value=(m.name||m.id||'');
+  document.getElementById('modelEditTemp').value=(m.temperature!=null?m.temperature:'');
+  document.getElementById('modelEditMaxTokens').value=(m.max_tokens!=null?m.max_tokens:'');
   var inputTypes=(m.input_types&&m.input_types.length)?m.input_types:(m.capabilities||[]).filter(function(c){return c==='text'||c==='image'||c==='audio';});
   ['text','image','audio'].forEach(function(t){
     var el=document.getElementById('modelInput_'+t); if(el) el.classList.toggle('on', inputTypes.indexOf(t)>=0);
@@ -7132,11 +7235,21 @@ function openModelEditModal(i){
 }
 function closeModelEditModal(){ var m=document.getElementById('modelEditModal'); if(m) m.style.display='none'; }
 function toggleModelInput(chip){ if(chip) chip.classList.toggle('on'); }
+function setCtxPreset(n, targetId){
+  var el=document.getElementById(targetId); if(el){ el.value=n; el.focus(); }
+}
 function saveModelEdit(){
   var i=parseInt(document.getElementById('modelEditIdx').value);
   var list=_providerModelCache||[]; var m=list[i]; if(!m) return;
   m.id=document.getElementById('modelEditId').value.trim()||m.id;
   m.name=document.getElementById('modelEditName').value.trim()||m.id;
+  // Temperature / Max Tokens：留空表示"用 Provider 默认"（删除字段）
+  var tEl=document.getElementById('modelEditTemp');
+  var mtEl=document.getElementById('modelEditMaxTokens');
+  var tVal=tEl?tEl.value.trim():'';
+  var mtVal=mtEl?mtEl.value.trim():'';
+  if(tVal==='') delete m.temperature; else m.temperature=parseFloat(tVal);
+  if(mtVal==='') delete m.max_tokens; else m.max_tokens=parseInt(mtVal);
   var its=['text','image','audio'].filter(function(t){ var el=document.getElementById('modelInput_'+t); return el&&el.classList.contains('on'); });
   m.input_types=its;
   m.context_window=parseInt(document.getElementById('modelEditCtx').value)||0;
@@ -7146,7 +7259,7 @@ function saveModelEdit(){
   if(m.supports_reasoning && caps.indexOf('reasoning')<0) caps.unshift('reasoning');
   if(m.context_window>=1000000 && caps.indexOf('long_context')<0) caps.push('long_context');
   m.capabilities=caps;
-  renderProviderModels();
+  renderProviderModelList();
   closeModelEditModal();
   toast('已保存模型配置：'+m.name);
 }
@@ -7166,9 +7279,16 @@ function deleteProviderModel(i){
   renderProviderModels();
 }
 function addProviderModel(){
+  // 从「未列出的模型 ID」输入框读取用户输入
+  var inp=document.getElementById('providerCustomModelId');
+  var v = inp ? (inp.value||'').trim() : '';
+  if(!v){ toast('请输入模型 ID'); if(inp) inp.focus(); return; }
+  // 查重
   var list=_providerModelCache||[];
-  list.push(_normModel({ id:'', name:'新模型', enabled:true, default:false }));
-  renderProviderModels();
+  if(list.some(function(m){ return (m.id||m.name)===v; })){ toast('模型已存在：'+v); return; }
+  list.push(_normModel({ id:v, name:v, enabled:true, default:list.length===0 }));
+  if(inp) inp.value='';
+  renderProviderModelList();
 }
 function updateProviderModelName(i, el){
   var list=_providerModelCache||[]; var m=list[i]; if(!m) return;
@@ -7187,6 +7307,7 @@ function fillModelOptionsFromList(list){
 function fetchProviderModels(){
   var provider=buildProviderObj();
   if(!provider.base_url){ toast('请先填写 Base URL'); return; }
+  if(!provider.api_key){ toast('请先填写 API Key'); return; }
   toast('正在获取模型列表…');
   apiPost('/api/config/test', { provider: provider }).then(function(r){
     var models=(r&&r.models)?r.models:[];
@@ -7194,6 +7315,38 @@ function fetchProviderModels(){
     else if(r&&r.error){ toast('获取失败：'+r.error); }
     else toast('该端点未返回模型列表，可手动添加');
   }).catch(function(e){ toast('获取失败：'+e.message); });
+}
+var _autoFetchTimer = null;
+function autoFetchModelsDebounced(){
+  clearTimeout(_autoFetchTimer);
+  _autoFetchTimer = setTimeout(function(){
+    var url = (document.getElementById('providerBaseUrl')||{}).value||'';
+    var key = (document.getElementById('providerKey')||{}).value||'';
+    if(url && key && (_providerModelCache||[]).length === 0){
+      fetchProviderModels();
+    }
+  }, 600);
+}
+function testProviderModel(i, ev){
+  if(ev) ev.stopPropagation();
+  var list=_providerModelCache||[]; var m=list[i]; if(!m){ toast('模型不存在'); return; }
+  var provider = buildProviderObj();
+  if(!provider.base_url){ toast('请先填写 Base URL'); return; }
+  var btn = ev && ev.currentTarget ? ev.currentTarget : null;
+  if(btn){ btn.classList.add('testing'); btn.disabled = true; }
+  toast('正在测试模型：'+(m.id||m.name));
+  apiPost('/api/config/test', { provider: provider, model: m.id }).then(function(r){
+    if(btn){ btn.classList.remove('testing'); btn.disabled = false; }
+    if(r && r.ok){
+      var ms = (r.latency_ms!=null)?(' 延迟 '+r.latency_ms+'ms'):'';
+      toast('✅ 模型可用：'+(m.id||m.name)+ms);
+    } else {
+      toast('❌ 模型不可用：'+(m.id||m.name)+'（'+(r&&r.error?r.error:'接口错误')+'）');
+    }
+  }).catch(function(e){
+    if(btn){ btn.classList.remove('testing'); btn.disabled = false; }
+    toast('测试失败：'+e.message);
+  });
 }
 function toggleKeyVisibility(){
   var inp=document.getElementById('providerKey');
@@ -7702,17 +7855,41 @@ var _wfCat='';
 function renderWorkflowPresets(){
   var grid=document.getElementById('wfGrid'); if(!grid) return;
   var presets = window.AO_WORKFLOW_PRESETS || [];
-  var cats=[{id:'',label:'全部'}];
-  presets.forEach(function(p){ if(p.category && !cats.some(function(c){return c.id===p.category;})) cats.push({id:p.category,label:p.category}); });
-  var catWrap=document.getElementById('wfCats');
-  if(catWrap){
-    catWrap.innerHTML = cats.map(function(c){ return '<button class="ch-filter'+(c.id===_wfCat?' active':'')+'" onclick="setWfCat(\''+esc(c.id)+'\')">'+esc(c.label)+'</button>'; }).join('');
+  var catLabels={
+    '':'全部','data':'数据','department-collab':'部门协作','design':'设计','dev':'开发',
+    'English':'英文','hr':'人力资源','legal':'法务','marketing':'营销','ops':'运维',
+    'strategy':'战略','一人公司':'一人公司'
+  };
+  // 常见英文工作流名 → 中文
+  var nameLabels={
+    'Business Plan':'商业计划书','Code Architecture Review':'代码架构审查',
+    'Competitor Analysis Report':'竞品分析报告','Customer Discovery':'客户调研',
+    'Customer Persona':'用户画像','Daily Standup':'每日站会','Data Audit':'数据审计',
+    'Data Migration':'数据迁移','Decision Memo':'决策备忘','Design Review':'设计评审',
+    'Documentation Sprint':'文档冲刺','Feature Spec':'功能规格说明书',
+    'Go-to-Market Plan':'上市推广方案','Hiring Pipeline':'招聘流程',
+    'Incident Response':'事故应急响应','Launch Checklist':'上线检查清单',
+    'Marketing Campaign':'营销活动','Onboarding Plan':'入职培训计划',
+    'OKR Setting':'OKR 制定','Performance Review':'绩效评估',
+    'Postmortem':'事后复盘','Pricing Experiment':'定价实验',
+    'Quarterly Planning':'季度规划','Release Notes':'发布说明',
+    'Roadmap':'路线图','Sprint Planning':'Sprint 计划',
+    'Stakeholder Update':'利益相关方同步','Strategy Memo':'战略备忘',
+    'User Interview Synthesis':'用户访谈汇总','一人公司:全灵大会':'一人公司:全灵大会'
+  };
+  var cats=[{id:'',label:catLabels['']||'全部'}];
+  presets.forEach(function(p){ if(p.category && !cats.some(function(c){return c.id===p.category;})) cats.push({id:p.category,label:catLabels[p.category]||p.category}); });
+  var catSel=document.getElementById('wfCats');
+  if(catSel && catSel.tagName==='SELECT'){
+    catSel.innerHTML = cats.map(function(c){ return '<option value="'+esc(c.id)+'"'+(c.id===_wfCat?' selected':'')+'>'+esc(c.label)+'</option>'; }).join('');
   }
   var appliedKey = (_cfg.extensions.workflow && _cfg.extensions.workflow.key) || '';
   grid.innerHTML = presets.filter(function(p){ return !_wfCat || p.category===_wfCat; }).map(function(p){
     var applied = (p.key===appliedKey);
+    var catLabel = catLabels[p.category]||p.category||'通用';
+    var nameZh = nameLabels[p.name] || p.name;
     return '<div class="ext-card'+(applied?' active':'')+'">'+
-      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(p.name)+'</div><div class="status">'+(p.category||'通用')+(applied?' · 已应用':'')+'</div></div></div>'+
+      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(nameZh)+'</div><div class="status">'+esc(catLabel)+(applied?' · 已应用':'')+'</div></div></div>'+
       '<div class="conn-desc">'+esc(p.description||'')+'</div>'+
       '<button class="action" onclick="applyWorkflow(\''+esc(p.key)+'\')">'+(applied?'重新应用':'应用')+'</button></div>';
   }).join('') || '<div class="empty-state">暂无工作流模板。</div>';
