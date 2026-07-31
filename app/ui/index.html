@@ -88,8 +88,10 @@
     .session-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text2);transition:background .15s}
     .session-item:hover{background:var(--bg3)}
     .session-item.active{background:var(--accent-bg);color:var(--accent)}
-    .session-item .dot{width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
+    .session-item .dot{width:8px;height:8px;border-radius:50%;background:var(--border2);flex-shrink:0}
     .session-item.active .dot{background:var(--accent)}
+    .session-item .dot.streaming,.session-item.streaming .dot{background:#f59e0b;animation:tabPulse 1s infinite;box-shadow:0 0 0 2px rgba(245,158,11,.18)}
+    .session-item.streaming{background:rgba(245,158,11,.06)}
     .session-item .title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .session-item .del{opacity:0;color:var(--text3);font-size:13px}
     .session-item:hover .del{opacity:1}
@@ -120,7 +122,9 @@
     .chat-header .subtitle{font-size:12px;color:var(--text3)}
 
     /* ── 多会话标签栏（浏览器式多开） ── */
-    .session-tabs{display:flex;align-items:center;gap:2px;padding:6px 12px 0;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+    /* 默认桌面隐藏（会话树展开时占用空间）；当 chat-rail.hidden（折叠）或移动端时显示 */
+    .session-tabs{display:none;align-items:center;gap:2px;padding:6px 12px 0;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+    .session-tabs.visible{display:flex}
     .tabs-scroll{display:flex;align-items:flex-end;gap:2px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
     .tabs-scroll::-webkit-scrollbar{display:none}
     .session-tab{display:inline-flex;align-items:center;gap:6px;max-width:180px;padding:6px 8px 6px 12px;border-radius:8px 8px 0 0;background:var(--bg1);border:1px solid var(--border);border-bottom:none;color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s,color .15s;position:relative;user-select:none}
@@ -493,7 +497,7 @@
 .provider-model-row .actions{display:flex;gap:6px;flex-shrink:0}
 .provider-model-row .actions button{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;font-size:13px;color:var(--text3)}
 .provider-model-row .actions button:hover{border-color:var(--accent);color:var(--accent)}
-.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:5000;display:flex;align-items:center;justify-content:center;padding:16px}
 .modal-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
 .modal-head h3{margin:0;font-size:16px}
@@ -5395,10 +5399,18 @@ function openTab(sid) {
   switchTab(sid);
 }
 
-/* 切换激活标签 */
+/* 切换激活标签：流式中允许切换（切走前先停止旧会话的生成，类似 ChatGPT） */
 function switchTab(sid) {
   if (!sid || sid === currentSession) return;
-  if (_msgState.streaming && _tabStreaming[currentSession]) { toast('当前会话正在生成回复，请等待完成或停止后再切换'); return; }
+  // 切走前若旧会话正在流式，主动发送停止信号，避免后台空跑
+  if (_msgState.streaming && currentSession && _tabStreaming[currentSession]) {
+    try {
+      fetch(apiUrl('/api/chat/stop'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': monitorToken || '' }, body: JSON.stringify({ session_id: currentSession }) }).catch(function () {});
+    } catch (e) {}
+    if (_msgState.abortCtrl) try { _msgState.abortCtrl.abort(); } catch (e) {}
+    _msgState.streaming = false; _msgState.abortCtrl = null;
+    _tabStreaming[currentSession] = false;
+  }
   saveDraft(currentSession);
   currentSession = sid;
   renderSessionTabs();
@@ -5407,11 +5419,18 @@ function switchTab(sid) {
   loadSessionMessages(sid);
 }
 
-/* 关闭一个会话标签（会话本身保留在左侧树） */
+/* 关闭一个会话标签（会话本身保留在左侧树）；若该标签在流式，先停止再关闭 */
 function closeTab(sid) {
   var i = _openTabs.indexOf(sid);
   if (i === -1) return;
-  if (_tabStreaming[sid]) { toast('该会话正在生成回复，无法关闭'); return; }
+  if (_tabStreaming[sid]) {
+    try {
+      fetch(apiUrl('/api/chat/stop'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': monitorToken || '' }, body: JSON.stringify({ session_id: sid }) }).catch(function () {});
+    } catch (e) {}
+    if (_msgState.abortCtrl && currentSession === sid) try { _msgState.abortCtrl.abort(); } catch (e) {}
+    _tabStreaming[sid] = false;
+    if (currentSession === sid) { _msgState.streaming = false; _msgState.abortCtrl = null; }
+  }
   _openTabs.splice(i, 1); persistTabs();
   delete _tabDrafts[sid];
   if (currentSession === sid) {
@@ -5458,6 +5477,21 @@ function syncTabs() {
     currentSession = _openTabs.length ? _openTabs[0] : '';
   }
   renderSessionTabs();
+}
+
+/* 同步标签栏可见性：仅在左侧会话树折叠时显示（移动端 drawer 模式除外，始终显示） */
+function syncSessionTabsVisibility() {
+  var tabs = document.querySelector('.page-container .session-tabs');
+  if (!tabs) return;
+  var rail = document.getElementById('chatRail');
+  if (!rail) return;
+  if (window.innerWidth <= 768) {
+    tabs.classList.add('visible');  // 移动端：始终显示
+  } else if (rail.classList.contains('hidden')) {
+    tabs.classList.add('visible');  // 桌面端：仅 rail 折叠时显示
+  } else {
+    tabs.classList.remove('visible');
+  }
 }
 
 function loadSessions(){
@@ -5515,11 +5549,12 @@ function renderRail(){
         var s = _sessions.find(function(x){ return x.id===sid; });
         if(!s) return '';
         var sa = (sid===currentSession) ? 'active' : '';
+        var streaming = !!_tabStreaming[sid];
         var rawTitle = (s.title && s.title!=='New Chat' && s.title!=='未命名会话') ? s.title : '';
         var title = rawTitle || '新会话';
         var meta = fmtDateTime(s.updated_at) + (s.message_count ? ' · '+s.message_count+' 条' : '');
-        return '<div class="session-item '+sa+'" onclick="switchSession(\''+esc(agent.id)+'\',\''+esc(s.id)+'\',event)">'+
-          '<span class="dot"></span>'+
+        return '<div class="session-item '+sa+(streaming?' streaming':'')+'" onclick="switchSession(\''+esc(agent.id)+'\',\''+esc(s.id)+'\',event)">'+
+          '<span class="dot'+(streaming?' streaming':'')+'"></span>'+
           '<span class="si-body"><span class="title">'+esc(title)+'</span>'+(meta?'<span class="meta">'+esc(meta)+'</span>':'')+'</span>'+
           '<span class="del" onclick="delSession(\''+esc(agent.id)+'\',\''+esc(s.id)+'\',event)">×</span></div>';
       }).join('');
@@ -5696,6 +5731,7 @@ function toggleRail(){
   if(ic) ic.style.display = collapsed?'none':'block';
   if(ie) ie.style.display = collapsed?'block':'none';
   var rt=document.getElementById('railToggle'); if(rt) rt.title = collapsed?'展开会话树':'折叠会话树';
+  syncSessionTabsVisibility();
 }
 
 /* ============================ 对话输入 / 发送 ============================ */
@@ -6536,6 +6572,8 @@ function renderOverview(){
     applyServiceState(s);
     // 初始化日志过滤区折叠状态（手机端默认收起，电脑端始终展开）
     initLogFilterToggle();
+    // 同步多会话标签栏可见性（仅左侧折叠时显示）
+    syncSessionTabsVisibility();
     // 默认加载 Monitor 日志（仅首次）
     if(!_logInited){ _logInited=true; setTimeout(function(){ appendLog('monitor','Monitor 日志'); }, 100); }
   }).catch(function(){ setStatusOffline(); });
@@ -7576,15 +7614,18 @@ function renderPersonas(){
   }).join('');
 }
 function openPersonaModal(id){
-  var m=document.getElementById('personaModal'); if(!m) return; m.style.display='flex';
-  document.getElementById('personaEditId').value = id||'';
-  document.getElementById('personaModalTitle').textContent = id? '编辑角色' : '添加角色';
-  var personas=allPersonas();
-  var p = id ? personas[id] : null;
-  document.getElementById('personaEmoji').value = p?(p.emoji||''):'🤖';
-  document.getElementById('personaLabel').value = p?(p.label||''):'';
-  document.getElementById('personaPrompt').value = p?(p.prompt||''):'';
-  document.getElementById('personaDeleteBtn').style.display = (id && !EXT_PERSONAS[id]) ? 'inline-block' : 'none';
+  try {
+    var m=document.getElementById('personaModal'); if(!m){ toast('模态未就绪'); return; }
+    m.style.display='flex';
+    document.getElementById('personaEditId').value = id||'';
+    document.getElementById('personaModalTitle').textContent = id? '编辑角色' : '添加角色';
+    var personas=allPersonas();
+    var p = id ? personas[id] : null;
+    document.getElementById('personaEmoji').value = p?(p.emoji||''):'🤖';
+    document.getElementById('personaLabel').value = p?(p.label||''):'';
+    document.getElementById('personaPrompt').value = p?(p.prompt||''):'';
+    document.getElementById('personaDeleteBtn').style.display = (id && !EXT_PERSONAS[id]) ? 'inline-block' : 'none';
+  } catch(e){ toast('打开角色编辑失败：'+e.message); console.error('openPersonaModal:', e); }
 }
 function closePersonaModal(){ var m=document.getElementById('personaModal'); if(m) m.style.display='none'; }
 function savePersona(){
