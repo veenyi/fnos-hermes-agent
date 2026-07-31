@@ -881,7 +881,7 @@ async function fetchGatewayModels(provider) {
     // LOCAL provider 必须用真实 MONITOR_TOKEN
     const isLocal = (provider.base_url === "LOCAL" || provider.id === "hermes");
     if (!isLocal && !provider.base_url) {
-      return { models: [], latency: 0, error: 'base_url 未填写' };
+      return { ok: false, models: [], latency_ms: 0, error: 'base_url 未填写' };
     }
     if (isLocal) {
       headers["Authorization"] = `Bearer ${MONITOR_TOKEN}`;
@@ -894,7 +894,7 @@ async function fetchGatewayModels(provider) {
       signal: AbortSignal.timeout(5000),
     });
     const latency = Date.now() - t0;
-    if (!r.ok) return { models: [], latency, error: `HTTP ${r.status}` };
+    if (!r.ok) return { ok: false, models: [], latency_ms: latency, error: `HTTP ${r.status}` };
     const data = await r.json();
     let models = (data.data || data.models || []).map(m => ({ id: m.id, name: m.id }));
     if (isLocal) {
@@ -912,9 +912,56 @@ async function fetchGatewayModels(provider) {
         models = [{ id: "hermes-agent", name: "hermes-agent", fake: true }];
       }
     }
-    return { models, latency };
+    return { ok: true, models, latency_ms: latency };
   } catch (e) {
-    return { models: [], latency: Date.now() - t0, error: e.message };
+    return { ok: false, models: [], latency_ms: Date.now() - t0, error: e.message };
+  }
+}
+
+/* 测试单个模型：向 /chat/completions 发一条最小请求，验证该模型能否调用成功 */
+async function testOneModelCall(provider, modelId) {
+  const t0 = Date.now();
+  try {
+    const isLocal = (provider.base_url === "LOCAL" || provider.id === "hermes");
+    const baseUrl = isLocal ? GATEWAY_API : (provider.base_url || '').replace(/\/$/, "");
+    if (!baseUrl) return { ok: false, error: 'base_url 未填写' };
+    const headers = { "Content-Type": "application/json" };
+    if (isLocal) {
+      headers["Authorization"] = `Bearer ${MONITOR_TOKEN}`;
+    } else if (provider.api_key && provider.api_key !== "none") {
+      headers["Authorization"] = `Bearer ${provider.api_key}`;
+    }
+    const r = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({
+        model: modelId,
+        messages: [
+          { role: "system", content: "Reply with a single word." },
+          { role: "user", content: "ping" },
+        ],
+        max_tokens: 8,
+        temperature: 0,
+        stream: false,
+      }),
+    });
+    const latency = Date.now() - t0;
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      let errMsg = `HTTP ${r.status}`;
+      try {
+        const j = JSON.parse(errText);
+        if (j && j.error) errMsg = j.error.message || j.error || errMsg;
+      } catch {}
+      return { ok: false, error: errMsg, latency_ms: latency };
+    }
+    const data = await r.json().catch(() => null);
+    if (!data) return { ok: false, error: '响应不是合法 JSON', latency_ms: latency };
+    const reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+    return { ok: true, latency_ms: latency, message: '模型返回：' + String(reply).slice(0, 40) };
+  } catch (e) {
+    return { ok: false, error: e.message || '请求失败', latency_ms: Date.now() - t0 };
   }
 }
 
@@ -5321,8 +5368,35 @@ async function handleFetch(req) {
       const realKey = resolveRealApiKey(provider);
       if (realKey) provider.api_key = realKey;
     }
-    const result = await fetchGatewayModels(provider);
-    return new Response(JSON.stringify(result), { headers: jsonHeaders() });
+    // 1) 始终先验证 provider 配置（拉取 /models 列表）
+    const baseResult = await fetchGatewayModels(provider);
+    let models = baseResult.models || [];
+    let latency = baseResult.latency || 0;
+    let error = baseResult.error || '';
+    // 2) 如果指定了具体 model（前端 testProviderModel 传入），做一次真实调用
+    const targetModel = body.model;
+    if (targetModel && !error) {
+      const testResult = await testOneModelCall(provider, targetModel);
+      latency = testResult.latency_ms || latency;
+      if (testResult.ok) {
+        return new Response(JSON.stringify({
+          ok: true, models, latency_ms: latency,
+          model: targetModel, model_ok: true,
+          message: testResult.message || '模型可用',
+        }), { headers: jsonHeaders() });
+      } else {
+        return new Response(JSON.stringify({
+          ok: false, models, latency_ms: latency,
+          model: targetModel, model_ok: false,
+          error: '模型「' + targetModel + '」调用失败：' + (testResult.error || '未知错误'),
+        }), { status: 200, headers: jsonHeaders() });
+      }
+    }
+    // 3) 没指定 model：返回 provider 配置验证结果
+    return new Response(JSON.stringify({
+      ok: !error, models, latency_ms: latency,
+      error: error || undefined,
+    }), { status: 200, headers: jsonHeaders() });
   }
 
   // ─── 聊天：模型 API ──────────────────────────────────────────────────────
