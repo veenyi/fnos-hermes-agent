@@ -7618,15 +7618,31 @@ function renderPersonas(){
   el.innerHTML = Object.keys(personas).map(function(k){
     var p=personas[k]; var active=(_persona===k);
     var isCustom = !EXT_PERSONAS[k];
-    return '<div class="ext-card" onclick="selectPersona(\''+esc(k)+'\')">'+
+    // 重构：去掉 ext-card 外层 onclick（之前 inline event.stopPropagation() 在某些浏览器/ WebView 中失效，
+    // 导致点编辑/选择按钮时同时触发 selectPersona 重写 DOM，破坏 modal 状态）。
+    // 改为：每个按钮独立 onclick，不依赖 stopPropagation。
+    return '<div class="ext-card">'+
       '<div class="top"><div class="icon">'+(p.emoji||'🤖')+'</div><div><div class="name">'+esc(p.label||k)+'</div><div class="status '+(active?'on':'off')+'">'+(active?'当前角色':'点击切换')+'</div></div></div>'+
       '<div class="conn-desc">'+esc((p.prompt||'').slice(0,60))+'</div>'+
       '<div class="persona-actions">'+
-        '<button class="action sm" onclick="event.stopPropagation();openPersonaModal(\''+esc(k)+'\')">编辑</button>'+
-        (isCustom?'<button class="action sm danger" onclick="event.stopPropagation();deletePersona(\''+esc(k)+'\')">删除</button>':'')+
-        '<button class="action sm primary" onclick="event.stopPropagation();selectPersona(\''+esc(k)+'\')">'+(active?'已选择':'选择')+'</button>'+
+        '<button class="action sm" data-persona-action="edit" data-id="'+esc(k)+'">编辑</button>'+
+        (isCustom?'<button class="action sm danger" data-persona-action="delete" data-id="'+esc(k)+'">删除</button>':'')+
+        '<button class="action sm primary" data-persona-action="select" data-id="'+esc(k)+'">'+(active?'已选择':'选择')+'</button>'+
       '</div></div>';
   }).join('');
+  // 用事件委托统一处理（避免 inline onclick + stopPropagation 在 WebView 中失效）
+  if (!el._personaDelegated) {
+    el._personaDelegated = true;
+    el.addEventListener('click', function(ev){
+      var btn = ev.target.closest('button[data-persona-action]');
+      if (!btn || !el.contains(btn)) return;
+      var id = btn.getAttribute('data-id');
+      var action = btn.getAttribute('data-persona-action');
+      if (action === 'edit') openPersonaModal(id);
+      else if (action === 'delete') deletePersona(id);
+      else if (action === 'select') selectPersona(id);
+    });
+  }
 }
 function openPersonaModal(id){
   try {
@@ -7654,9 +7670,11 @@ function savePersona(){
   _cfg.extensions.personas[id]={ emoji:emoji, label:label, prompt:prompt };
   saveConfig(); renderPersonas(); closePersonaModal(); toast('已保存角色：'+label);
 }
-function deletePersona(){
-  var id=document.getElementById('personaEditId').value;
+function deletePersona(id){
+  // 支持从 modal 内调用（无参，从 personaEditId 取）或从卡片按钮调用（带 id）
+  if(!id) id = document.getElementById('personaEditId').value;
   if(!id) return;
+  if(!confirm('确定删除该角色？')) return;
   if(_cfg.extensions.personas && _cfg.extensions.personas[id]){ delete _cfg.extensions.personas[id]; }
   if(_persona===id){ _persona='default'; _cfg.extensions.persona='default'; try{ localStorage.setItem('hermes_persona','default'); }catch(e){} }
   saveConfig(); renderPersonas(); closePersonaModal(); toast('已删除角色');
