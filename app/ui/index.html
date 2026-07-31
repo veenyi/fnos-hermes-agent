@@ -119,6 +119,24 @@
     .chat-header .title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
     .chat-header .subtitle{font-size:12px;color:var(--text3)}
 
+    /* ── 多会话标签栏（浏览器式多开） ── */
+    .session-tabs{display:flex;align-items:center;gap:2px;padding:6px 12px 0;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+    .tabs-scroll{display:flex;align-items:flex-end;gap:2px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+    .tabs-scroll::-webkit-scrollbar{display:none}
+    .session-tab{display:inline-flex;align-items:center;gap:6px;max-width:180px;padding:6px 8px 6px 12px;border-radius:8px 8px 0 0;background:var(--bg1);border:1px solid var(--border);border-bottom:none;color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s,color .15s;position:relative;user-select:none}
+    .session-tab .tab-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .2s}
+    .session-tab .tab-title{overflow:hidden;text-overflow:ellipsis;max-width:120px}
+    .session-tab .tab-close{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;color:var(--text3);font-size:13px;line-height:1;flex-shrink:0}
+    .session-tab .tab-close:hover{background:rgba(239,68,68,.15);color:#ef4444}
+    .session-tab:hover{background:var(--bg3);color:var(--text)}
+    .session-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
+    .session-tab.active .tab-dot{background:var(--accent)}
+    .session-tab.streaming .tab-dot{background:#f59e0b;animation:tabPulse 1s infinite}
+    @keyframes tabPulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .tab-new{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:1px dashed var(--border);background:transparent;color:var(--text3);cursor:pointer;flex-shrink:0;transition:all .15s}
+    .tab-new:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+    .tab-new svg{width:14px;height:14px;stroke-width:2;stroke-linecap:round;stroke:currentColor;fill:none}
+
     .chat-body{flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:16px}
     .msg{max-width:85%;display:flex;flex-direction:column;gap:4px}
     .msg.user{align-self:flex-end;align-items:flex-end}
@@ -332,6 +350,10 @@
       .chat-rail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:199;display:none}
       .chat-rail-overlay.open{display:block}
       .chat-header{height:48px;padding:0 10px}
+      .session-tabs{padding:4px 8px 0}
+      .session-tab{max-width:150px;padding:5px 6px 5px 10px;font-size:11px}
+      .session-tab .tab-title{max-width:90px}
+      .tab-new{width:24px;height:24px}
       .chat-header .rail-toggle.mobile-only{display:flex}
       .chat-body{padding:14px 12px}
       .msg{max-width:92%}
@@ -733,6 +755,14 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
               </div>
             </div>
           </header>
+
+          <!-- 多会话标签栏（浏览器式多开） -->
+          <div class="session-tabs" id="sessionTabs">
+            <div class="tabs-scroll" id="tabsScroll"></div>
+            <button class="tab-new" id="tabNewBtn" title="新建会话" onclick="newTab()">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
 
           <div class="chat-body" id="chatBody">
             <div class="system-tip">系统已注入「默认主力助手」角色设定，不会写入对话历史</div>
@@ -5312,6 +5342,124 @@ function openNewWindow(){ window.open(window.location.href, '_blank'); }
 function openGitHub(){ window.open('https://github.com/veenyi/fnos-hermes-agent','_blank'); }
 
 /* ============================ 会话树（Rail） ============================ */
+/* ============================ 多会话标签（浏览器式多开） ============================ */
+/* _openTabs：已打开的会话标签 id 数组（有序）；_tabDrafts：各标签输入框草稿；_tabStreaming：流式状态 */
+var _openTabs = [];
+var _tabDrafts = {};
+var _tabStreaming = {};
+try { _openTabs = JSON.parse(localStorage.getItem('hermes_open_tabs') || '[]'); } catch (e) { _openTabs = []; }
+function persistTabs() { try { localStorage.setItem('hermes_open_tabs', JSON.stringify(_openTabs)); } catch (e) {} }
+
+/* 渲染顶部标签栏 */
+function renderSessionTabs() {
+  var scroll = document.getElementById('tabsScroll');
+  if (!scroll) return;
+  var html = '';
+  _openTabs.forEach(function (sid) {
+    var s = _sessions.find(function (x) { return x.id === sid; });
+    if (!s) return;
+    var active = (sid === currentSession);
+    var rawTitle = (s.title && s.title !== 'New Chat' && s.title !== '未命名会话') ? s.title : '新会话';
+    var streaming = !!_tabStreaming[sid];
+    html += '<div class="session-tab' + (active ? ' active' : '') + (streaming ? ' streaming' : '') + '" title="' + esc(rawTitle) + '" onclick="switchTab(\'' + esc(sid) + '\')">' +
+      '<span class="tab-dot"></span>' +
+      '<span class="tab-title">' + esc(rawTitle) + '</span>' +
+      '<span class="tab-close" onclick="event.stopPropagation();closeTab(\'' + esc(sid) + '\')" title="关闭标签">×</span>' +
+      '</div>';
+  });
+  scroll.innerHTML = html;
+  var activeEl = scroll.querySelector('.session-tab.active');
+  if (activeEl && activeEl.scrollIntoView) { try { activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {} }
+  var btn = document.getElementById('tabNewBtn');
+  if (btn) btn.style.display = 'inline-flex';
+}
+
+/* 保存/恢复指定标签的输入框草稿 */
+function saveDraft(sid) {
+  var ta = document.getElementById('chatInput');
+  if (ta && sid) _tabDrafts[sid] = ta.value;
+}
+function restoreDraft(sid) {
+  var ta = document.getElementById('chatInput');
+  if (!ta) return;
+  ta.value = _tabDrafts[sid] || '';
+  try { autoResize(ta); } catch (e) {}
+  var send = document.getElementById('sendBtn');
+  if (send) send.disabled = !ta.value.trim();
+}
+
+/* 打开（或激活）一个会话标签 */
+function openTab(sid) {
+  if (!sid) return;
+  if (_openTabs.indexOf(sid) === -1) { _openTabs.push(sid); persistTabs(); }
+  switchTab(sid);
+}
+
+/* 切换激活标签 */
+function switchTab(sid) {
+  if (!sid || sid === currentSession) return;
+  if (_msgState.streaming && _tabStreaming[currentSession]) { toast('当前会话正在生成回复，请等待完成或停止后再切换'); return; }
+  saveDraft(currentSession);
+  currentSession = sid;
+  renderSessionTabs();
+  renderRail(); updateHeader();
+  restoreDraft(sid);
+  loadSessionMessages(sid);
+}
+
+/* 关闭一个会话标签（会话本身保留在左侧树） */
+function closeTab(sid) {
+  var i = _openTabs.indexOf(sid);
+  if (i === -1) return;
+  if (_tabStreaming[sid]) { toast('该会话正在生成回复，无法关闭'); return; }
+  _openTabs.splice(i, 1); persistTabs();
+  delete _tabDrafts[sid];
+  if (currentSession === sid) {
+    currentSession = _openTabs.length ? _openTabs[Math.min(i, _openTabs.length - 1)] : '';
+    if (currentSession) {
+      renderRail(); updateHeader();
+      restoreDraft(currentSession);
+      loadSessionMessages(currentSession);
+    } else {
+      var body = document.getElementById('chatBody');
+      if (body) body.innerHTML = '<div class="system-tip">没有打开的会话，点击右上角 + 新建</div>';
+      updateHeader();
+    }
+  }
+  renderSessionTabs(); renderRail();
+}
+
+/* 新建会话并打开为标签 */
+function newTab() {
+  var aid = currentAgent || 'default';
+  fetch(apiUrl('/api/sessions'), { method: 'POST', headers: monitorToken ? { 'X-Monitor-Token': monitorToken } : {} })
+    .then(function (r) { return r.json(); })
+    .then(function (s) {
+      _sessions.unshift(s);
+      currentSession = s.id;
+      setSessionAgent(s.id, aid);
+      _openTabs.push(s.id); persistTabs();
+      var ta = document.getElementById('chatInput'); if (ta) ta.value = '';
+      renderSessionTabs(); renderRail(); updateHeader();
+      if (window.innerWidth <= 768) closeRailDrawer();
+      var body = document.getElementById('chatBody');
+      if (body) body.innerHTML = '<div class="system-tip">新会话已创建</div>';
+    })
+    .catch(function () { toast('创建会话失败'); });
+}
+
+/* 与后端会话列表同步标签（删除会话后清理、首次加载默认打开一个） */
+function syncTabs() {
+  var valid = _sessions.map(function (s) { return s.id; });
+  _openTabs = _openTabs.filter(function (sid) { return valid.indexOf(sid) !== -1; });
+  if (!_openTabs.length && _sessions.length) { _openTabs.push(_sessions[0].id); }
+  persistTabs();
+  if (currentSession && valid.indexOf(currentSession) === -1) {
+    currentSession = _openTabs.length ? _openTabs[0] : '';
+  }
+  renderSessionTabs();
+}
+
 function loadSessions(){
   return fetch(apiUrl('/api/sessions'), { cache:'no-store', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
     .then(function(r){ return r.json(); })
@@ -5319,6 +5467,7 @@ function loadSessions(){
       _sessions = (d && d.sessions) || [];
       if(!currentSession && _sessions.length){ currentSession = _sessions[0].id; }
       else if(currentSession && !_sessions.some(function(s){ return s.id===currentSession; })){ currentSession = _sessions.length?_sessions[0].id:''; }
+      syncTabs();
       renderRail(); updateHeader();
       if(currentSession) loadSessionMessages(currentSession);
     })
@@ -5388,33 +5537,30 @@ function toggleAgent(id){
 }
 function switchSession(aid, sid, e){
   if(e) e.stopPropagation();
-  currentAgent = aid; currentSession = sid;
+  currentAgent = aid; 
   if(aid) setSessionAgent(sid, aid);
-  renderRail(); updateHeader();
+  openTab(sid);
   if(window.innerWidth<=768) closeRailDrawer();
-  loadSessionMessages(sid);
 }
 function delSession(aid, sid, e){
   if(e) e.stopPropagation();
   if(!confirm('确定删除该会话？')) return;
   fetch(apiUrl('/api/sessions/'+encodeURIComponent(sid)), { method:'DELETE', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
-    .then(function(){ _sessions = _sessions.filter(function(s){ return s.id!==sid; }); delete _sessionAgent[sid]; persistSessionAgent(); if(currentSession===sid) currentSession = _sessions.length?_sessions[0].id:''; renderRail(); updateHeader(); if(currentSession) loadSessionMessages(currentSession); })
+    .then(function(){
+      _sessions = _sessions.filter(function(s){ return s.id!==sid; });
+      delete _sessionAgent[sid]; persistSessionAgent();
+      var ti = _openTabs.indexOf(sid);
+      if(ti!==-1){ _openTabs.splice(ti,1); persistTabs(); }
+      delete _tabDrafts[sid]; delete _tabStreaming[sid];
+      if(currentSession===sid) currentSession = _openTabs.length?_openTabs[0]:(_sessions.length?_sessions[0].id:'');
+      renderSessionTabs(); renderRail(); updateHeader();
+      if(currentSession) loadSessionMessages(currentSession);
+      else { var b = document.getElementById('chatBody'); if(b) b.innerHTML = '<div class="system-tip">没有打开的会话，点击右上角 + 新建</div>'; }
+    })
     .catch(function(){ toast('删除会话失败'); });
 }
 function newSession(){
-  var aid = currentAgent || 'default';
-  fetch(apiUrl('/api/sessions'), { method:'POST', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
-    .then(function(r){ return r.json(); })
-    .then(function(s){
-      _sessions.unshift(s);
-      currentSession = s.id;
-      setSessionAgent(s.id, aid);
-      renderRail(); updateHeader();
-      if(window.innerWidth<=768) closeRailDrawer();
-      var body = document.getElementById('chatBody');
-      if(body) body.innerHTML = '<div class="system-tip">新会话已创建</div>';
-    })
-    .catch(function(){ toast('创建会话失败'); });
+  newTab();
 }
 function loadSessionMessages(sid){
   var body = document.getElementById('chatBody');
@@ -5532,6 +5678,7 @@ function updateHeader(){
   var sub = document.getElementById('chatSubtitle');
   if(title) title.textContent = s ? (s.title||'未命名会话') : '新对话';
   if(sub) sub.textContent = (s ? (s.title||'会话') : '默认主力助手') + ' · ' + (_sessions.length) + ' 个会话';
+  renderSessionTabs();
 }
 function openRailDrawer(){
   var r=document.getElementById('chatRail'); if(r){ r.classList.remove('hidden'); r.classList.add('open'); }
@@ -5627,13 +5774,14 @@ function sendRaw(text){
   if(!currentSession){
     fetch(apiUrl('/api/sessions'), { method:'POST', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
       .then(function(r){ return r.json(); })
-      .then(function(s){ _sessions.unshift(s); currentSession=s.id; renderRail(); updateHeader(); doStream(); })
+      .then(function(s){ _sessions.unshift(s); currentSession=s.id; _openTabs.push(s.id); persistTabs(); renderSessionTabs(); renderRail(); updateHeader(); doStream(); })
       .catch(function(){ toast('创建会话失败'); mdEl.textContent='⚠ 无法创建会话'; });
   } else {
     doStream();
   }
 
   function doStream(){
+    _tabStreaming[currentSession] = true; renderSessionTabs();
     var sys = _personaPrompt || '';
     if(_activeSkills.length){ sys += '\n\n【已启用技能】请在本轮对话中优先使用以下技能：'+_activeSkills.join('、')+'。'; }
     sys = injectExpertSystem(sys);
@@ -5711,8 +5859,9 @@ function sendRaw(text){
           meta.textContent = 'Hermes · '+fmtDateTime(Date.now())+' · ' + t + ' tokens';
         }
       },
-      onError: function(err){ mdEl.innerHTML = '<span class="error-text">⚠ '+esc(err)+'</span>'; },
+      onError: function(err){ mdEl.innerHTML = '<span class="error-text">⚠ '+esc(err)+'</span>'; _tabStreaming[currentSession]=false; renderSessionTabs(); },
       onDone: function(aborted){
+        _tabStreaming[currentSession]=false; renderSessionTabs();
         mdEl.innerHTML = renderMarkdown(fullText) + (aborted ? ' <em>(已停止)</em>' : '');
         infoEl.style.display = 'none';
         // 完成后折叠工具区（Issue #8）；若仍有运行中的工具则保持展开
@@ -6160,7 +6309,8 @@ function pickItemExpert(id, el){
         setSessionAgent(s.id, agentId);
         // 新专家分组默认展开，便于立即看到会话
         localStorage.setItem('hermes_rail_open_'+agentId, 'true');
-        renderRail(); updateHeader();
+        _openTabs.push(s.id); persistTabs();
+        renderSessionTabs(); renderRail(); updateHeader();
         if(window.innerWidth<=768) closeRailDrawer();
         sendRaw('/title '+expertName); afterSwitch();
       })
@@ -6947,7 +7097,8 @@ function ensureDefaultSession(){
       _sessions.unshift(s);
       currentSession = s.id;
       try { setSessionAgent(s.id, currentAgent || 'default'); } catch(e){}
-      renderRail(); updateHeader();
+      _openTabs.push(s.id); persistTabs();
+      renderSessionTabs(); renderRail(); updateHeader();
     })
     .catch(function(){});
 }
