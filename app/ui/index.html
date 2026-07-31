@@ -5351,6 +5351,7 @@ function openGitHub(){ window.open('https://github.com/veenyi/fnos-hermes-agent'
 var _openTabs = [];
 var _tabDrafts = {};
 var _tabStreaming = {};
+var _chatHTML = {};  // sid → chatBody.innerHTML 快照（流式后台继续时保留最新内容，切回时从缓存恢复）
 try { _openTabs = JSON.parse(localStorage.getItem('hermes_open_tabs') || '[]'); } catch (e) { _openTabs = []; }
 function persistTabs() { try { localStorage.setItem('hermes_open_tabs', JSON.stringify(_openTabs)); } catch (e) {} }
 
@@ -5399,37 +5400,42 @@ function openTab(sid) {
   switchTab(sid);
 }
 
-/* 切换激活标签：流式中允许切换（切走前先停止旧会话的生成，类似 ChatGPT） */
+/* 切换激活标签：允许后台流式继续（用户明确要求"并行多会话"，类比 delegation-patterns 文档的子 Agent 并行）
+   关键：切换前保存当前 chatBody → _chatHTML[currentSession]，切回时从 _chatHTML[sid] 恢复（保留流式最新内容） */
 function switchTab(sid) {
   if (!sid || sid === currentSession) return;
-  // 切走前若旧会话正在流式，主动发送停止信号，避免后台空跑
-  if (_msgState.streaming && currentSession && _tabStreaming[currentSession]) {
-    try {
-      fetch(apiUrl('/api/chat/stop'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': monitorToken || '' }, body: JSON.stringify({ session_id: currentSession }) }).catch(function () {});
-    } catch (e) {}
-    if (_msgState.abortCtrl) try { _msgState.abortCtrl.abort(); } catch (e) {}
-    _msgState.streaming = false; _msgState.abortCtrl = null;
-    _tabStreaming[currentSession] = false;
-  }
-  saveDraft(currentSession);
+  // 1) 把当前 chatBody 内容存到缓存（含流式中最新内容）
+  var body = document.getElementById('chatBody');
+  if (body && currentSession) _chatHTML[currentSession] = body.innerHTML;
+  // 2) 切换会话
   currentSession = sid;
   renderSessionTabs();
   renderRail(); updateHeader();
   restoreDraft(sid);
-  loadSessionMessages(sid);
+  // 3) 优先从缓存恢复；缓存没有才从后端拉取
+  if (body) {
+    if (_chatHTML[sid] != null) {
+      body.innerHTML = _chatHTML[sid];
+      body.scrollTop = body.scrollHeight;
+      hideScrollBtn();
+    } else {
+      loadSessionMessages(sid);
+    }
+  }
 }
 
-/* 关闭一个会话标签（会话本身保留在左侧树）；若该标签在流式，先停止再关闭 */
+/* 关闭一个会话标签（会话本身保留在左侧树）；流式中允许关闭（后台流式继续，不影响其他会话） */
 function closeTab(sid) {
   var i = _openTabs.indexOf(sid);
   if (i === -1) return;
+  // 流式允许后台继续：仅清理 UI 状态（如果当前 tab 被关闭，需要 abort 它的流式，因为没有可见 DOM 了）
   if (_tabStreaming[sid]) {
-    try {
-      fetch(apiUrl('/api/chat/stop'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': monitorToken || '' }, body: JSON.stringify({ session_id: sid }) }).catch(function () {});
-    } catch (e) {}
-    if (_msgState.abortCtrl && currentSession === sid) try { _msgState.abortCtrl.abort(); } catch (e) {}
+    if (currentSession === sid) {
+      try { fetch(apiUrl('/api/chat/stop'), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Monitor-Token': monitorToken || '' }, body: JSON.stringify({ session_id: sid }) }).catch(function () {}); } catch (e) {}
+      if (_msgState.abortCtrl) try { _msgState.abortCtrl.abort(); } catch (e) {}
+      _msgState.streaming = false; _msgState.abortCtrl = null;
+    }
     _tabStreaming[sid] = false;
-    if (currentSession === sid) { _msgState.streaming = false; _msgState.abortCtrl = null; }
   }
   _openTabs.splice(i, 1); persistTabs();
   delete _tabDrafts[sid];
@@ -5817,12 +5823,14 @@ function sendRaw(text){
   }
 
   function doStream(){
-    _tabStreaming[currentSession] = true; renderSessionTabs();
+    var sid = currentSession;  // 捕获：本会话的 sid（后台流式继续时切换不影响这里的 sid）
+    _chatHTML[sid] = _chatHTML[sid] || '';  // 初始化缓存（防止首次流式就被清空）
+    _tabStreaming[sid] = true; renderSessionTabs();
     var sys = _personaPrompt || '';
     if(_activeSkills.length){ sys += '\n\n【已启用技能】请在本轮对话中优先使用以下技能：'+_activeSkills.join('、')+'。'; }
     sys = injectExpertSystem(sys);
     var payload = {
-      session_id: currentSession,
+      session_id: sid,
       message: buildMessageContent(text, attachments),
       system: sys
     };
@@ -5835,7 +5843,7 @@ function sendRaw(text){
       }
     }
     streamChat(payload, {
-      onDelta: function(d){ fullText += d; mdEl.innerHTML = renderMarkdown(fullText, true); body.scrollTop=body.scrollHeight; },
+      onDelta: function(d){ fullText += d; mdEl.innerHTML = renderMarkdown(fullText, true); body.scrollTop=body.scrollHeight; _chatHTML[sid] = body.innerHTML; },
       onTool: function(tp){
         // 技能调用渲染为 chip（Issue #9），不占完整工具卡片
         if(tp.skill || (tp.tool && /skill/i.test(tp.tool))){
@@ -5846,6 +5854,7 @@ function sendRaw(text){
           toolList.appendChild(chip);
           updateToolSummary();
           body.scrollTop=body.scrollHeight;
+          _chatHTML[sid] = body.innerHTML;
           return;
         }
         var id = tp.toolCallId || tp.tool || 'tool';
@@ -5879,12 +5888,14 @@ function sendRaw(text){
         // 流式进行中（有运行中的工具）保持展开；全部完成后折叠
         if(running) toolBox.setAttribute('data-collapsed','false');
         body.scrollTop=body.scrollHeight;
+        _chatHTML[sid] = body.innerHTML;
       },
       onInfo: function(i){
         if(!i) return;
         infoEl.innerHTML = '<span class="info-dot"></span>'+escapeHtml(i);
         infoEl.style.display = 'flex';
         body.scrollTop=body.scrollHeight;
+        _chatHTML[sid] = body.innerHTML;
       },
       onUsage: function(u){
         if(!u) return;
@@ -5895,9 +5906,9 @@ function sendRaw(text){
           meta.textContent = 'Hermes · '+fmtDateTime(Date.now())+' · ' + t + ' tokens';
         }
       },
-      onError: function(err){ mdEl.innerHTML = '<span class="error-text">⚠ '+esc(err)+'</span>'; _tabStreaming[currentSession]=false; renderSessionTabs(); },
+      onError: function(err){ mdEl.innerHTML = '<span class="error-text">⚠ '+esc(err)+'</span>'; _tabStreaming[sid]=false; renderSessionTabs(); _chatHTML[sid] = body.innerHTML; },
       onDone: function(aborted){
-        _tabStreaming[currentSession]=false; renderSessionTabs();
+        _tabStreaming[sid]=false; renderSessionTabs();
         mdEl.innerHTML = renderMarkdown(fullText) + (aborted ? ' <em>(已停止)</em>' : '');
         infoEl.style.display = 'none';
         // 完成后折叠工具区（Issue #8）；若仍有运行中的工具则保持展开
@@ -5908,6 +5919,7 @@ function sendRaw(text){
         }
         hideScrollBtn();
         _msgState.streaming=false; _msgState.abortCtrl=null;
+        _chatHTML[sid] = body.innerHTML;  // 完成后同步缓存
         loadSessions();
       }
     });
