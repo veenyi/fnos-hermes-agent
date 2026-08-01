@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hermes Agent · 控制台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E">
   <style>
 /* ===== inlined styles.css (V17) ===== */
 
@@ -15,7 +16,21 @@
       --accent:#5e64f3; --accent-h:#4f55d8; --accent-bg:#e8eafe;
       --blue:#2563eb; --blue-bg:#dbeafe;
       --red:#ef4444; --red-bg:#fee2e2;
+      /* 语义状态色（取值映射原硬编码，确保视觉等价） */
+      --success:#16a34a; --success-bg:#dcfce7; --success-text:#166534;
+      --warning:#f59e0b; --warning-dark:#d97706; --warning-bg:#fef3c7;
+      --green:#22c55e;
+      /* 警告横幅 / 日志终端 / GitHub 按钮 */
+      --warn-banner-bg:#fffbeb; --warn-banner-border:#fde68a; --warn-banner-text:#92400e;
+      --log-bg:#0f1115; --log-text:#c9cdd4;
+      --gh-bg:#dbeafe; --gh-text:#1d4ed8; --gh-border:#bfdbfe;
+      --gh-bg-h:#bfdbfe; --gh-border-h:#93c5fd; --gh-text-h:#1e40af;
       --radius:10px; --radius-lg:14px;
+      /* 圆角 / 字号 / 间距 / 阴影 scale */
+      --radius-sm:6px; --radius-md:8px; --radius-xl:12px; --radius-pill:20px;
+      --fs-xs:11px; --fs-sm:12px; --fs-md:13px; --fs-lg:14px; --fs-xl:16px;
+      --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+      --shadow-sm:0 1px 2px rgba(0,0,0,.05); --shadow-card:0 4px 12px rgba(99,102,241,.12);
       --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,"PingFang SC","Microsoft YaHei",sans-serif;
     }
     body.theme-dark{
@@ -25,6 +40,15 @@
       --accent:#6b70ff; --accent-h:#585dff; --accent-bg:#2a2d4a;
       --blue:#3b82f6; --blue-bg:#1e3a5f;
       --red:#f87171; --red-bg:#450a0a;
+      /* 语义状态色暗色覆盖（背景类必须反转，前景状态色保持等价） */
+      --success:#16a34a; --success-bg:#14321f; --success-text:#86efac;
+      --warning:#f59e0b; --warning-dark:#d97706; --warning-bg:#3a2c10;
+      --green:#22c55e;
+      --warn-banner-bg:#2a2310; --warn-banner-border:#6b5a1e; --warn-banner-text:#f0d78c;
+      --log-bg:#0f1115; --log-text:#c9cdd4;
+      --gh-bg:#1e3a8a; --gh-text:#bfdbfe; --gh-border:#1e40af;
+      --gh-bg-h:#1e40af; --gh-border-h:#60a5fa; --gh-text-h:#bfdbfe;
+      --shadow-sm:0 1px 2px rgba(0,0,0,.3); --shadow-card:0 4px 12px rgba(0,0,0,.4);
     }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0;font-family:var(--font);background:var(--bg0);color:var(--text);overflow:hidden}
@@ -32,7 +56,7 @@
 
     /* 全局左侧导航 */
     .global-sidebar{width:72px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:2px;flex-shrink:0;z-index:10}
-    .global-sidebar .nav-btn{width:64px;border-radius:8px;border:none;background:transparent;color:var(--text2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:500}
+    .global-sidebar .nav-btn{width:64px;border-radius:var(--radius-md);border:none;background:transparent;color:var(--text2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:500}
     .global-sidebar .nav-btn:hover{background:var(--bg3);color:var(--text)}
     .global-sidebar .nav-btn.active{background:var(--blue-bg);color:var(--blue);font-weight:600}
     .global-sidebar .nav-btn svg{width:20px;height:20px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
@@ -46,12 +70,12 @@
     .global-topbar .left{display:flex;align-items:center;gap:10px}
     .brand-logo{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
     .brand-dot{width:8px;height:8px;border-radius:50%;background:#9ca3af;transition:background .2s}
-    .brand-dot.online{background:#22c55e}
-    .brand-dot.offline{background:#ef4444}
-    .brand-dot.connecting{background:#f59e0b}
+    .brand-dot.online{background:var(--green)}
+    .brand-dot.offline{background:var(--red)}
+    .brand-dot.connecting{background:var(--warning)}
     .brand-ver{font-size:11px;color:var(--text3);background:var(--bg1);padding:2px 7px;border-radius:10px;border:1px solid var(--border)}
     .global-topbar .right{display:flex;align-items:center;gap:6px}
-    .glob-btn{width:32px;height:32px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+    .glob-btn{width:32px;height:32px;border-radius:var(--radius-md);border:1px solid transparent;background:transparent;color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
     .glob-btn:hover{background:var(--bg3);color:var(--text)}
     .glob-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
     .glob-btn svg{width:18px;height:18px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
@@ -65,35 +89,32 @@
     .rail-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
     .rail-head h2{margin:0;font-size:15px;font-weight:600;white-space:nowrap;color:var(--text)}
     .rail-head .right{display:flex;align-items:center;gap:6px}
-    .rail-head .icon-btn{width:28px;height:28px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--text3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+    .rail-head .icon-btn{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid transparent;background:transparent;color:var(--text3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
     .rail-head .icon-btn:hover{background:var(--bg3);color:var(--text)}
     .rail-head .icon-btn svg{width:16px;height:16px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
 
     .rail-search{padding:10px 12px}
-    .rail-search input{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;outline:none;color:var(--text)}
+    .rail-search input{width:100%;padding:7px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);font-size:13px;outline:none;color:var(--text)}
     .rail-scroll{flex:1;overflow-y:auto;padding:6px}
     .agent-group{margin-bottom:2px}
-    .agent-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s;user-select:none}
+    .agent-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-md);cursor:pointer;transition:background .15s;user-select:none}
     .agent-row:hover{background:var(--bg3)}
     .agent-row.active{background:var(--accent-bg);color:var(--accent)}
     .agent-row .chevron{margin-right:2px;font-size:11px;color:var(--text3);transition:transform .2s;width:14px;height:14px;display:flex;align-items:center;justify-content:center}
     .agent-row.expanded .chevron{transform:rotate(90deg)}
-    .agent-row .avatar{width:28px;height:28px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+    .agent-row .avatar{width:28px;height:28px;border-radius:var(--radius-md);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
     .agent-row.active .avatar{background:var(--accent);color:#fff}
     .agent-row .info{flex:1;min-width:0}
     .agent-row .name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .agent-row .desc{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .agent-del{width:22px;height:22px;border-radius:5px;border:1px solid transparent;background:transparent;color:var(--text3);font-size:13px;cursor:pointer;opacity:0;transition:all .15s;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;margin-left:2px}
-    .agent-row:hover .agent-del{opacity:1}
-    .agent-del:hover{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.4);color:#dc2626}
     .session-list{padding-left:24px;overflow:hidden;max-height:0;transition:max-height .25s ease}
     .session-list.open{max-height:400px}
-    .session-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--text2);transition:background .15s}
+    .session-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 8px;border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--text2);transition:background .15s}
     .session-item:hover{background:var(--bg3)}
     .session-item.active{background:var(--accent-bg);color:var(--accent)}
     .session-item .dot{width:8px;height:8px;border-radius:50%;background:var(--border2);flex-shrink:0}
     .session-item.active .dot{background:var(--accent)}
-    .session-item .dot.streaming,.session-item.streaming .dot{background:#f59e0b;animation:tabPulse 1s infinite;box-shadow:0 0 0 2px rgba(245,158,11,.18)}
+    .session-item .dot.streaming,.session-item.streaming .dot{background:var(--warning);animation:tabPulse 1s infinite;box-shadow:0 0 0 2px rgba(245,158,11,.18)}
     .session-item.streaming{background:rgba(245,158,11,.06)}
     .session-item .title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .session-item .del{opacity:0;color:var(--text3);font-size:13px}
@@ -109,15 +130,14 @@
     .page-header{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;background:var(--bg2)}
     .page-header h1{margin:0;font-size:16px;font-weight:600;color:var(--text)}
     .page-body{flex:1;overflow-y:auto;padding:20px;background:var(--bg2)}
-    .local-banner{background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
-    body.theme-dark .local-banner{background:#2a2310;border-color:#6b5a1e;color:#f0d78c}
+    .local-banner{background:var(--warn-banner-bg);border:1px solid var(--warn-banner-border);color:var(--warn-banner-text);padding:10px 14px;border-radius:var(--radius-md);font-size:13px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
     .empty-state{padding:30px 20px;text-align:center;color:var(--text3);font-size:13px}
 
     /* 聊天页 */
     .chat-main{flex:1;min-width:0;background:var(--bg2);position:relative}
     .chat-header{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;gap:12px;background:var(--bg2)}
     .chat-header .left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
-    .chat-header .rail-toggle{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);display:none;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);flex-shrink:0}
+    .chat-header .rail-toggle{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg2);display:none;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);flex-shrink:0}
     .chat-header .rail-toggle:hover{background:var(--bg3)}
     .chat-header .rail-toggle svg{width:16px;height:16px;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
     .chat-header .rail-toggle.desktop-only{display:flex}
@@ -130,17 +150,17 @@
     .session-tabs.visible{display:flex}
     .tabs-scroll{display:flex;align-items:stretch;gap:8px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 0}
     .tabs-scroll::-webkit-scrollbar{display:none}
-    .session-tab{display:inline-flex;align-items:center;gap:8px;min-width:180px;max-width:220px;flex:0 0 auto;padding:8px 10px 8px 14px;border-radius:8px;background:var(--bg1);border:1px solid var(--border);color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s,color .15s,border-color .15s;position:relative;user-select:none}
+    .session-tab{display:inline-flex;align-items:center;gap:8px;min-width:180px;max-width:220px;flex:0 0 auto;padding:8px 10px 8px 14px;border-radius:var(--radius-md);background:var(--bg1);border:1px solid var(--border);color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s,color .15s,border-color .15s;position:relative;user-select:none}
     .session-tab .tab-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .2s}
     .session-tab .tab-title{overflow:hidden;text-overflow:ellipsis;max-width:140px;flex:1;min-width:0}
     .session-tab .tab-close{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;color:var(--text3);font-size:14px;line-height:1;flex-shrink:0;margin-left:2px}
-    .session-tab .tab-close:hover{background:rgba(239,68,68,.15);color:#ef4444}
+    .session-tab .tab-close:hover{background:rgba(239,68,68,.15);color:var(--red)}
     .session-tab:hover{background:var(--bg3);color:var(--text)}
     .session-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
     .session-tab.active .tab-dot{background:var(--accent)}
-    .session-tab.streaming .tab-dot{background:#f59e0b;animation:tabPulse 1s infinite}
+    .session-tab.streaming .tab-dot{background:var(--warning);animation:tabPulse 1s infinite}
     @keyframes tabPulse{0%,100%{opacity:1}50%{opacity:.3}}
-    .tab-new{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px dashed var(--border);background:transparent;color:var(--text3);cursor:pointer;flex-shrink:0;transition:all .15s}
+    .tab-new{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:var(--radius-md);border:1px dashed var(--border);background:transparent;color:var(--text3);cursor:pointer;flex-shrink:0;transition:all .15s}
     .tab-new:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
     .tab-new svg{width:14px;height:14px;stroke-width:2;stroke-linecap:round;stroke:currentColor;fill:none}
 
@@ -163,20 +183,20 @@
 
     /* 工具/技能调用卡片 */
     .tool-call{margin-top:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);overflow:hidden}
-    .tool-call.running{border-color:#f59e0b}
+    .tool-call.running{border-color:var(--warning)}
     .tool-head{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg1);border-bottom:1px solid var(--border);font-size:12px;cursor:pointer;user-select:none}
     .tool-icon{font-size:14px}
     .tool-name{font-weight:600;color:var(--text)}
     .tool-status{margin-left:auto;font-size:11px}
-    .tool-status.running{color:#d97706}
-    .tool-status.done{color:#16a34a}
+    .tool-status.running{color:var(--warning-dark)}
+    .tool-status.done{color:var(--success)}
     .tool-cmd{padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--text2);border-bottom:1px dashed var(--border);background:var(--bg2);white-space:pre-wrap;word-break:break-word}
     .tool-out{padding:8px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:var(--text);line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto}
     .tool-cmd-label{display:block;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
     .tool-call.collapsed .tool-cmd,.tool-call.collapsed .tool-out{display:none}
 
     /* 消息内富文本（对齐 Markdown 渲染） */
-    .msg-bubble pre{background:var(--bg0);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow:auto;margin:8px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12.5px;line-height:1.5;color:var(--text);white-space:pre}
+    .msg-bubble pre{background:var(--bg0);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;overflow:auto;margin:8px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12.5px;line-height:1.5;color:var(--text);white-space:pre}
     .msg-bubble code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12.5px;background:var(--bg3);padding:2px 5px;border-radius:4px}
     .msg-bubble pre code{background:transparent;padding:0;font-size:inherit}
     .msg-bubble blockquote{border-left:3px solid var(--accent);padding:4px 12px;margin:8px 0;color:var(--text2);background:var(--bg1)}
@@ -204,16 +224,8 @@
     .input-outer{background:var(--bg2);border:1px solid var(--border);border-radius:22px;padding:12px 14px 10px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
     body.theme-dark .input-outer{box-shadow:0 2px 8px rgba(0,0,0,.2)}
     .input-outer:focus-within{border-color:var(--accent)}
-    /* chat composer 顶部 chip 行：persona + 专家团 + 工作流 */
-.chat-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 8px;align-items:center;min-height:0}
-.chat-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;font-size:12px;border-radius:16px;border:1px solid var(--border);background:var(--bg1);color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;font-family:inherit;line-height:1}
-.chat-chip:hover{border-color:var(--accent);color:var(--accent)}
-.chat-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500}
-.chat-chip.active:hover{opacity:.92;color:#fff}
-.chat-chip.delimiter::before{content:"";display:inline-block;width:1px;height:14px;background:var(--border);margin:0 4px}
-.chat-chips:empty{display:none}
-.skill-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 8px}
-    .skill-chip{display:inline-flex;align-items:center;gap:5px;background:var(--accent-bg);color:var(--accent);border-radius:12px;padding:2px 9px;font-size:11px;cursor:pointer;line-height:1.6}
+    .skill-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 8px}
+    .skill-chip{display:inline-flex;align-items:center;gap:5px;background:var(--accent-bg);color:var(--accent);border-radius:var(--radius-xl);padding:2px 9px;font-size:11px;cursor:pointer;line-height:1.6}
     .skill-chip .x{font-weight:700;opacity:.65}
     .skill-chip:hover .x{opacity:1}
     .input-wrap{display:flex;align-items:flex-end;gap:10px;margin-bottom:10px}
@@ -225,7 +237,7 @@
     .input-wrap .send svg{width:20px;height:20px;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
 
     .toolbar{display:flex;align-items:center;gap:6px;padding-left:2px;position:relative}
-    .tool-btn{width:32px;height:32px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;position:relative}
+    .tool-btn{width:32px;height:32px;border-radius:var(--radius-md);border:1px solid transparent;background:transparent;color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;position:relative}
     .tool-btn:hover{background:var(--bg3);color:var(--text)}
     .tool-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
     .tool-btn svg{width:18px;height:18px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
@@ -243,12 +255,12 @@
     .mini-popup-close{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);font-size:18px;line-height:1}
     .mini-popup-close:hover{background:var(--bg3);color:var(--text)}
     .mini-popup-search{padding:8px 12px;border-bottom:1px solid var(--border)}
-    .mini-popup-search input{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;outline:none;color:var(--text)}
+    .mini-popup-search input{width:100%;padding:7px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:13px;outline:none;color:var(--text)}
     .mini-popup-tabs{display:flex;padding:0 12px;border-bottom:1px solid var(--border);background:var(--bg1)}
     .mini-popup-tab{flex:1;text-align:center;padding:10px 4px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;position:relative}
     .mini-popup-tab:hover{color:var(--text)}
     .mini-popup-tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--accent-bg)}
-    .mini-popup-body{max-height:320px;overflow-y:auto;padding:10px}
+    .mini-popup-body{max-height:320px;overflow-y:auto;padding:10px;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
     .mini-popup.wide .mini-popup-body{max-height:800px}
     .mini-popup-foot{padding:9px 12px;border-top:1px solid var(--border);text-align:center;font-size:12px;color:var(--text2);cursor:pointer}
     .mini-popup-foot:hover{color:var(--accent);background:var(--bg1)}
@@ -256,17 +268,16 @@
     .pop-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;transition:all .15s;background:var(--bg1);border:1px solid var(--border);margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
     .pop-item:last-child{margin-bottom:0}
     .pop-item:hover{background:var(--bg3);border-color:var(--border2)}
-    .pop-item.active{background:#eef2ff;border-color:var(--accent);box-shadow:0 0 0 2px rgba(99,102,241,.18)}
-    body.theme-dark .pop-item.active{background:#1e233a;border-color:var(--accent);box-shadow:0 0 0 2px rgba(99,102,241,.35)}
-    .pop-item .ico{width:34px;height:34px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;font-weight:600;color:var(--text2);transition:all .15s}
-    .pop-item.active .ico{background:var(--accent);color:#fff;transform:scale(1.05)}
+    .pop-item.active{background:#eef2ff;border-color:#c7d2fe}
+    body.theme-dark .pop-item.active{background:#1e233a;border-color:#4b5563}
+    .pop-item .ico{width:34px;height:34px;border-radius:var(--radius-md);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;font-weight:600;color:var(--text2)}
+    .pop-item.active .ico{background:var(--accent);color:#fff}
     .pop-item .txt{flex:1;min-width:0}
     .pop-item .t{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pop-item.active .t{color:var(--accent)}
     .pop-item .d{font-size:11px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pop-item .check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--bg1);transition:all .15s}
-    .pop-item.active .check{border-color:var(--accent);background:var(--accent);transform:scale(1.1)}
-    .pop-item.active .check::after{content:"";width:8px;height:8px;border-radius:50%;background:#fff}
+    .pop-item .check{width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .pop-item.active .check{border-color:var(--accent);background:var(--accent)}
+    .pop-item.active .check::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
 
     .pick-groups{display:flex;flex-direction:column;gap:10px}
     .pick-group{display:flex;flex-direction:column;gap:6px}
@@ -289,7 +300,7 @@
     .tab:hover{color:var(--text)}
     .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
     .connector-grid, .ext-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-    .connector-card, .ext-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:14px;transition:all .15s;cursor:pointer;display:flex;flex-direction:column;height:100%}
+    .connector-card, .ext-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);padding:14px;transition:all .15s;cursor:pointer;display:flex;flex-direction:column;height:100%}
     .connector-card:hover, .ext-card:hover{background:var(--bg2);border-color:var(--accent);box-shadow:0 4px 12px rgba(0,0,0,.06)}
     .connector-card .top, .ext-card .top{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
     .connector-card .top{min-height:74px}
@@ -298,9 +309,9 @@
     .connector-card .name, .ext-card .name{font-size:14px;font-weight:600;color:var(--text)}
     .connector-card .status, .ext-card .status{font-size:12px;color:var(--text3);margin-top:4px;line-height:1.4}
     .connector-card .status{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.8em}
-    .connector-card .status.on, .ext-card .status.on{color:#16a34a}
+    .connector-card .status.on, .ext-card .status.on{color:var(--success)}
     .connector-card .status.off, .ext-card .status.off{color:var(--text3)}
-    .connector-card .action, .ext-card .action, .ov-logbtn{margin-top:auto;width:100%;padding:7px 0;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);text-align:center}
+    .connector-card .action, .ext-card .action, .ov-logbtn{margin-top:auto;width:100%;padding:7px 0;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);text-align:center}
     .connector-card .action:hover, .ext-card .action:hover, .ov-logbtn:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
     .ext-card .desc{font-size:12px;color:var(--text2);line-height:1.45;margin:-2px 0 10px}
     .ext-card .tools{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
@@ -315,30 +326,30 @@
     .skill-config-provider .prov-desc{font-size:12px;color:var(--text2);margin-bottom:10px}
     .skill-config-field{margin-bottom:12px}
     .skill-config-field label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--text2)}
-    .skill-config-field input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg0);color:var(--text);font-size:13px}
+    .skill-config-field input{width:100%;padding:8px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg0);color:var(--text);font-size:13px}
     .skill-config-field input:focus{outline:none;border-color:var(--accent)}
     .ov-logbtn{margin-top:0;width:auto;padding:6px 12px}
     .connector-card .badge{display:inline-block;margin-left:8px;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:500;background:var(--bg3);color:var(--text3)}
-    .conn-badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid transparent;vertical-align:middle}
+    .conn-badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;border:1px solid transparent;vertical-align:middle}
     .conn-desc{font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.5}
     .conn-doc{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--accent);text-decoration:none;margin-bottom:10px}
     .conn-doc:hover{text-decoration:underline}
-    .conn-hint{font-size:12px;color:var(--text3);background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:14px;line-height:1.4}
+    .conn-hint{font-size:12px;color:var(--text3);background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;margin-bottom:14px;line-height:1.4}
     .conn-section-title{font-size:13px;font-weight:600;color:var(--text);margin:14px 0 8px}
     .conn-tools{display:flex;flex-direction:column;gap:8px}
-    .conn-tool{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+    .conn-tool{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px}
     .conn-tool.remote{font-size:12px;color:var(--text3)}
     .conn-tool .tool-name{font-size:13px;font-weight:600;color:var(--text)}
     .conn-tool .tool-desc{font-size:12px;color:var(--text3);margin-top:2px}
     .conn-invoke{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:12px}
-    .conn-result{display:block;margin-top:10px;padding:10px;border-radius:8px;background:var(--bg0);border:1px solid var(--border);font-size:12px;color:var(--text2);white-space:pre-wrap;max-height:200px;overflow:auto}
+    .conn-result{display:block;margin-top:10px;padding:10px;border-radius:var(--radius-md);background:var(--bg0);border:1px solid var(--border);font-size:12px;color:var(--text2);white-space:pre-wrap;max-height:200px;overflow:auto}
 
     /* 设置页面 */
     .settings-list{max-width:600px}
     .setting-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)}
     .setting-row .label{font-size:14px;font-weight:500;color:var(--text)}
     .setting-row .desc{font-size:12px;color:var(--text3);margin-top:2px}
-    .toggle{display:inline-block;width:44px;height:24px;border-radius:12px;background:var(--border2);position:relative;cursor:pointer;transition:background .15s;flex-shrink:0}
+    .toggle{display:inline-block;width:44px;height:24px;border-radius:var(--radius-xl);background:var(--border2);position:relative;cursor:pointer;transition:background .15s;flex-shrink:0}
     .toggle.on{background:var(--accent)}
     .toggle::after{content:"";position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
     .toggle.on::after{left:22px}
@@ -411,7 +422,7 @@
       .ov-status{font-size:10px;padding:2px 7px;flex-shrink:0}
       /* 系统信息：2x2 网格（4 个 metric 在手机端更清晰可读） */
       .sys-metrics{grid-template-columns:repeat(2,1fr) !important;gap:8px}
-      .ov-metric{display:flex !important;flex-direction:column;gap:3px;padding:8px 6px;background:var(--bg2);border-radius:6px;text-align:center;font-size:11px;color:var(--text3)}
+      .ov-metric{display:flex !important;flex-direction:column;gap:3px;padding:8px 6px;background:var(--bg2);border-radius:var(--radius-sm);text-align:center;font-size:11px;color:var(--text3)}
       .ov-metric:last-child{border-bottom:none}
       .ov-metric span{font-size:10px;color:var(--text3);order:2}
       .ov-metric strong{font-size:13px;color:var(--text);font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;order:1;margin-bottom:2px}
@@ -422,7 +433,7 @@
       .log-filter-row{display:none !important}
       /* 运行服务：Gateway/Dashboard 一行 2 列横排（紧凑，每行只显示名称+开关） */
       .ov-card-services .ov-card-body{display:flex;flex-direction:row;gap:6px}
-      .service-row{padding:8px 6px !important;gap:4px !important;background:var(--bg2);border-radius:6px;border-bottom:none !important;display:flex !important;flex:1;flex-wrap:nowrap;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;overflow:hidden;max-width:100%}
+      .service-row{padding:8px 6px !important;gap:4px !important;background:var(--bg2);border-radius:var(--radius-sm);border-bottom:none !important;display:flex !important;flex:1;flex-wrap:nowrap;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;overflow:hidden;max-width:100%}
       .service-row:last-child{margin-bottom:0}
       .service-info{flex:1;min-width:0;width:100%;overflow:hidden}
       .service-title{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;display:block}
@@ -448,19 +459,19 @@
 .ov-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .ov-title{font-size:18px;font-weight:700}
 .ov-status{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;background:var(--bg3);color:var(--text3)}
-.ov-status.on{background:#dcfce7;color:#166534}
+.ov-status.on{background:var(--success-bg);color:var(--success-text)}
 .ov-status.off{background:var(--bg3);color:var(--text3)}
 .ov-status .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
 .ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex-shrink:0;align-items:stretch}
-.ov-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.ov-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);padding:14px;display:flex;flex-direction:column;gap:10px}
 .ov-card-head{display:flex;align-items:center;gap:10px}
 .ov-icon{font-size:22px}
 .ov-card-title{flex:1;font-size:15px;font-weight:600}
 .ov-head-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
-.ov-iconbtn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;transition:all .15s}
+.ov-iconbtn{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg2);color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;transition:all .15s}
 .ov-iconbtn:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
-.ov-head-actions .ov-openbtn{padding:5px 12px;font-size:12px;border-radius:6px}
-.ov-refresh{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2)}
+.ov-head-actions .ov-openbtn{padding:5px 12px;font-size:12px;border-radius:var(--radius-sm)}
+.ov-refresh{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2)}
 .ov-card-body{display:block;flex:1}
 .sys-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start}
 .ov-metric{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--text3)}
@@ -480,32 +491,32 @@
 .service-title{font-size:14px;font-weight:600;color:var(--text)}
 .service-meta{font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ov-toggle{margin-left:auto;flex-shrink:0}
-.ov-openbtn{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);transition:all .15s;white-space:nowrap}
+.ov-openbtn{padding:6px 14px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);transition:all .15s;white-space:nowrap}
 .ov-openbtn:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
-.service-row .ov-openbtn{padding:5px 12px;font-size:12px;border-radius:6px}
+.service-row .ov-openbtn{padding:5px 12px;font-size:12px;border-radius:var(--radius-sm)}
 .ov-actions{display:flex;gap:10px;flex-shrink:0}
-.ov-actbtn{padding:8px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
-.ov-actbtn.start{background:#16a34a;color:#fff}
-.ov-actbtn.stop{background:#ef4444;color:#fff}
-.ov-actbtn.restart{background:#f59e0b;color:#fff}
+.ov-actbtn{padding:8px 16px;border-radius:var(--radius-md);border:none;font-size:var(--fs-md);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+.ov-actbtn.start{background:var(--success);color:#fff}
+.ov-actbtn.stop{background:var(--red);color:#fff}
+.ov-actbtn.restart{background:var(--warning);color:#fff}
 .ov-actbtn:not(.start):not(.stop):not(.restart){background:var(--bg3);color:var(--text)}
 .ov-actbtn:hover{opacity:.9}
-.ov-logbox{border:1px solid var(--border);border-radius:12px;background:var(--bg1);overflow:hidden;flex:1;min-height:140px;display:flex;flex-direction:column}
+.ov-logbox{border:1px solid var(--border);border-radius:var(--radius-xl);background:var(--bg1);overflow:hidden;flex:1;min-height:140px;display:flex;flex-direction:column}
 .ov-logbox-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600}
 .ov-logbox-ctrl{display:flex;align-items:center;gap:10px}
 .ov-refresh-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3)}
-.ov-logpre{margin:0;padding:12px 14px;flex:1;min-height:0;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.6;color:#c9cdd4;background:#0f1115;white-space:pre-wrap;word-break:break-word}
+.ov-logpre{margin:0;padding:12px 14px;flex:1;min-height:0;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.6;color:var(--log-text);background:var(--log-bg);white-space:pre-wrap;word-break:break-word}
 .ov-logpre .log-debug{color:#9ca3af}
 .ov-logpre .log-info{color:#4ade80}
 .ov-logpre .log-warning{color:#fbbf24}
 .ov-logpre .log-error{color:#f87171;font-weight:600}
 .ov-logbtn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);font-weight:600}
-.msg-bubble .error-text{color:#ef4444}
+.msg-bubble .error-text{color:var(--red)}
 .settings-section{display:flex;flex-direction:column;gap:14px}
 .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .section-head h2{margin:0;font-size:16px}
 .provider-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.provider-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px;transition:all .15s;display:flex;flex-direction:column;gap:8px;min-height:180px}
+.provider-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);padding:var(--sp-4);transition:all .15s;display:flex;flex-direction:column;gap:8px;min-height:180px}
 .provider-card:hover{border-color:var(--accent);box-shadow:0 4px 12px rgba(0,0,0,.06)}
 .provider-card.active{border-color:var(--accent);background:var(--accent-bg);box-shadow:0 0 0 1px var(--accent)}
 .provider-card-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -515,22 +526,25 @@
 .provider-card.active .provider-name{color:var(--accent)}
 .provider-status{font-size:11px;padding:2px 8px;border-radius:10px;margin-left:auto;flex-shrink:0;font-weight:500}
 .provider-status.current{background:var(--accent);color:#fff}
-.provider-status.fallback{background:rgba(245,158,11,.12);color:#d97706;border:1px solid rgba(245,158,11,.3)}
+.provider-status.fallback{background:rgba(245,158,11,.12);color:var(--warning-dark);border:1px solid rgba(245,158,11,.3)}
 .provider-model{font-size:12px;color:var(--text2);font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .provider-meta{font-size:11px;color:var(--text3)}
 .provider-key{font-size:11px;color:var(--text3);font-family:ui-monospace,monospace;display:inline-flex;align-items:center;gap:6px;background:var(--bg2);padding:3px 8px;border-radius:4px;width:fit-content;max-width:100%;overflow:hidden}
 .provider-key .key-dot{color:var(--text3);letter-spacing:1px}
 .provider-actions{margin-top:auto;display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border)}
-.provider-actions .action{flex:1;min-width:60px;padding:5px 8px;font-size:12px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text);text-align:center;transition:all .15s}
+.provider-actions .action{flex:1;min-width:60px;padding:5px 8px;font-size:12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text);text-align:center;transition:all .15s}
 .provider-actions .action:hover:not(.disabled){border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
 .provider-actions .action.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-.provider-actions .action.warn{color:#d97706;border-color:rgba(245,158,11,.4)}
+.provider-actions .action.warn{color:var(--warning-dark);border-color:rgba(245,158,11,.4)}
+.provider-actions .action.danger{color:var(--red);border-color:var(--red)}
+.provider-actions .action.danger:hover{background:rgba(239,68,68,.1)}
 .provider-actions .action.warn:hover{background:rgba(245,158,11,.1)}
 .provider-actions .action.disabled{opacity:.6;cursor:not-allowed;color:var(--text3)}
-.provider-actions .action.danger{color:#dc2626;border-color:rgba(239,68,68,.4)}
-.provider-actions .action.danger:hover{background:rgba(239,68,68,.12);color:#dc2626}
 .model-manage-head{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
-.provider-model-list{display:flex;flex-direction:column;gap:6px;padding-right:4px;max-height:340px;overflow-y:auto;scrollbar-gutter:stable}
+.provider-model-list{display:flex;flex-direction:column;gap:4px;max-height:min(50vh, 520px);overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--border) transparent;border:1px solid var(--border);border-radius:10px;background:var(--bg1);padding:6px;flex-shrink:0;min-height:60px}
+.provider-model-list::-webkit-scrollbar{width:6px}
+.provider-model-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.provider-model-list::-webkit-scrollbar-track{background:transparent}
 .model-group{border:1px solid var(--border);border-radius:10px;background:var(--bg1);overflow:hidden}
 .model-group-head{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;user-select:none;background:var(--bg2);border-bottom:1px solid var(--border)}
 .model-group-head:hover{background:var(--bg3)}
@@ -541,7 +555,7 @@
 .model-group-head .count{font-size:11px;color:var(--text3);background:var(--bg1);padding:2px 8px;border-radius:10px;border:1px solid var(--border)}
 .model-group-body{display:flex;flex-direction:column;padding:4px}
 .model-group-head.collapsed + .model-group-body{display:none}
-.model-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text);font-family:ui-monospace,monospace;transition:background .15s}
+.model-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;color:var(--text);font-family:ui-monospace,monospace;transition:background .15s;flex-shrink:0}
 .model-item:hover{background:var(--bg2)}
 .model-item.applied{background:var(--accent-bg);color:var(--accent);font-weight:600}
 .model-item.disabled{opacity:.45}
@@ -551,7 +565,7 @@
 .model-cfg-btn{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text3);font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:2px}
 .model-cfg-btn:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
 .model-test-btn{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text3);font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
-.model-test-btn:hover{background:#dcfce7;border-color:#16a34a;color:#16a34a}
+.model-test-btn:hover{background:var(--success-bg);border-color:var(--success);color:var(--success)}
 .model-test-btn.testing{background:#fef3c7;border-color:#f59e0b;color:#f59e0b;animation:testPulse 1s infinite}
 @keyframes testPulse{0%,100%{opacity:1}50%{opacity:.4}}
 .model-tick{color:var(--accent);font-size:14px;flex-shrink:0}
@@ -559,10 +573,10 @@
 .chip-sm{padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text3);cursor:pointer;font-family:inherit}
 .chip-sm:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
 .wf-search-bar{margin-bottom:8px}
-.wf-search-bar input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
+.wf-search-bar input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
 .wf-search-bar input:focus{border-color:var(--accent)}
-.model-custom-row{display:flex;gap:6px;margin-top:10px;padding:10px;padding-bottom:14px;border-top:1px solid var(--border);background:var(--bg2);position:sticky;bottom:0;z-index:2;box-shadow:0 -2px 8px rgba(0,0,0,0.04)}
-.model-custom-row input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg1);font-size:12px;color:var(--text);outline:none}
+.model-custom-row{display:flex;gap:6px;margin-bottom:8px}
+.model-custom-row input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg1);font-size:12px;color:var(--text);outline:none}
 .model-custom-row input:focus{border-color:var(--accent)}
 .model-custom-row .action{flex:none;padding:7px 12px;font-size:12px}
 .provider-model-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg1)}
@@ -577,50 +591,42 @@
 .provider-model-row .badges .badge{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--bg2);color:var(--text3)}
 .provider-model-row .badges .badge.on{background:var(--accent-bg);color:var(--accent)}
 .provider-model-row .actions{display:flex;gap:6px;flex-shrink:0}
-.provider-model-row .actions button{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;font-size:13px;color:var(--text3)}
+.provider-model-row .actions button{padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg2);cursor:pointer;font-size:13px;color:var(--text3)}
 .provider-model-row .actions button:hover{border-color:var(--accent);color:var(--accent)}
 .modal-backdrop{position:fixed;left:0;top:0;width:100vw;height:100vh;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:6000;display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:auto}
-.modal-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow:auto;scrollbar-gutter:stable;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.modal-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
 .modal-head h3{margin:0;font-size:16px}
-.modal-close{width:28px;height:28px;border-radius:6px;border:none;background:transparent;cursor:pointer;font-size:20px;color:var(--text3)}
+.modal-close{width:28px;height:28px;border-radius:var(--radius-sm);border:none;background:transparent;cursor:pointer;font-size:20px;color:var(--text3)}
 .modal-close:hover{background:var(--bg3);color:var(--text)}
-.modal-body{padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1;min-height:0;scrollbar-gutter:stable}
+.modal-body{padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1;min-height:0;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.modal-body::-webkit-scrollbar{width:6px}
+.modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.modal-body::-webkit-scrollbar-track{background:transparent}
 .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 16px;border-top:1px solid var(--border);flex-shrink:0}
-    .modal-foot .action{width:auto;padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text)}
+    .modal-foot .action{width:auto;padding:7px 16px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text)}
     .modal-foot .action:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
     .modal-foot .action.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
     .modal-foot .action.primary:hover{opacity:.9}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:12px;color:var(--text3);font-weight:500}
 /* .action 全局基础样式：所有 modal-body / modal-foot 内的按钮统一 secondary 风格 */
-    .action{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:13px;cursor:pointer;color:var(--text);transition:all .15s;display:inline-block;vertical-align:middle}
+    .action{padding:7px 16px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);font-size:var(--fs-md);cursor:pointer;color:var(--text);transition:all .15s;display:inline-block;vertical-align:middle}
     .action:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
     .action.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
     .action.primary:hover{opacity:.9;background:var(--accent);color:#fff}
-    .field input, .field select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none}
+    .field input, .field select{padding:8px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:var(--fs-md);color:var(--text);outline:none}
     .field input:focus, .field select:focus{border-color:var(--accent)}
-    /* 完全自定义 select（button + ul 弹层，WebView 兼容） */
-    .select-wrap{position:relative;display:block;width:100%}
-    .cs-btn{width:100%;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg1);font-size:13px;color:var(--text);cursor:pointer;font-family:inherit;text-align:left;transition:border-color .15s}
-    .cs-btn:hover,.cs-btn:focus{border-color:var(--accent);outline:none}
-    .cs-btn .cs-value{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .cs-btn .cs-arrow{font-size:10px;color:var(--text3);transition:transform .2s;flex-shrink:0;margin-left:8px}
-    .cs-btn[aria-expanded="true"] .cs-arrow{transform:rotate(180deg)}
-    .cs-options{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:100;max-height:260px;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:4px;display:none;margin:0;list-style:none}
-    .cs-options.open{display:block}
-    .cs-options li{padding:8px 12px;border-radius:6px;font-size:13px;color:var(--text);cursor:pointer;transition:background .12s}
-    .cs-options li:hover{background:var(--bg3)}
-    .cs-options li.active{background:var(--accent-bg);color:var(--accent);font-weight:500}
-    .select-wrap select option{background:var(--bg2);color:var(--text);padding:8px}
-    /* 兼容：没有 .select-wrap 包裹的 .field select（依然尝试屏蔽） */
-    .field select{appearance:none !important;-webkit-appearance:none !important;-moz-appearance:none !important;background-color:var(--bg1) !important;padding:8px 36px 8px 10px !important;border-radius:8px !important;text-overflow:ellipsis;border:1px solid var(--border);font-size:13px;color:var(--text);outline:none;cursor:pointer;color-scheme:light}
-    .field select::-ms-expand{display:none !important;width:0 !important;height:0 !important;background:transparent !important;border:0 !important}
-    .field select::-webkit-calendar-picker-indicator,.field select::-webkit-search-cancel-button,.field select::-webkit-search-decoration{display:none !important;visibility:hidden !important;opacity:0 !important}
+    /* select 统一圆角 + 自定义下拉箭头（解决浏览器原生 select 右侧箭头不圆角的问题） */
+    .field select{appearance:none !important;-webkit-appearance:none !important;-moz-appearance:none !important;background:var(--bg1) !important;padding:8px 36px 8px 10px !important;border-radius:var(--radius-md) !important;text-overflow:ellipsis;border:1px solid var(--border);font-size:13px;color:var(--text);outline:none;cursor:pointer;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23888' d='M6 9L1.5 3.5h9z'/></svg>") !important;background-repeat:no-repeat !important;background-position:right 12px center !important;background-size:12px !important}
+    .field select::-ms-expand{display:none !important;width:0 !important;height:0 !important;margin:0 !important;padding:0 !important;background:transparent !important;border:0 !important}
+    .field select::-webkit-search-cancel-button,.field select::-webkit-search-decoration,.field select::-webkit-search-results-button,.field select::-webkit-search-results-decoration,.field select::-webkit-calendar-picker-indicator,.field select::-webkit-inner-spin-button,.field select::-webkit-outer-spin-button{display:none !important;-webkit-appearance:none !important;visibility:hidden !important;opacity:0 !important}
+    .field select::-moz-focus-inner{border:0 !important;padding:0 !important}
+    .field select::-ms-value{display:block !important;color:var(--text) !important}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .key-wrap{display:flex;gap:6px}
 .key-wrap input{flex:1}
-.key-wrap button{padding:0 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);cursor:pointer}
+.key-wrap button{padding:0 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);cursor:pointer}
 .ext-tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:none}
 .ext-panes{position:relative}
 .ext-pane{display:none}
@@ -628,7 +634,7 @@
 .skill-subtabs{display:flex;gap:8px;margin-bottom:12px}
 /* 工作流 preset 网格：桌面端固定 2-3 列，与下方 DAG 编辑器有视觉分隔 */
     .toolset-list, .skill-grid, .persona-grid, .expert-grid, .channel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.card-item{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;align-items:flex-start;gap:10px;cursor:pointer;transition:all .15s}
+.card-item{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);padding:var(--sp-3);display:flex;align-items:flex-start;gap:10px;cursor:pointer;transition:all .15s}
 .card-item:hover{border-color:var(--accent)}
 .card-item.active{border-color:var(--accent);background:var(--accent-bg)}
 .card-item .ico{font-size:20px}
@@ -638,61 +644,58 @@
 .card-item .check{margin-left:auto;width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center}
 .card-item.active .check{border-color:var(--accent);background:var(--accent)}
 .card-item.active .check::after{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
-.wf-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px;margin:18px 0 0;max-width:none}
+.wf-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);padding:var(--sp-4);margin:18px 0 0;max-width:none}
 .wf-card .desc{font-size:13px;color:var(--text3);margin:8px 0 16px}
 .wf-card .field-row{grid-template-columns:1fr 120px;gap:12px}
 .wf-card input[type="number"]{max-width:120px}
 .exp-search{margin-bottom:12px}
-.exp-search input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text)}
+.exp-search input{width:100%;padding:8px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text)}
 .exp-depts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.exp-dept{padding:4px 10px;border-radius:12px;border:1px solid var(--border);background:var(--bg1);font-size:12px;cursor:pointer}
+.exp-dept{padding:4px 10px;border-radius:var(--radius-xl);border:1px solid var(--border);background:var(--bg1);font-size:var(--fs-sm);cursor:pointer}
 .exp-dept.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
 .team-head{display:flex;gap:10px;margin-bottom:12px}
-.team-head input{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text)}
+.team-head input{flex:1;padding:8px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text)}
 .ch-filterbar{display:flex;gap:8px;margin-bottom:14px}
-.ch-filter{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;cursor:pointer;color:var(--text2)}
+.ch-filter{padding:6px 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:var(--fs-md);cursor:pointer;color:var(--text2)}
 .ch-filter.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
 .update-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-.update-card{background:var(--bg1);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.update-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);padding:var(--sp-4);display:flex;flex-direction:column;gap:10px}
 .update-title{font-size:15px;font-weight:600}
 .update-ver{font-size:13px;color:var(--text3)}
 .update-gh{margin-top:16px;font-size:13px;display:flex;justify-content:center}
 .update-gh a{color:var(--accent);text-decoration:none}
-.gh-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 18px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:500;border:1px solid #bfdbfe;transition:all .15s}
-.gh-button:hover{background:#bfdbfe;border-color:#93c5fd;color:#1e40af}
-body.theme-dark .gh-button{background:#1e3a8a;color:#bfdbfe;border-color:#1e40af}
-body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
+.gh-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 18px;border-radius:var(--radius-md);background:var(--gh-bg);color:var(--gh-text);font-weight:500;border:1px solid var(--gh-border);transition:all .15s}
+.gh-button:hover{background:var(--gh-bg-h);border-color:var(--gh-border-h);color:var(--gh-text-h)}
 
 /* ===== V17.1 新增：专家计数 / 工作流 / 角色管理 ===== */
 .exp-count{font-size:12px;color:var(--text3);margin:0 0 10px}
 .exp-dept .cnt{font-size:11px;color:var(--text3);margin-left:4px}
-.wf-intro{font-size:13px;color:var(--text2);margin-bottom:12px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.5}
+.wf-intro{font-size:13px;color:var(--text2);margin-bottom:12px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;line-height:1.5}
 .wf-cat-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:13px}
 .wf-cat-bar label{color:var(--text3);font-weight:500}
-.wf-cat-bar select{flex:1;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg1);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit}
+.wf-cat-bar select{flex:1;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg1);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit}
 .wf-cat-bar select:focus{outline:none;border-color:var(--accent)}
 .ext-card.active{border-color:var(--accent);background:var(--accent-bg)}
 .persona-actions{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap}
-.persona-actions .action{margin-top:0;width:auto;flex:1;min-width:60px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:12px;cursor:pointer;color:var(--text);text-align:center}
+.persona-actions .action{margin-top:0;width:auto;flex:1;min-width:60px;padding:6px 8px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);font-size:12px;cursor:pointer;color:var(--text);text-align:center}
 .persona-actions .action:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
 .persona-actions .action.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .persona-actions .action.primary:hover{opacity:.9}
 .persona-actions .action.danger{color:var(--red);border-color:var(--red)}
 .persona-actions .action.danger:hover{background:rgba(239,68,68,.1)}
-.modal-body textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);resize:vertical;font-family:inherit}
+.modal-body textarea{width:100%;padding:8px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);resize:vertical;font-family:inherit}
 
 /* ===== V17 P0 新增样式 ===== */
 .cap-badge{display:inline-block;margin-right:5px;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:500;background:var(--accent-bg);color:var(--accent);border:1px solid transparent;vertical-align:middle}
 .cap-badge.ctx{background:var(--blue-bg);color:var(--blue)}
 .chip-group{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px}
-.chip{padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:var(--bg1);font-size:13px;cursor:pointer;color:var(--text2);transition:all .15s}
+.chip{padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:var(--bg1);font-size:var(--fs-md);cursor:pointer;color:var(--text2);transition:all .15s}
 .chip:hover{border-color:var(--accent)}
 .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-.wf-steps{display:flex;flex-direction:column;gap:14px;margin:6px 0 4px}
-.wf-step-card{border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg1);box-sizing:border-box;display:flex;flex-direction:column;gap:10px}
-.wf-step-card input,.wf-step-card textarea{width:100%;box-sizing:border-box;max-width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
+.wf-steps{display:flex;flex-direction:column;gap:12px;margin:6px 0 4px}
+.wf-step-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg1);box-sizing:border-box}
+.wf-step-card input,.wf-step-card textarea{width:100%;box-sizing:border-box;max-width:100%;padding:8px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
 .wf-step-card input:focus,.wf-step-card textarea:focus{border-color:var(--accent)}
-.wf-step-card textarea{resize:vertical;min-height:64px;max-height:160px;font-family:inherit;line-height:1.5}
 .wf-step-head{display:flex;align-items:center;justify-content:space-between;font-weight:600;margin-bottom:8px;gap:8px}
 .wf-step-head .action{margin-top:0;width:auto;padding:3px 10px;font-size:12px}
 .wf-step-card .action.danger{color:var(--red);border-color:var(--red)}
@@ -705,17 +708,17 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 .wf-actions .action.secondary{background:transparent}
 .wf-dep-list{display:flex;flex-wrap:wrap;gap:8px}
 .wf-dep{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);cursor:pointer}
-.selected-expert-bar{display:none;align-items:center;gap:8px;background:var(--accent-bg);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}
+.selected-expert-bar{display:none;align-items:center;gap:8px;background:var(--accent-bg);border:1px solid var(--accent);color:var(--accent);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:12px;font-size:13px}
 .selected-expert-bar .seb-label{color:var(--text2)}
 .selected-expert-bar strong{color:var(--accent)}
 .selected-expert-bar .action{margin-top:0;width:auto;padding:3px 12px;font-size:12px;background:var(--bg2)}
-.action.sm{padding:4px 10px;font-size:12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text)}
+.action.sm{padding:4px 10px;font-size:var(--fs-sm);border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text)}
 .action.sm:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent)}
     .ext-card .action.danger{color:var(--red);border-color:var(--red)}
     .ext-card .action.danger:hover{background:rgba(239,68,68,.1)}
     .skill-config-provider.selected{border-color:var(--accent);background:var(--accent-bg)}
     /* 专家团 CTA 按钮（替代原 .action.primary 大块按钮）— 跟 pop-item 同一设计语言 */
-    .team-cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 14px;margin-top:6px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+    .team-cta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 14px;margin-top:6px;border-radius:var(--radius-md);border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:var(--fs-md);font-weight:600;cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm)}
     .team-cta:hover{opacity:.92;transform:translateY(-1px);box-shadow:0 4px 12px rgba(99,102,241,.25)}
     .team-cta:active{transform:translateY(0)}
     .team-cta.on{background:var(--accent);color:#fff}
@@ -733,7 +736,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 .tool-calls[data-collapsed="true"] .tool-list{display:none}
 .tool-calls .tool-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 /* 技能调用 chip（Issue #9） */
-.skill-invoke-chip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-bg);color:var(--accent);border-radius:12px;padding:2px 9px;font-size:11px;margin:2px 4px 2px 0;line-height:1.6}
+.skill-invoke-chip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-bg);color:var(--accent);border-radius:var(--radius-xl);padding:2px 9px;font-size:11px;margin:2px 4px 2px 0;line-height:1.6}
 .skill-invoke-chip:hover{background:var(--accent);color:#fff}
 /* 会话树空分组占位 */
 .empty-sess{padding:4px 0 8px 24px;font-size:11px;color:var(--text3)}
@@ -758,14 +761,14 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 
 /* Issue D：二维码登录选择视图 */
 .qr-choice-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
-.qr-choice-btn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg1);cursor:pointer;text-align:center;color:var(--text);transition:all .15s}
+.qr-choice-btn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 12px;border:1px solid var(--border);border-radius:var(--radius-xl);background:var(--bg1);cursor:pointer;text-align:center;color:var(--text);transition:all .15s}
 .qr-choice-btn:hover{border-color:var(--accent);background:var(--accent-bg);box-shadow:0 4px 12px rgba(0,0,0,.06)}
 .qr-choice-ico{font-size:30px;line-height:1}
 .qr-choice-t{font-weight:600;font-size:14px}
 .qr-choice-s{font-size:11px;color:var(--text3);margin-top:3px;line-height:1.35}
 #chManualWrap{margin-top:6px}
 /* 渠道二维码白底居中（与既有内联样式一致） */
-.qr-box{display:flex;flex-direction:column;align-items:center;gap:10px;background:#fff;padding:16px;border-radius:12px;align-self:center}
+.qr-box{display:flex;flex-direction:column;align-items:center;gap:10px;background:#fff;padding:16px;border-radius:var(--radius-xl);align-self:center}
 .qr-box img{display:block}
 .qr-status{text-align:center;font-size:13px;color:var(--text3)}
 .expert-actions .action{flex:1;margin-top:0}
@@ -796,7 +799,6 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 <script src="scripts/marked.min.js"></script>
 <script src="scripts/purify.min.js"></script>
 <script src="scripts/qrcode.min.js"></script>
-<script src="js/personas_library.js"></script>
 </head>
 <body>
 <div class="app" id="app">
@@ -841,7 +843,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 
     <div class="workspace">
       <!-- 左侧会话树 -->
-      <aside class="chat-rail" id="chatRail">
+      <aside class="chat-rail hidden" id="chatRail">
         <div class="rail-head">
           <h2>会话</h2>
           <div class="right">
@@ -863,9 +865,9 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
               <button class="rail-toggle mobile-only" title="打开会话树" onclick="openRailDrawer()">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
               </button>
-              <button class="rail-toggle desktop-only" id="railToggle" title="折叠会话树" onclick="toggleRail()">
-                <svg xmlns="http://www.w3.org/2000/svg" id="iconCollapse" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="9" y1="5" x2="9" y2="19"/><polyline points="16 9 12 12 16 15"/></svg>
-                <svg xmlns="http://www.w3.org/2000/svg" id="iconExpand" viewBox="0 0 24 24" style="display:none"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="9" y1="5" x2="9" y2="19"/><polyline points="11 9 15 12 11 15"/></svg>
+              <button class="rail-toggle desktop-only" id="railToggle" title="展开会话树" onclick="toggleRail()">
+                <svg xmlns="http://www.w3.org/2000/svg" id="iconCollapse" viewBox="0 0 24 24" style="display:none"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="9" y1="5" x2="9" y2="19"/><polyline points="16 9 12 12 16 15"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" id="iconExpand" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="9" y1="5" x2="9" y2="19"/><polyline points="11 9 15 12 11 15"/></svg>
               </button>
               <div style="min-width:0">
                 <div class="title" id="chatTitle">项目规划讨论</div>
@@ -1020,32 +1022,36 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
 </div>
 <div id="providerModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeProviderModal()">
   <div class="modal-panel">
-    <div class="modal-head"><h3>模型设置</h3><button class="modal-close" onclick="closeProviderModal()">×</button></div>
+    <div class="modal-head"><h3 id="providerModalTitle">添加模型提供商</h3><button class="modal-close" onclick="closeProviderModal()">×</button></div>
     <div class="modal-body">
       <input type="hidden" id="providerId">
-      <div class="field"><label>类型</label><div class="select-wrap" id="providerPresetWrap"><button type="button" class="cs-btn" id="providerPresetBtn" onclick="openCustomSelect('providerPreset')"><span class="cs-value">自定义</span><span class="cs-arrow">▾</span></button><ul class="cs-options" id="providerPresetList"></ul><select id="providerPreset" onchange="onProviderPresetChange()" style="display:none"><option value="">自定义</option></select></div></div>
       <div class="field"><label>名称 *</label><input type="text" id="providerName" placeholder="sensenova"></div>
+      <div class="field"><label>类型</label><select id="providerPreset" onchange="onProviderPresetChange()"><option value="">自定义</option></select></div>
       <div class="field"><label>Base URL</label><input type="text" id="providerBaseUrl" placeholder="https://token.sensenova.cn/v1" onchange="autoFetchModelsDebounced()"></div>
       <div class="field"><label>API Key</label><div class="key-wrap"><input type="password" id="providerKey" placeholder="sk-..." onchange="autoFetchModelsDebounced()"><button onclick="toggleKeyVisibility()">👁</button></div></div>
-      <div class="field"><label>备注(可选)</label><textarea id="providerNote" rows="2" placeholder="自定义说明，仅在仪表盘可见"></textarea></div>
+      <div class="field"><label>备注</label><textarea id="providerNote" rows="2" placeholder="自定义说明，仅在仪表盘可见"></textarea></div>
       <div class="field-row">
         <div class="field"><label>Temperature</label><input type="number" id="providerTemp" step="0.1" min="0" max="2" value="0.7"></div>
         <div class="field"><label>Max Tokens</label><input type="number" id="providerMaxTokens" min="1" max="128000" value="4096"></div>
       </div>
       <div class="model-manage-head">
-        <span class="conn-section-title">模型列表</span>
+        <span class="conn-section-title">选择模型（可搜索）</span>
+        <span style="display:flex;gap:8px">
+          <button class="action secondary" onclick="fetchProviderModels()">获取模型</button>
+          <button class="action secondary" onclick="testAllProviderModels()">测试所有模型</button>
+        </span>
       </div>
       <div class="wf-search-bar">
         <input type="text" id="providerModelSearch" placeholder="搜索模型 ID / Provider..." oninput="renderProviderModelList()">
       </div>
-      <div id="providerModelList" class="provider-model-list"></div>
       <div class="model-custom-row">
         <input type="text" id="providerCustomModelId" placeholder="未列出的模型 ID（手动输入）">
         <button class="action secondary" onclick="addProviderModel()">+ 添加</button>
       </div>
+      <div id="providerModelList" class="provider-model-list"></div>
     </div>
     <div class="modal-foot">
-      <button class="action" onclick="validateProvider()">验证连接</button>
+      <button class="action" onclick="closeProviderModal()">取消</button>
       <button class="action primary" onclick="saveProvider()">保存</button>
     </div>
   </div>
@@ -1118,6 +1124,19 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
     <div class="ch-filterbar skill-subtabs">
       <button class="ch-filter active" onclick="extSkillSubtab(this,'local')">本地技能</button>
       <button class="ch-filter" onclick="extSkillSubtab(this,'native')">内置技能</button>
+      <button class="ch-filter" onclick="extSkillSubtab(this,'market')">技能市场</button>
+    </div>
+    <div id="skillMarketBar" style="display:none;margin-bottom:10px">
+      <div style="display:flex;gap:8px">
+        <input type="text" id="skillMarketSearch" placeholder="搜索 SkillHub 海量技能（高德 / 知乎 / Notion / 股票...）" onkeydown="if(event.key==='Enter')searchSkillMarket()" style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit">
+        <button class="action secondary" onclick="searchSkillMarket()">🔍 搜索</button>
+        <button class="action secondary" onclick="renderSkillMarketCatalog()">📚 精选目录</button>
+      </div>
+      <div class="ch-filterbar" style="margin-top:8px">
+        <button class="ch-filter active" id="smFilterAll" onclick="setSkillMarketFilter(this,'all')">全部</button>
+        <button class="ch-filter" id="smFilterInstalled" onclick="setSkillMarketFilter(this,'installed')">已安装</button>
+        <button class="ch-filter" id="smFilterOfficial" onclick="setSkillMarketFilter(this,'official')">官方认证</button>
+      </div>
     </div>
     <div class="skill-grid" id="skillGrid"></div>
   </div>
@@ -1163,6 +1182,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
     <div class="setting-row"><div><div class="label">启用专家团</div><div class="desc">开启后自动启用任务委派（delegation）</div></div><div class="toggle" id="teamEnabledToggle" onclick="toggleTeam()"></div></div>
     <div class="team-head">
       <input type="text" id="teamName" placeholder="团队名称" value="我的团队">
+      <button class="ov-actbtn" onclick="buildTeam()" title="随机挑选不同行业的专家组建团队（每次结果不同）">🎲 随机组建</button>
       <button class="ov-actbtn start" onclick="buildAndUseTeam()">🚀 组建并使用专家团</button>
       <button class="ov-actbtn stop" onclick="clearTeam()">清空</button>
     </div>
@@ -1195,7 +1215,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
           </div>
         </section>
 
-        <!-- 连接器页 -->
+        <!-- connectors -->
         <section class="page" id="page-connectors">
           <div class="page-header"><h1>连接器</h1></div>
           <div class="page-body">
@@ -1272,6 +1292,17 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
       </div>
     </div>
   </div>
+  <!-- 技能市场配置 -->
+  <div id="marketCfgModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeMarketConfig()">
+    <div class="modal-panel" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-head"><h3 id="marketCfgTitle">技能配置</h3><button class="modal-close" onclick="closeMarketConfig()">×</button></div>
+      <div class="modal-body" id="marketCfgBody" style="overflow:auto"></div>
+      <div class="modal-foot">
+        <button class="action" onclick="closeMarketConfig()">取消</button>
+        <button class="action primary" onclick="saveMarketConfig()">保存配置</button>
+      </div>
+    </div>
+  </div>
   <!-- 工具配置 -->
   <div id="toolConfigModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeToolConfigModal()">
     <div class="modal-panel" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
@@ -1306,7 +1337,7 @@ body.theme-dark .gh-button:hover{background:#1e40af;border-color:#60a5fa}
   <!-- 统一小浮层 -->
   <div class="mini-popup" id="miniPopup">
     <div class="mini-popup-head"><span class="mini-popup-title" id="popupTitle">标题</span><span class="mini-popup-close" onclick="closeMini()">×</span></div>
-    <div class="mini-popup-search" id="popupSearchWrap"><input type="text" id="popupSearch" placeholder="搜索"></div>
+    <div class="mini-popup-search" id="popupSearchWrap"><input type="text" id="popupSearch" placeholder="搜索" oninput="filterMiniPopup()"></div>
     <div class="mini-popup-tabs" id="popupTabs" style="display:none"></div>
     <div class="mini-popup-body" id="popupBody"></div>
     <div class="mini-popup-foot" id="popupFoot" style="display:none"></div>
@@ -4973,6 +5004,368 @@ window.AO_WORKFLOW_PRESETS = [
         ]
       }
     ]
+  },
+  {
+    "key": "sp\\brainstorm-to-plan",
+    "file": "sp\\brainstorm-to-plan.yaml",
+    "name": "头脑风暴 → 实施计划（Superpowers）",
+    "description": "superpowers 方法论：先头脑风暴澄清需求产出设计规格，再拆成可执行的分步实施计划，想清楚再动手。",
+    "category": "superpowers",
+    "featured": true,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "requirement", "description": "想做的功能或需求（一句话即可）", "required": true },
+      { "name": "constraint", "description": "已知约束（技术栈/工期/预算，可留空）", "required": false }
+    ],
+    "steps": [
+      { "id": "brainstorm", "expert": "头脑风暴引导师（brainstorming）", "task": "这是自动化流水线，不要反问。针对需求「{{requirement}}」，约束：{{constraint}}，用头脑风暴法输出：\n1. 核心意图与要解决的真正问题\n2. 2-3 个可行方案及各自优劣\n3. 关键决策点与推荐选择\n4. 边界与不做什么\n产出《设计规格》。", "output": "spec", "depends_on": [] },
+      { "id": "risk", "expert": "风险评估师", "task": "基于设计规格找出最大风险与假设：\n{{spec}}\n输出：3 个最可能翻车的点 + 每个的验证手段。", "output": "risks", "depends_on": ["brainstorm"] },
+      { "id": "plan", "expert": "计划编写师（writing-plans）", "task": "把下面的规格拆成可执行的分步实施计划，并吸纳风险建议：\n{{spec}}\n\n风险：{{risks}}\n\n要求：每步含目标/产物/验证方式，标注依赖关系与可并行项，给出里程碑。", "output": null, "depends_on": ["brainstorm", "risk"] }
+    ]
+  },
+  {
+    "key": "sp\\tdd-feature-dev",
+    "file": "sp\\tdd-feature-dev.yaml",
+    "name": "TDD 测试驱动开发闭环（Superpowers）",
+    "description": "superpowers 方法论：先写失败测试，再写最小实现使其通过，最后重构。严格 TDD 红-绿-重构。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 1,
+    "inputs": [
+      { "name": "feature", "description": "要实现的功能点", "required": true },
+      { "name": "stack", "description": "技术栈与测试框架（如 Node+Jest / Python+pytest）", "required": true }
+    ],
+    "steps": [
+      { "id": "test_first", "expert": "TDD 测试先行工程师（test-driven-development）", "task": "这是自动化流水线，不要反问。针对功能「{{feature}}」（技术栈 {{stack}}），先设计并写出会失败的测试用例（红）：覆盖正常路径、边界、异常。只输出测试代码与用例说明，不写实现。", "output": "tests", "depends_on": [] },
+      { "id": "implement", "expert": "最小实现工程师", "task": "让下面的测试全部通过（绿），只写满足测试所需的最小实现，不多写：\n{{tests}}", "output": "code", "depends_on": ["test_first"] },
+      { "id": "refactor", "expert": "重构与验证工程师", "task": "在测试保护下重构下面的实现，消除重复、改善命名，并确认所有测试仍通过（重构）：\n{{code}}\n\n测试：{{tests}}\n输出重构后代码 + 验证结论。", "output": null, "depends_on": ["implement"] }
+    ]
+  },
+  {
+    "key": "sp\\systematic-debugging",
+    "file": "sp\\systematic-debugging.yaml",
+    "name": "四阶段系统化调试（Superpowers）",
+    "description": "superpowers 方法论：定位 → 分析 → 假设 → 修复，用证据说话的系统化调试，拒绝瞎猜。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 1,
+    "inputs": [
+      { "name": "symptom", "description": "故障现象（报错信息/异常行为/复现步骤）", "required": true },
+      { "name": "context", "description": "环境信息（系统/版本/近期改动，可留空）", "required": false }
+    ],
+    "steps": [
+      { "id": "locate", "expert": "系统化调试指挥官（systematic-debugging）", "task": "这是自动化流水线，不要反问。故障现象：{{symptom}}\n环境：{{context}}\n\n执行调试第一阶段【定位】：缩小故障范围，列出需要收集的证据与排查命令，给出最可能的 3 个故障区间。", "output": "locate", "depends_on": [] },
+      { "id": "hypothesize", "expert": "根因分析师", "task": "基于定位结果【分析 + 假设】：\n{{locate}}\n\n为每个可疑区间提出可证伪的假设，并给出验证每个假设的最小实验。按可能性排序。", "output": "hypothesis", "depends_on": ["locate"] },
+      { "id": "fix", "expert": "修复与回归工程师", "task": "针对最可能的根因假设给出修复方案与代码改动，并设计回归验证步骤确保问题不复现：\n{{hypothesis}}\n输出：修复 diff 思路 + 回归检查清单。", "output": null, "depends_on": ["hypothesize"] }
+    ]
+  },
+  {
+    "key": "sp\\code-review-loop",
+    "file": "sp\\code-review-loop.yaml",
+    "name": "代码审查请求与接收闭环（Superpowers）",
+    "description": "superpowers 方法论：派遣审查 → 严谨接收反馈 → 逐条修复 → 再验证，拒绝敷衍式改代码。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "code", "description": "待审查的代码或改动描述", "required": true },
+      { "name": "focus", "description": "重点关注（性能/安全/可读性，可留空=全面）", "required": false }
+    ],
+    "steps": [
+      { "id": "request_review", "expert": "代码审查请求者（requesting-code-review）", "task": "这是自动化流水线，不要反问。整理下面的改动为一份结构化的审查请求（改了什么/为什么/风险点/请重点看 {{focus}}）：\n{{code}}", "output": "review_request", "depends_on": [] },
+      { "id": "do_review", "expert": "严格代码审查员", "task": "对下面的审查请求执行审查，逐条给出问题（严重级/建议级）与证据：\n{{review_request}}", "output": "findings", "depends_on": ["request_review"] },
+      { "id": "receive_fix", "expert": "审查反馈接收者（receiving-code-review）", "task": "技术严谨地处理审查反馈，不敷衍、不盲从：对每条意见判断是否采纳并说明理由，采纳的给出修复代码：\n{{findings}}\n\n原改动：{{review_request}}", "output": null, "depends_on": ["do_review"] }
+    ]
+  },
+  {
+    "key": "sp\\parallel-agent-dev",
+    "file": "sp\\parallel-agent-dev.yaml",
+    "name": "并行子智能体开发（Superpowers）",
+    "description": "superpowers 方法论：把大任务拆给多个并行子智能体，各自产出后经两轮审查再汇总。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 4,
+    "inputs": [
+      { "name": "goal", "description": "总体目标（如：给系统加用户/订单/报表三个模块）", "required": true }
+    ],
+    "steps": [
+      { "id": "decompose", "expert": "任务拆解调度官（dispatching-parallel-agents）", "task": "这是自动化流水线，不要反问。把目标「{{goal}}」拆成 3-4 个相互独立、可并行执行的子任务，明确每个子任务的输入/输出/验收标准。", "output": "subtasks", "depends_on": [] },
+      { "id": "parallel_exec", "expert": "子智能体驱动开发者（subagent-driven-development）", "task": "为每个子任务各写一份可直接派发给子智能体的完整指令（含上下文、产物格式、验收标准），模拟并行执行并汇总各子任务产出：\n{{subtasks}}", "output": "merged", "depends_on": ["decompose"] },
+      { "id": "two_round_review", "expert": "两轮审查官", "task": "对汇总产出做两轮审查：第一轮查各子任务是否达标，第二轮查子任务之间的接口/一致性。给出问题清单与最终整合结论：\n{{merged}}", "output": null, "depends_on": ["parallel_exec"] }
+    ]
+  },
+  {
+    "key": "sp\\git-worktree-feature",
+    "file": "sp\\git-worktree-feature.yaml",
+    "name": "Git Worktree 隔离式特性开发（Superpowers）",
+    "description": "superpowers 方法论：用 git worktree 隔离开发特性，完成后按合并/PR/保留/丢弃四选一收尾。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 1,
+    "inputs": [
+      { "name": "feature", "description": "要开发的特性", "required": true },
+      { "name": "base_branch", "description": "基础分支（默认 main）", "required": false }
+    ],
+    "steps": [
+      { "id": "setup_worktree", "expert": "Git Worktree 工程师（using-git-worktrees）", "task": "这是自动化流水线，不要反问。为特性「{{feature}}」设计 git worktree 隔离开发方案：分支命名、worktree 路径、从 {{base_branch}} 拉出的命令序列、环境准备检查清单。", "output": "worktree_plan", "depends_on": [] },
+      { "id": "dev_commit", "expert": "中文提交规范工程师（chinese-commit-conventions）", "task": "在隔离 worktree 中规划特性开发的提交序列，遵循 Conventional Commits 中文适配规范（feat/fix/docs/refactor 等），每个提交小而原子：\n{{worktree_plan}}\n输出：提交计划表（每条含 type + 中文描述 + 范围）。", "output": "commits", "depends_on": ["setup_worktree"] },
+      { "id": "finish_branch", "expert": "分支收尾官（finishing-a-development-branch）", "task": "特性完成后给出收尾决策与操作：合并/PR/保留/丢弃 四选一的判断依据与各自命令，并附中文 PR 描述模板：\n{{commits}}", "output": null, "depends_on": ["dev_commit"] }
+    ]
+  },
+  {
+    "key": "sp\\verification-gate",
+    "file": "sp\\verification-gate.yaml",
+    "name": "完成前证据验证关（Superpowers）",
+    "description": "superpowers 方法论：声称完成前必须跑验证、拿证据。证据先行，杜绝“我觉得好了”。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "deliverable", "description": "已完成的工作成果（代码/功能/改动描述）", "required": true },
+      { "name": "acceptance", "description": "验收标准（可留空=自动推导）", "required": false }
+    ],
+    "steps": [
+      { "id": "criteria", "expert": "验收标准推导师", "task": "这是自动化流水线，不要反问。从成果与验收要求中推导出可机器验证的检查项清单（测试/构建/运行/边界）：\n成果：{{deliverable}}\n验收：{{acceptance}}", "output": "checklist", "depends_on": [] },
+      { "id": "gather_evidence", "expert": "证据采集官（verification-before-completion）", "task": "为每个检查项设计取证方式（命令/截图/日志），并模拟执行给出“证据或反证”：\n{{checklist}}\n\n成果：{{deliverable}}", "output": "evidence", "depends_on": ["criteria"] },
+      { "id": "verdict", "expert": "完成度裁决官", "task": "基于证据给出裁决：通过/有条件通过/不通过。不通过的列出缺口与补齐动作，绝不空口说完成：\n{{evidence}}", "output": null, "depends_on": ["gather_evidence"] }
+    ]
+  },
+  {
+    "key": "sp\\skill-authoring",
+    "file": "sp\\skill-authoring.yaml",
+    "name": "编写一个 AI Skill（Superpowers）",
+    "description": "superpowers 方法论：按 writing-skills 方法论设计、编写、验证一个新的 AI 编程 skill。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 1,
+    "inputs": [
+      { "name": "skill_idea", "description": "想让 AI 学会的技能（如：自动生成周报）", "required": true }
+    ],
+    "steps": [
+      { "id": "design_skill", "expert": "Skill 设计师（writing-skills）", "task": "这是自动化流水线，不要反问。为「{{skill_idea}}」设计 skill：触发场景、核心步骤、输入输出、失败边界。输出 skill 设计规格。", "output": "skill_spec", "depends_on": [] },
+      { "id": "write_skillmd", "expert": "SKILL.md 编写者", "task": "按设计规格写出完整的 SKILL.md（含 frontmatter name/description、何时使用、分步指令、示例）：\n{{skill_spec}}", "output": "skill_md", "depends_on": ["design_skill"] },
+      { "id": "meta_check", "expert": "元技能审核官（using-superpowers）", "task": "从“如何被 AI 正确调用”的角度审核下面的 SKILL.md：description 是否能被正确触发、步骤是否可执行、是否与其他 skill 冲突，给出修改建议与最终版：\n{{skill_md}}", "output": null, "depends_on": ["write_skillmd"] }
+    ]
+  },
+  {
+    "key": "sp\\mcp-server-build",
+    "file": "sp\\mcp-server-build.yaml",
+    "name": "MCP 服务器构建（Superpowers 中文原创）",
+    "description": "superpowers-zh 原创 skill：设计并构建一个生产级 MCP 工具服务器，扩展 AI 能力边界。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "capability", "description": "想让 AI 获得的能力（如：查询内部工单系统）", "required": true },
+      { "name": "transport", "description": "传输方式（stdio / SSE，默认 stdio）", "required": false }
+    ],
+    "steps": [
+      { "id": "tool_design", "expert": "MCP 工具设计师（mcp-builder）", "task": "这是自动化流水线，不要反问。为能力「{{capability}}」设计 MCP 服务器：暴露哪些 tools/resources/prompts、每个 tool 的入参出参 schema、错误处理策略。传输方式 {{transport}}。", "output": "mcp_design", "depends_on": [] },
+      { "id": "implement_server", "expert": "MCP 服务器实现工程师", "task": "按设计实现 MCP 服务器核心代码（工具注册、参数校验、调用转发、日志）：\n{{mcp_design}}\n输出可运行代码骨架 + 依赖清单。", "output": "mcp_code", "depends_on": ["tool_design"] },
+      { "id": "test_doc", "expert": "MCP 测试与文档工程师", "task": "为下面的 MCP 服务器写调用测试用例（含异常入参）与接入文档（如何注册到 Claude Code / Cursor / Hermes）：\n{{mcp_code}}", "output": null, "depends_on": ["implement_server"] }
+    ]
+  },
+  {
+    "key": "sp\\workflow-yaml-run",
+    "file": "sp\\workflow-yaml-run.yaml",
+    "name": "多角色 YAML 工作流编排（Superpowers 中文原创）",
+    "description": "superpowers-zh 原创 skill：设计一个多角色 YAML 工作流并模拟执行，验证编排合理性。",
+    "category": "superpowers",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "scenario", "description": "要编排的场景（如：竞品调研 → 写分析报告）", "required": true }
+    ],
+    "steps": [
+      { "id": "design_yaml", "expert": "工作流编排师（workflow-runner）", "task": "这是自动化流水线，不要反问。为场景「{{scenario}}」设计多角色 YAML 工作流：角色分工、DAG 依赖、每步输入输出变量、并行度。输出 YAML 全文。", "output": "yaml", "depends_on": [] },
+      { "id": "dry_run", "expert": "工作流执行官", "task": "模拟执行下面的 YAML 工作流，逐步推演每个角色的产出与变量流转，检查死锁/缺依赖/变量未定义问题：\n{{yaml}}", "output": "dry_run", "depends_on": ["design_yaml"] },
+      { "id": "optimize", "expert": "编排优化师", "task": "基于试跑结果优化工作流（修正问题、提高并行度、精简角色），输出最终 YAML + 优化说明：\n{{dry_run}}", "output": null, "depends_on": ["dry_run"] }
+    ]
+  },
+  {
+    "key": "wechat-miniprogram-fullstack",
+    "file": "wechat-miniprogram-fullstack.yaml",
+    "name": "微信小程序全栈交付（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：产品设计 → 小程序开发 → 微信支付/云开发 → 发布验收。",
+    "category": "中国特色",
+    "featured": true,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "app_idea", "description": "小程序要做什么（如：社区团购下单）", "required": true },
+      { "name": "backend", "description": "后端方案（云开发 / 自建服务器，默认云开发）", "required": false }
+    ],
+    "steps": [
+      { "id": "product_design", "expert": "agency_product_product_manager", "task": "这是自动化流水线，不要反问。为小程序「{{app_idea}}」输出产品方案：核心用户场景、页面清单与信息架构、MVP 范围裁剪。", "output": "prd", "depends_on": [] },
+      { "id": "miniprogram_dev", "expert": "微信小程序开发者（WXML/WXSS/云开发）", "task": "按产品方案实现小程序核心代码（页面结构 WXML、样式 WXSS、关键逻辑 JS），后端采用 {{backend}}：\n{{prd}}\n输出核心页面代码 + 云函数/接口设计。", "output": "mp_code", "depends_on": ["product_design"] },
+      { "id": "payment", "expert": "微信支付与交易工程师", "task": "为下面的小程序设计微信支付与订单交易闭环（下单/支付回调/退款/对账），给出关键代码与防坑要点：\n{{mp_code}}", "output": "payment", "depends_on": ["miniprogram_dev"] },
+      { "id": "release", "expert": "小程序发布验收官", "task": "给出发布前检查清单（类目资质、隐私协议、体验版测试、审核常见被拒点）与上线步骤：\n{{payment}}", "output": null, "depends_on": ["payment"] }
+    ]
+  },
+  {
+    "key": "crossborder-ecommerce-launch",
+    "file": "crossborder-ecommerce-launch.yaml",
+    "name": "跨境电商新品出海（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：市场调研 → Listing 优化 → 海外仓/物流 → 广告投放。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "product", "description": "要出海的产品", "required": true },
+      { "name": "market", "description": "目标市场与平台（如 Amazon 美国站 / Shopee 东南亚）", "required": true }
+    ],
+    "steps": [
+      { "id": "market_research", "expert": "跨境电商运营专家（Amazon/Shopee/Lazada）", "task": "这是自动化流水线，不要反问。调研产品「{{product}}」在 {{market}} 的市场：竞品价格带、差异化卖点、合规与认证要求、预估利润空间。", "output": "research", "depends_on": [] },
+      { "id": "listing", "expert": "Listing 优化师", "task": "基于调研为产品写高转化 Listing（标题/五点/描述/A+ 思路/关键词），符合平台规则：\n{{research}}", "output": "listing", "depends_on": ["market_research"] },
+      { "id": "logistics", "expert": "海外仓与物流规划师", "task": "设计头程 + 海外仓 + 尾程物流方案与备货节奏，控制滞销与断货风险：\n{{research}}", "output": "logistics", "depends_on": ["market_research"] },
+      { "id": "ads", "expert": "广告投放与增长官", "task": "制定上架后 30 天广告与推广节奏（自动/手动广告、Coupon、站外引流），给出预算分配与关键指标：\n{{listing}}\n\n物流：{{logistics}}", "output": null, "depends_on": ["listing", "logistics"] }
+    ]
+  },
+  {
+    "key": "gov-tog-bidding",
+    "file": "gov-tog-bidding.yaml",
+    "name": "政务 ToG 方案与投标（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：政策解读 → 方案设计 → 投标文件 → 合规审查。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "project", "description": "政务项目（如：智慧园区一网通办）", "required": true },
+      { "name": "region", "description": "地区/预算级别（可留空）", "required": false }
+    ],
+    "steps": [
+      { "id": "policy", "expert": "政务 ToG 解决方案架构师", "task": "这是自动化流水线，不要反问。解读项目「{{project}}」（{{region}}）涉及的政策依据、建设标准与采购方式，指出甲方真实关切。", "output": "policy", "depends_on": [] },
+      { "id": "solution", "expert": "信创与等保方案设计师", "task": "设计满足信创国产化与等保要求的技术方案（架构、选型、安全、运维），并控制成本：\n{{policy}}", "output": "solution", "depends_on": ["policy"] },
+      { "id": "bid_doc", "expert": "投标文件编写师", "task": "按下面的方案编写投标文件核心章节（技术方案、实施计划、服务承诺、评分点应答）：\n{{solution}}", "output": "bid", "depends_on": ["solution"] },
+      { "id": "compliance", "expert": "投标合规审查官", "task": "审查投标文件的废标风险（资质、格式、星号条款、报价），给出整改清单：\n{{bid}}", "output": null, "depends_on": ["bid_doc"] }
+    ]
+  },
+  {
+    "key": "medical-compliance-audit",
+    "file": "medical-compliance-audit.yaml",
+    "name": "医疗产品合规审查（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：法规梳理 → 产品比对 → 风险评估 → 整改方案。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "product_desc", "description": "医疗产品/服务描述（如：互联网问诊小程序）", "required": true }
+    ],
+    "steps": [
+      { "id": "regulations", "expert": "医疗合规法规专家", "task": "这是自动化流水线，不要反问。梳理「{{product_desc}}」适用的法规与监管要求（医疗器械分类、互联网诊疗、数据与隐私、广告法）。", "output": "regs", "depends_on": [] },
+      { "id": "gap_analysis", "expert": "合规差距分析师", "task": "将产品现状与法规要求逐项比对，找出不合规点与灰色地带：\n{{regs}}\n\n产品：{{product_desc}}", "output": "gaps", "depends_on": ["regulations"] },
+      { "id": "risk_plan", "expert": "风险评估与整改官", "task": "对不合规点做风险分级（高/中/低），给出整改优先级与具体措施、所需资质与时间表：\n{{gaps}}", "output": null, "depends_on": ["gap_analysis"] }
+    ]
+  },
+  {
+    "key": "qt-industrial-hmi",
+    "file": "qt-industrial-hmi.yaml",
+    "name": "Qt 工业上位机 HMI 开发（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：需求分析 → 架构设计 → 界面开发 → Modbus/串口联调。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "device", "description": "上位机要对接的设备/仪器（如：PLC 温控炉）", "required": true },
+      { "name": "protocol", "description": "通信协议（Modbus RTU/TCP、CAN，默认 Modbus）", "required": false }
+    ],
+    "steps": [
+      { "id": "requirement", "expert": "上位机需求分析师", "task": "这是自动化流水线，不要反问。分析「{{device}}」上位机 HMI 需求：监控画面、参数配置、报警、数据记录、权限。", "output": "req", "depends_on": [] },
+      { "id": "architecture", "expert": "Qt/QML 上位机架构师", "task": "设计 Qt 上位机架构（界面层/业务层/通信层、QSerialPort 或网络、实时数据模型、QChart 可视化）：\n{{req}}", "output": "arch", "depends_on": ["requirement"] },
+      { "id": "comm", "expert": "Modbus/CAN 通信工程师", "task": "实现与下位机的 {{protocol}} 通信（报文解析、轮询、重连、字节序/CRC 防坑），给出核心代码：\n{{arch}}", "output": "comm", "depends_on": ["architecture"] },
+      { "id": "hmi_dev", "expert": "HMI 界面与联调工程师", "task": "完成主界面与实时曲线开发并与通信层联调，给出联调检查清单（抓包、模拟从站、断线重连测试）：\n{{comm}}", "output": null, "depends_on": ["comm"] }
+    ]
+  },
+  {
+    "key": "iot-e2e-solution",
+    "file": "iot-e2e-solution.yaml",
+    "name": "物联网端到端方案（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：设备层 → 边缘层 → 平台层 → 应用层的 IoT 全链路设计。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "scene", "description": "物联网场景（如：智慧农业大棚监测）", "required": true },
+      { "name": "scale", "description": "设备规模与现场环境（可留空）", "required": false }
+    ],
+    "steps": [
+      { "id": "device_layer", "expert": "IoT 方案架构师（MQTT/CoAP/边缘计算）", "task": "这是自动化流水线，不要反问。为场景「{{scene}}」（{{scale}}）设计设备层：传感器选型、MCU/模组、功耗与供电、接入协议。", "output": "device", "depends_on": [] },
+      { "id": "edge_platform", "expert": "边缘计算与设备管理工程师", "task": "设计边缘网关与设备管理（MQTT 主题规划、断网续传、OTA、设备影子）：\n{{device}}", "output": "edge", "depends_on": ["device_layer"] },
+      { "id": "cloud_app", "expert": "云平台与应用工程师", "task": "设计云平台数据接入、存储、规则引擎与应用层（看板/告警/反控），选型国内云 IoT 服务：\n{{edge}}", "output": "cloud", "depends_on": ["edge_platform"] },
+      { "id": "cost_plan", "expert": "IoT 成本与实施规划师", "task": "汇总全链路方案，核算单设备成本与规模化成本曲线，给出分期实施路线图：\n{{cloud}}", "output": null, "depends_on": ["cloud_app"] }
+    ]
+  },
+  {
+    "key": "feishu-dingtalk-automation",
+    "file": "feishu-dingtalk-automation.yaml",
+    "name": "飞书/钉钉办公自动化集成（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：机器人设计 → 审批流 → 多维表格 → 集成测试。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "automation_goal", "description": "要自动化的办公流程（如：报销审批自动推送）", "required": true },
+      { "name": "platform", "description": "飞书 / 钉钉（默认飞书）", "required": false }
+    ],
+    "steps": [
+      { "id": "bot_design", "expert": "飞书/钉钉集成开发工程师", "task": "这是自动化流水线，不要反问。为「{{automation_goal}}」设计 {{platform}} 机器人：交互方式、消息卡片、事件订阅、权限范围。", "output": "bot", "depends_on": [] },
+      { "id": "approval_flow", "expert": "审批流与连接器工程师", "task": "设计审批流与数据流转（审批节点、条件分支、回调、与多维表格/数据库同步）：\n{{bot}}", "output": "flow", "depends_on": ["bot_design"] },
+      { "id": "integration_test", "expert": "集成测试与上线官", "task": "给出集成测试用例（正常/驳回/超时/重复提交）与上线检查清单（权限、灰度、监控）：\n{{flow}}", "output": null, "depends_on": ["approval_flow"] }
+    ]
+  },
+  {
+    "key": "livestream-ecommerce-fullcase",
+    "file": "livestream-ecommerce-fullcase.yaml",
+    "name": "直播电商全案运营（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：选品排品 → 直播脚本 → 千川投放 → 复盘优化。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "category", "description": "直播品类（如：美妆/农产品/服装）", "required": true },
+      { "name": "platform", "description": "直播平台（抖音/快手/视频号，默认抖音）", "required": false }
+    ],
+    "steps": [
+      { "id": "selection", "expert": "直播电商主播教练（选品排品/话术/千川）", "task": "这是自动化流水线，不要反问。为 {{platform}} 直播「{{category}}」设计选品与排品策略（引流款/利润款/福利款比例、过款节奏）。", "output": "selection", "depends_on": [] },
+      { "id": "script", "expert": "直播脚本与话术编剧", "task": "编写单场直播脚本（开场留人、产品讲解、逼单话术、互动福袋、转款节奏）：\n{{selection}}", "output": "script", "depends_on": ["selection"] },
+      { "id": "qianchuan", "expert": "千川投放优化师", "task": "制定千川投放计划（预算、人群包、出价、直播间加热时机）与 ROI 监控指标：\n{{selection}}", "output": "ads", "depends_on": ["selection"] },
+      { "id": "review", "expert": "直播复盘分析师", "task": "给出直播复盘框架（在线人数/停留/转化/UV 价值/GPM）与下一场优化动作清单：\n{{script}}\n\n投放：{{ads}}", "output": null, "depends_on": ["script", "qianchuan"] }
+    ]
+  },
+  {
+    "key": "private-domain-scrm-growth",
+    "file": "private-domain-scrm-growth.yaml",
+    "name": "私域 SCRM 增长体系（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：企微 SCRM 搭建 → 社群运营 → 用户生命周期 → 复购增长。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "business", "description": "业务类型（如：母婴零售/教培/餐饮连锁）", "required": true }
+    ],
+    "steps": [
+      { "id": "scrm_setup", "expert": "私域流量运营师（企微 SCRM/社群/生命周期）", "task": "这是自动化流水线，不要反问。为「{{business}}」设计私域引流与 SCRM 搭建方案（包裹卡/门店/短信引流路径、企微号矩阵、标签体系）。", "output": "scrm", "depends_on": [] },
+      { "id": "community_ops", "expert": "社群运营官", "task": "设计社群分层与日常运营 SOP（内容日历、活动节奏、KOC 培养、防广告与沉默激活）：\n{{scrm}}", "output": "community", "depends_on": ["scrm_setup"] },
+      { "id": "lifecycle", "expert": "用户生命周期与复购增长官", "task": "设计用户生命周期运营（新客首单、复购召回、会员体系、1v1 私聊触达时机），给出关键指标与自动化触达方案：\n{{community}}", "output": null, "depends_on": ["community_ops"] }
+    ]
+  },
+  {
+    "key": "embedded-fpga-codesign",
+    "file": "embedded-fpga-codesign.yaml",
+    "name": "嵌入式/FPGA 软硬件协同设计（agency 中国原创）",
+    "description": "agency-agents-zh 中国原创场景：固件架构 → 驱动/逻辑开发 → 时序收敛 → 软硬件联调。",
+    "category": "中国特色",
+    "featured": false,
+    "concurrency": 2,
+    "inputs": [
+      { "name": "hw_target", "description": "硬件目标（如：STM32 采集板 / Xilinx FPGA 加速卡）", "required": true },
+      { "name": "function", "description": "核心功能（如：多通道 ADC 采集 + DMA 上传）", "required": true }
+    ],
+    "steps": [
+      { "id": "fw_arch", "expert": "嵌入式固件工程师（RTOS/外设驱动/低功耗）", "task": "这是自动化流水线，不要反问。为「{{hw_target}}」设计固件架构实现「{{function}}」：RTOS 任务划分、外设驱动、中断/DMA、低功耗策略。", "output": "fw", "depends_on": [] },
+      { "id": "logic_dev", "expert": "FPGA/ASIC 数字设计工程师（Verilog/时序收敛/AXI）", "task": "设计关键数字逻辑模块（Verilog 实现、状态机、AXI 接口、时钟域处理）：\n{{fw}}", "output": "logic", "depends_on": ["fw_arch"] },
+      { "id": "timing", "expert": "时序收敛与综合工程师", "task": "分析时序约束与收敛策略（SDC、流水线、跨时钟域），给出综合报告检查要点：\n{{logic}}", "output": "timing", "depends_on": ["logic_dev"] },
+      { "id": "codesign_debug", "expert": "软硬件协同调试工程师", "task": "制定软硬件联调与验证方案（信号发生器/逻辑分析仪、ILA 抓波形、分模块排查清单）：\n{{timing}}", "output": null, "depends_on": ["timing"] }
+    ]
   }
 ];
 
@@ -5666,11 +6059,9 @@ function renderRail(){
       if(aid !== 'default' && !getAgent(aid)) aid = 'default';
       return aid === agent.id;
     }).map(function(s){ return s.id; });
-      html += '<div class="agent-group"><div class="agent-row'+(open?' expanded':'')+(isActiveAgent?' active':'')+'" onclick="toggleAgent(\''+esc(agent.id)+'\')">'+
+    html += '<div class="agent-group"><div class="agent-row'+(open?' expanded':'')+(isActiveAgent?' active':'')+'" onclick="toggleAgent(\''+esc(agent.id)+'\')">'+
       '<span class="chevron">▶</span><span class="avatar">'+esc(agent.icon||'🤖')+'</span>'+
-      '<span class="info"><div class="name">'+esc(agent.name)+'</div><div class="desc">'+(isActiveAgent&&agent.id==='default'?'默认主力助手':'')+'</div></span>'+
-      (agent.id!=='default'?'<button class="agent-del" title="删除该角色所有会话（不可撤销）" onclick="delAgent(\''+esc(agent.id)+'\',event)">🗑</button>':'')+
-      '</div>'+
+      '<span class="info"><div class="name">'+esc(agent.name)+'</div><div class="desc">'+(isActiveAgent&&agent.id==='default'?'默认主力助手':'')+'</div></span></div>'+
       '<div class="session-list'+(open?' open':'')+'" id="sess-'+esc(agent.id)+'">';
     if(sessIds.length){
       html += sessIds.map(function(sid){
@@ -5722,46 +6113,6 @@ function delSession(aid, sid, e){
     })
     .catch(function(){ toast('删除会话失败'); });
 }
-/* 删除整个角色（含该角色下所有子会话）。先弹确认。 */
-function delAgent(agentId, e){
-  if(e) e.stopPropagation();
-  if(agentId === 'default'){ toast('默认助手不能删除'); return; }
-  var agent = getAgent(agentId);
-  var sessIds = _sessions.filter(function(s){ return (_sessionAgent[s.id] || 'default') === agentId; }).map(function(s){ return s.id; });
-  if(!sessIds.length){
-    if(!confirm('角色「'+(agent?agent.name:agentId)+'」下无会话，是否仍删除该角色？')) return;
-    finishDelAgent(agentId, []);
-    return;
-  }
-  if(!confirm('确定删除角色「'+(agent?agent.name:agentId)+'」及其所有会话？\n\n该角色下共有 '+sessIds.length+' 个会话将被删除（不影响其他角色）。\n\n此操作不可撤销！')) return;
-  var pending = sessIds.length;
-  sessIds.forEach(function(sid){
-    fetch(apiUrl('/api/sessions/'+encodeURIComponent(sid)), { method:'DELETE', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
-      .then(function(){ if(--pending===0) finishDelAgent(agentId, sessIds); })
-      .catch(function(){ if(--pending===0) finishDelAgent(agentId, sessIds); });
-  });
-}
-function finishDelAgent(agentId, sessIds){
-  _sessions = _sessions.filter(function(s){ return sessIds.indexOf(s.id)<0; });
-  sessIds.forEach(function(sid){
-    delete _sessionAgent[sid];
-    var ti = _openTabs.indexOf(sid);
-    if(ti!==-1) _openTabs.splice(ti,1);
-    delete _tabDrafts[sid]; delete _tabStreaming[sid];
-    var ds = _chatHistory[sid]; if(ds) { delete _chatHistory[sid]; }
-  });
-  persistSessionAgent(); persistTabs();
-  if(agentId !== 'default'){
-    _agents = _agents.filter(function(a){ return a.id !== agentId; });
-    delete _agentPicked[agentId];
-    try { localStorage.removeItem('hermes_rail_open_'+agentId); } catch(e){}
-    if(currentAgent === agentId) currentAgent = 'default';
-    try { if(_cfg.extensions && _cfg.extensions.session_agent) { delete _cfg.extensions.session_agent; _saveConfigDebounced(); } } catch(e){}
-  }
-  renderSessionTabs(); renderRail(); updateHeader();
-  var ag = getAgent(agentId);
-  toast('已删除角色「' + (ag?ag.name:agentId) + '」及其所有会话');
-}
 function newSession(){
   newTab();
 }
@@ -5798,7 +6149,7 @@ function splitContent(content){
 function msgHTML(m){
   var parts = splitContent(m.content);
   var text = parts.text, imgs = parts.images;
-  var imgHtml = imgs.map(function(u){ return '<img src="'+esc(u)+'" style="max-width:200px;max-height:200px;border-radius:8px;display:block;margin-top:6px">'; }).join('');
+  var imgHtml = imgs.map(function(u){ return '<img src="'+esc(u)+'" style="max-width:200px;max-height:200px;border-radius:var(--radius-md);display:block;margin-top:6px">'; }).join('');
   if(m.role === 'user'){
     return '<div class="msg user"><div class="msg-bubble">'+escapeHtml(text).replace(/\n/g,'<br>')+imgHtml+'</div><div class="msg-meta">你 · '+fmtDateTime(m.ts||m.created_at||Date.now())+'</div></div>';
   }
@@ -5925,17 +6276,47 @@ function sendChat(){
 function injectExpertSystem(sys){
   if(!sys) sys='';
   var ext=_cfg.extensions||{};
+  // ⓪ 工作流最高优先：启用且有步骤时，注入 DAG 编排上下文，让 AI 按工作流执行
+  var wf=ext.workflow;
+  if(wf && wf.enabled && wf.steps && wf.steps.length){
+    var wl=['', '【工作流 · DAG 编排模式】'];
+    wl.push('工作流名称：'+(wf.name||'未命名'));
+    if(wf.description) wl.push('描述：'+wf.description);
+    wl.push('并发上限：'+(wf.concurrency||2));
+    if(wf.inputs && wf.inputs.length){
+      wl.push('输入变量：');
+      wf.inputs.forEach(function(inp){ wl.push('  - '+inp.name+'：'+(inp.description||'')+(inp.required?'（必填）':'')); });
+    }
+    wl.push('');
+    wl.push('执行步骤（按依赖顺序）：');
+    wf.steps.forEach(function(s,i){
+      var dep=(s.depends_on&&s.depends_on.length)?'（依赖：'+s.depends_on.join(', ')+'）':'';
+      wl.push('  '+(i+1)+'. ['+s.id+'] 专家='+(s.expert||'自动分配')+'  输出变量='+(s.output||'无')+' '+dep);
+      if(s.task) wl.push('     任务：'+s.task.replace(/\n/g,'\n     '));
+    });
+    wl.push('');
+    wl.push('请严格按照上述 DAG 工作流执行：将用户消息视为输入变量，按依赖顺序逐步派发子智能体完成各步骤，最终汇总所有步骤输出给出完整结果。使用任务委派（delegation）工具并行/顺序调度各专家。');
+    return sys + '\n' + wl.join('\n');
+  }
   // ① 专家团优先
   if(ext.team_enabled && ext.team && ext.team.length){
-    var lines=['', '【专家团 · 多智能体协作模式】'];
+    var lines=['', '【专家团 · 多智能体协作模式（必须通过任务委派 delegate_task 执行）】'];
+    lines.push('你现在的身份是「主协调智能体」，负责拆解任务、委派专家、汇总结果。你手下有以下专家成员：');
+    lines.push('');
     ext.team.forEach(function(m){
       var ap=(window.AGENCY_PERSONAS||[]).find(function(p){ return p.id===m.id; });
       var pm = ap?ap.prompt:'';
-      lines.push('— 成员：'+(m.name||m.id)+' —');
+      lines.push('◆ 成员：'+(m.name||m.id)+(m.dept?'（'+m.dept+'）':''));
       if(pm) lines.push(pm);
+      lines.push('');
     });
-    lines.push('');
-    lines.push('请以多智能体协作方式工作：依据上述各成员专长，将用户任务分派给合适的成员作为子任务并行/顺序处理，并汇总各方结果给出最终答案。');
+    lines.push('═══ 强制执行规则（不可违反）═══');
+    lines.push('1. 收到用户任务后，先将其拆解为若干子任务，并判断哪些专家成员与子任务相关。');
+    lines.push('2. 对每个相关成员，必须调用 delegate_task（任务委派）工具真实地派发一个子智能体去执行，严禁自己“假装”成专家直接作答。每次 delegate_task 的指令开头必须写明：“你现在扮演【成员名】，其专长如下：<该成员的上述人设>。请完成以下子任务：<具体子任务内容>”。');
+    lines.push('3. 调用 delegate_task 时 tasks 参数必须是合法的 JSON 数组（array）：多个任务对象之间必须用英文逗号分隔，中括号 [] 与花括号 {} 必须配对完整，字符串必须用英文双引号包裹，不要遗漏逗号或括号，确保能被 JSON 解析器正确解析（否则会报 “Expecting \',\' delimiter” 错误导致委派失败）。');
+    lines.push('4. 与任务无关的成员可以不派发；但至少派发 1 个子任务。能并行就并行派发。');
+    lines.push('5. 等所有 delegate_task 子智能体返回结果后，你作为主协调者汇总、去重、整合各方产出，给出结构化的最终答案，并注明各部分来自哪位专家。');
+    lines.push('6. 再次强调：不许跳过 delegate_task 直接以单人口吻回答。是否真正调用了 delegate_task 是判断你是否在执行专家团协作的唯一标准。');
     return sys + '\n' + lines.join('\n');
   }
   // ② 单专家（追加，不替换 persona）
@@ -6291,7 +6672,7 @@ function buildMiniData(){
     model:{ title:'选择模型', groups:modelGroups },
     connector:{ title:'选择连接器', items:connectors, foot:'管理连接器' },
     skill:{ title:'选择技能', items:skillItems },
-    expert:{ title:'选择专家', items: expertsList().map(function(e){ return { t:e.name, d:e.dept||'', ico:e.icon||'🎯', active:false }; }) },
+    expert:{ title:'选择专家', items: expertsList().map(function(e){ return { id:e.id, t:e.name, d:e.dept||'', ico:e.icon||'🎯', active:false }; }) },
     quick:{ title:'快捷指令', search:false, groups:PV.quickGroups }
   };
 }
@@ -6305,12 +6686,12 @@ function expertsList(){
 }
 /* 动态加载 agency-agents-zh 专家库（Issue #1）。
    打包后的 app 中 js/personas_library.js 可能因浏览器缓存/加载时序失败，这里兜底注入并回调重渲染。
-   带缓存破坏(cache-bust)与多次重试，确保 268 位专家必然加载（不再停留 8 个样例）。 */
+   采用版本号缓存键（替代 Date.now() 强制每次重下载）+ 多次重试，确保 268 位专家必然加载。 */
 function ensurePersonasLibrary(cb, attempt){
   if(window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length){ if(cb) cb(); return; }
   attempt = attempt || 1;
   var s = document.createElement('script');
-  s.src = 'js/personas_library.js?v=' + Date.now() + '&t=' + attempt;
+  s.src = 'js/personas_library.js?v=' + (window.__APP_VER__ || 'app') + '&t=' + attempt;
   s.onload = function(){ if(cb) cb(); };
   s.onerror = function(){
     if(attempt < 4){ setTimeout(function(){ ensurePersonasLibrary(cb, attempt + 1); }, 400 * attempt); }
@@ -6336,7 +6717,7 @@ function openMini(btn, key){
   document.getElementById('popupTitle').textContent=d.title;
   var sw=document.getElementById('popupSearchWrap');
   sw.style.display = d.search===false ? 'none':'block';
-  if(d.search!==false) document.getElementById('popupSearch').placeholder='搜索'+d.title.replace('选择','');
+  if(d.search!==false){ var _ps=document.getElementById('popupSearch'); _ps.placeholder='搜索'+d.title.replace('选择',''); _ps.value=''; }
   var foot=document.getElementById('popupFoot');
   if(d.foot){ foot.style.display='block'; foot.textContent=d.foot; foot.onclick=function(){ closeMini(); switchPage('connectors'); }; }
   else foot.style.display='none';
@@ -6346,7 +6727,8 @@ function openMini(btn, key){
     tabs.style.display='flex';
     tabs.innerHTML='<div class="mini-popup-tab '+(_expertPickerTab==='single'?'active':'')+'" onclick="switchExpertPickerTab(\'single\')">专家</div>'+
       '<div class="mini-popup-tab '+(_expertPickerTab==='team'?'active':'')+'" onclick="switchExpertPickerTab(\'team\')">专家团</div>'+
-      '<div class="mini-popup-tab '+(_expertPickerTab==='workflow'?'active':'')+'" onclick="switchExpertPickerTab(\'workflow\')">工作流</div>';
+      '<div class="mini-popup-tab '+(_expertPickerTab==='workflow'?'active':'')+'" onclick="switchExpertPickerTab(\'workflow\')">工作流</div>'+
+      '<div class="mini-popup-tab '+(_expertPickerTab==='persona'?'active':'')+'" onclick="switchExpertPickerTab(\'persona\')">智能体</div>';
   } else {
     tabs.style.display='none'; tabs.innerHTML='';
   }
@@ -6358,9 +6740,9 @@ function openMini(btn, key){
 }
 function switchExpertPickerTab(tab){
   _expertPickerTab=tab;
+  var tabNames={single:'专家',team:'专家团',workflow:'工作流',persona:'智能体'};
   var tabs=document.getElementById('popupTabs');
-  var labels={single:'专家',team:'专家团',workflow:'工作流'};
-  Array.from(tabs.children).forEach(function(el){ el.classList.toggle('active', el.textContent===labels[tab]); });
+  Array.from(tabs.children).forEach(function(el){ el.classList.toggle('active', el.textContent===tabNames[tab]); });
   document.getElementById('popupBody').innerHTML=buildMiniPopupBody('expert', buildMiniData().expert);
 }
 function buildMiniPopupBody(key,d){
@@ -6408,36 +6790,34 @@ function buildMiniPopupBody(key,d){
           '</button></div>';
       }
     } else if(_expertPickerTab==='workflow'){
-      // 工作流 tab：仅显示预设列表（已应用的标 active），避免与下方预设重复
-      var wf=_cfg.extensions.workflow||{name:'',enabled:false,steps:[]};
-      var presets=(window.AO_WORKFLOW_PRESETS||[]).slice(0,12);
-      body='<div class="empty-state" style="padding:10px 12px;font-size:12px;color:var(--text3);text-align:left;border-bottom:1px solid var(--border);margin-bottom:6px;background:var(--bg2);border-radius:6px">';
-      if(wf.enabled && wf.name){
-        body+='<span style="color:var(--accent);font-weight:600">当前：'+esc(wf.name)+'</span> · '+((wf.steps||[]).length)+' 个步骤 · 发送消息即按 DAG 顺序执行';
+      var presets=window.AO_WORKFLOW_PRESETS||[];
+      var curKey=(_cfg.extensions.workflow&&_cfg.extensions.workflow.key)||'';
+      var curEnabled=!!(_cfg.extensions.workflow&&_cfg.extensions.workflow.enabled&&_cfg.extensions.workflow.steps&&_cfg.extensions.workflow.steps.length);
+      if(!presets.length){
+        body='<div class="pick-list"><div class="empty-state" style="padding:20px 0;text-align:center;color:var(--text3)">暂无工作流模板。<br>请在「扩展→工作流」页面添加。</div></div>';
       } else {
-        body+='点下方模板一键应用当前工作流，或到「扩展 → 工作流」自定义 DAG。';
+        body='<div class="pick-list">';
+        presets.forEach(function(p){
+          var isActive=(curEnabled&&p.key===curKey);
+          body+='<div class="pop-item'+(isActive?' active':'')+'" data-key="'+esc(p.key)+'" onclick="pickWorkflowFromMini(\''+esc(p.key).replace(/'/g,"\\'")+'\')">' +
+            '<div class="ico">🎛️</div><div class="txt"><div class="t">'+esc(p.name)+'</div><div class="d">'+esc(p.description||'')+(isActive?' · 当前已启用':'')+'</div></div><div class="check"></div></div>';
+        });
+        body+='</div>';
+        if(curEnabled){
+          body+='<div class="team-cta-wrap"><button class="team-cta on" onclick="clearWorkflowFromMini()">'+
+            '<span class="ico">✓</span><span>已启用工作流：'+esc((_cfg.extensions.workflow||{}).name||'')+'</span><span class="hint">点击停用</span></button></div>';
+        }
       }
-      body+='</div>';
-      body+='<div class="pick-list">';
-      // 预设模板列表（已应用的标 active）
-      presets.forEach(function(p){
-        var applied = p.key===wf.key;
-        body+='<div class="pop-item'+(applied?' active':'')+'" data-wfkey="'+esc(p.key)+'" onclick="pickItem(\'workflow\',this)">'+
-          '<div class="ico">🎛️</div>'+
-          '<div class="txt"><div class="t">'+esc(p.name)+'</div><div class="d">'+esc(p.category||'通用')+(applied?' · 已应用':'')+'</div></div>'+
-          '<div class="check"></div>'+
-          '</div>';
+    } else if(_expertPickerTab==='persona'){
+      var personas=allPersonas();
+      body='<div class="pick-list">';
+      Object.keys(personas).forEach(function(k){
+        var p=personas[k];
+        var isActive=(_persona===k);
+        body+='<div class="pop-item'+(isActive?' active':'')+'" data-id="'+esc(k)+'" onclick="pickPersonaFromMini(\''+esc(k).replace(/'/g,"\\'")+'\')">' +
+          '<div class="ico">'+(p.emoji||'🤖')+'</div><div class="txt"><div class="t">'+esc(p.label||k)+'</div><div class="d">'+esc((p.prompt||'').slice(0,40))+(isActive?' · 当前角色':'')+'</div></div><div class="check"></div></div>';
       });
       body+='</div>';
-      body+='<div class="team-cta-wrap">'+
-        '<button class="team-cta '+(wf.enabled?'on':'off')+'" onclick="pickWorkflowAndSend()">'+
-        '<span class="ico">'+(wf.enabled?'✓':'⚙')+'</span>'+
-        '<span>'+(wf.enabled?'工作流已激活（发送消息触发）':'应用当前工作流')+'</span>'+
-        '<span class="hint">'+(wf.enabled?'自动按 DAG 顺序执行':'点选预设后开启')+'</span>'+
-        '</button>'+
-        '<button class="team-cta" style="margin-top:6px" onclick="openWorkflowEditor()">'+
-        '<span class="ico">⚙</span><span>打开工作流编排器</span><span class="hint">自定义 DAG</span>'+
-        '</button></div>';
     } else {
       body='<div class="pick-list">';
       (d.items||[]).forEach(function(it){
@@ -6457,6 +6837,25 @@ function buildMiniPopupBody(key,d){
     body+='</div>';
   }
   return body;
+}
+/* 迷你弹窗通用搜索过滤：模型/专家/技能/连接器/快捷指令条目按文本实时筛选。
+   模型多达上百个时避免逐个翻找；过滤后空分组连同组头一起隐藏。 */
+function filterMiniPopup(){
+  var ps=document.getElementById('popupSearch'); if(!ps) return;
+  var q=(ps.value||'').trim().toLowerCase();
+  var body=document.getElementById('popupBody'); if(!body) return;
+  body.querySelectorAll('.pop-item').forEach(function(it){
+    var txt=((it.textContent||'')+' '+(it.getAttribute('data-provider')||'')+' '+(it.getAttribute('data-model')||'')).toLowerCase();
+    it.style.display = (!q || txt.indexOf(q)>=0) ? '' : 'none';
+  });
+  body.querySelectorAll('.pick-group').forEach(function(g){
+    var any=false; g.querySelectorAll('.pop-item').forEach(function(it){ if(it.style.display!=='none') any=true; });
+    g.style.display = (!q || any) ? '' : 'none';
+  });
+  body.querySelectorAll('.cmd-cell').forEach(function(c){
+    var txt=(c.textContent||'').toLowerCase();
+    c.style.display = (!q || txt.indexOf(q)>=0) ? '' : 'none';
+  });
 }
 function positionPopup(btn){
   if(window.innerWidth<=768) return;
@@ -6492,6 +6891,7 @@ function pickItem(key, el){
     } else {
       _selectedModel = name;   // 回退：无 provider 信息时仅存模型名
     }
+    persistSelectedModel();
     toast('已选择模型：'+name);
     closeMini();
     return;
@@ -6510,14 +6910,6 @@ function pickItem(key, el){
     var b2=document.getElementById('btnSkill'); if(b2) b2.classList.toggle('active', _activeSkills.length>0);
     renderSkillChips();
     return; // 保持弹窗打开，可继续勾选多个技能
-  } else if(key==='workflow'){
-    // 工作流：应用预设模板到当前工作流
-    var wfkey = el.getAttribute('data-wfkey');
-    if(wfkey){ applyWorkflow(wfkey); closeMini(); toast('已应用工作流：'+name); }
-    return;
-  } else if(key==='workflow-apply'){
-    // 工作流 tab 的 CTA 按钮：仅刷新 popup，不关闭
-    return;
   }
   closeMini();
 }
@@ -6540,6 +6932,9 @@ function pickItemExpert(id, el){
   function afterSwitch(){
     currentAgent = agentId;
     _selectedExpert = { id:pid||'', name:expertName, prompt:prompt };
+    // 互斥：停用工作流 & 专家团
+    if(_cfg.extensions.workflow&&_cfg.extensions.workflow.enabled){ _cfg.extensions.workflow.enabled=false; _cfg.extensions.workflow.active=false; renderWorkflowBar(); }
+    _cfg.extensions.team_enabled=false; renderTeamBar();
     var t=document.getElementById('chatTitle'); if(t) t.textContent=expertName;
     renderSelectedExpertBar();
     toast('已为专家「'+expertName+'」开启独立会话（发送时注入系统提示）');
@@ -6574,6 +6969,37 @@ function agencyIdByName(name){
   var f=window.AGENCY_PERSONAS.find(function(x){ return (x.label||x.name)===name; });
   return f ? f.id : '';
 }
+/* 专家团专属会话分组：启用专家团时建立「专家团」标签卡片，会话归入该分组（与单专家分组一致） */
+function enterTeamSession(){
+  var team=_cfg.extensions.team||[];
+  if(!team.length) return;   // 无成员不建分组
+  var teamName=_cfg.extensions.team_name||'专家团';
+  var agentId='team';
+  var ag=ensureAgent(agentId, { name:teamName, icon:'👥' });
+  if(ag && (ag.name!==teamName || ag.icon!=='👥')){ ag.name=teamName; ag.icon='👥'; saveAgents(); }
+  function afterTeamSwitch(){
+    currentAgent=agentId;
+    var t=document.getElementById('chatTitle'); if(t) t.textContent=teamName;
+  }
+  // 复用已归属专家团分组的会话，否则新建一个并归入该分组
+  var existing=_sessions.find(function(s){ return (_sessionAgent[s.id]||'default')===agentId; });
+  if(existing){
+    switchSession(agentId, existing.id); afterTeamSwitch();
+  } else {
+    fetch(apiUrl('/api/sessions'), { method:'POST', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+      .then(function(s){
+        _sessions.unshift(s);
+        currentSession=s.id; currentAgent=agentId;
+        setSessionAgent(s.id, agentId);
+        localStorage.setItem('hermes_rail_open_'+agentId, 'true');
+        _openTabs.push(s.id); persistTabs();
+        renderSessionTabs(); renderRail(); updateHeader();
+        if(window.innerWidth<=768) closeRailDrawer();
+        sendRaw('/title '+teamName); afterTeamSwitch();
+      })
+      .catch(function(){ toast('创建会话失败'); });
+  }
+}
 /* 启用专家团模式（从工具栏弹窗触发）：开启委派并切到默认 agent，后续发送走专家团注入 */
 function useExpertTeam(){
   var team=_cfg.extensions.team||[];
@@ -6589,15 +7015,102 @@ function useExpertTeam(){
     }
   }
   _cfg.extensions.team_enabled=true;
+  // 互斥：停用工作流
+  if(_cfg.extensions.workflow&&_cfg.extensions.workflow.enabled){ _cfg.extensions.workflow.enabled=false; _cfg.extensions.workflow.active=false; renderWorkflowBar(); }
   if(!_cfg.extensions.toolsets) _cfg.extensions.toolsets={};
   _cfg.extensions.toolsets.delegation=true;
-  saveConfig(); if(typeof renderTeam==='function') renderTeam();
-  // 切回 default agent，清除单专家选择，让 system 注入走专家团分支
-  currentAgent='default';
+  saveConfig(); if(typeof renderTeam==='function') renderTeam(); renderTeamBar();
+  // 清除单专家选择，让 system 注入走专家团分支；并为专家团建立专属「专家团」会话分组
   _selectedExpert=null; renderSelectedExpertBar();
-  var t=document.getElementById('chatTitle'); if(t) t.textContent='默认主力助手';
+  enterTeamSession();
   closeMini();
-  toast('已启用专家团（'+team.length+' 人协作）');
+  toast('已启用专家团：'+team.length+' 人协作（发送消息即自动触发）');
+}
+/* 工具栏工作流选择器：从 mini popup 应用并激活工作流，互斥清除专家/专家团 */
+function pickWorkflowFromMini(key){
+  var p=(window.AO_WORKFLOW_PRESETS||[]).find(function(x){ return x.key===key; });
+  if(!p){ toast('未找到工作流模板'); return; }
+  _cfg.extensions.workflow = {
+    key:p.key, name:p.name, description:p.description,
+    enabled:true, active:true, concurrency:(p.concurrency||2), category:(p.category||''),
+    inputs:(p.inputs||[]), steps:(p.steps||[])
+  };
+  // 互斥：清除单专家 & 专家团
+  _selectedExpert=null; renderSelectedExpertBar();
+  _cfg.extensions.team_enabled=false; renderTeamBar();
+  if(!_cfg.extensions.toolsets) _cfg.extensions.toolsets={};
+  _cfg.extensions.toolsets.delegation=true;
+  saveConfig(); if(typeof renderWorkflow==='function') renderWorkflow(); if(typeof renderTeam==='function') renderTeam();
+  currentAgent='default';
+  var t=document.getElementById('chatTitle'); if(t) t.textContent=p.name;
+  renderWorkflowBar();
+  closeMini();
+  toast('已启用工作流：'+p.name+'（发送消息即自动触发）');
+}
+function clearWorkflowFromMini(){
+  _cfg.extensions.workflow = { enabled:false, active:false, key:'', name:'', concurrency:2, category:'', inputs:[], steps:[] };
+  saveConfig(); if(typeof renderWorkflow==='function') renderWorkflow();
+  renderWorkflowBar();
+  var t=document.getElementById('chatTitle'); if(t) t.textContent='默认主力助手';
+  toast('已停用工作流');
+  // 刷新 mini popup 内容
+  if(activePanel==='expert') document.getElementById('popupBody').innerHTML=buildMiniPopupBody('expert', buildMiniData().expert);
+}
+/* 工具栏智能体选择器：从 mini popup 切换默认角色（persona），互斥清除专家/专家团/工作流 */
+function pickPersonaFromMini(id){
+  var p=allPersonas()[id]; if(!p){ toast('未找到角色'); return; }
+  selectPersona(id);
+  // 互斥：清除单专家 & 专家团 & 工作流
+  if(_cfg.extensions.workflow&&_cfg.extensions.workflow.enabled){ _cfg.extensions.workflow.enabled=false; _cfg.extensions.workflow.active=false; renderWorkflowBar(); }
+  _cfg.extensions.team_enabled=false; renderTeamBar();
+  saveConfig();
+  currentAgent='default';
+  var t=document.getElementById('chatTitle'); if(t) t.textContent=p.label||id;
+  var sub=document.getElementById('chatSubtitle'); if(sub) sub.textContent=(p.label||id)+' · 默认角色';
+  closeMini();
+  toast('已切换默认角色：'+(p.label||id));
+}
+/* 工作流状态栏（显示在聊天区上方，类似 selectedExpertBar） */
+function renderWorkflowBar(){
+  var bar=document.getElementById('workflowBar');
+  var wf=_cfg.extensions.workflow;
+  var active=!!(wf&&wf.enabled&&wf.steps&&wf.steps.length);
+  if(!bar){
+    if(!active) return;
+    var comp=document.getElementById('chatComposer'); if(!comp) return;
+    bar=document.createElement('div'); bar.id='workflowBar'; bar.className='selected-expert-bar';
+    comp.parentNode.insertBefore(bar, comp);
+  }
+  if(!active){ bar.style.display='none'; return; }
+  bar.style.display='flex';
+  bar.innerHTML='<span class="seb-label">当前工作流：</span><strong>🎛️ '+esc(wf.name||'')+'</strong><span style="color:var(--text3);font-size:12px">'+(wf.steps?wf.steps.length:0)+' 个步骤 · 发送即触发</span><button class="action sm" onclick="clearWorkflowFromMini()">停用</button>';
+}
+/* 专家团状态栏（显示在聊天区上方，与工作流状态栏一致）：
+   当前专家团：成员名、… · N 个角色 · 发送即触发 + 停用按钮 */
+function renderTeamBar(){
+  var bar=document.getElementById('teamBar');
+  var team=_cfg.extensions.team||[];
+  // 与工作流互斥：注入优先级工作流 > 专家团，工作流激活时不显示专家团栏
+  var wf=_cfg.extensions.workflow;
+  var wfActive=!!(wf&&wf.enabled&&wf.steps&&wf.steps.length);
+  var active=!!(_cfg.extensions.team_enabled&&team.length&&!wfActive);
+  if(!bar){
+    if(!active) return;
+    var comp=document.getElementById('chatComposer'); if(!comp) return;
+    bar=document.createElement('div'); bar.id='teamBar'; bar.className='selected-expert-bar';
+    comp.parentNode.insertBefore(bar, comp);
+  }
+  if(!active){ bar.style.display='none'; return; }
+  bar.style.display='flex';
+  var names=team.map(function(m){ return m.name||m.id; }).join('、');
+  bar.innerHTML='<span class="seb-label">当前专家团：</span><strong style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(names)+'">👥 '+esc(names)+'</strong><span style="color:var(--text3);font-size:12px;white-space:nowrap">'+team.length+' 个角色 · 发送即触发</span><button class="action sm" onclick="disableTeamFromBar()">停用</button>';
+}
+/* 从状态栏停用专家团：关闭 team_enabled 并同步扩展页开关 */
+function disableTeamFromBar(){
+  _cfg.extensions.team_enabled=false;
+  setToggle('teamEnabledToggle', false);
+  saveConfig(); if(typeof renderTeam==='function') renderTeam(); renderTeamBar();
+  toast('已停用专家团');
 }
 /* 连接器激活卡片（渲染在输入区上方，best-effort 调用首个工具） */
 function renderConnectorChip(c){
@@ -6630,7 +7143,8 @@ function invokeSelectedConnector(){
       if(currentSession) sendRaw('请通过已配置的 '+c.name+' 连接器处理以下请求：');
     });
 }
-var _selectedModel = '';
+var _selectedModel = (function(){ try{ var s=localStorage.getItem('hermes_selected_model'); return s?JSON.parse(s):''; }catch(e){ return ''; } })();
+function persistSelectedModel(){ try{ localStorage.setItem('hermes_selected_model', JSON.stringify(_selectedModel)); }catch(e){} }
 var _activeSkills = [];   // 当前会话已启用的技能（名称列表），发送时注入 system 提示
 var _selectedExpert = null;     // 单专家注入对象 {id,name,prompt}（决策 3，随会话）
 var _selectedConnector = '';    // 当前选中的连接器 kind（字符串）
@@ -6769,6 +7283,7 @@ function applyServiceState(s){
   if(hvEl && s.gateway && s.gateway.version){ hvEl.textContent=fmtHermesVer(s.gateway.version, s.hermes_version_date); }
   var avEl=document.getElementById('sysAppVer');
   if(avEl && s.app_version){ avEl.textContent=s.app_version; }
+  if(s.app_version){ window.__APP_VER__ = s.app_version; }
   // 顶栏与更新页当前版本同步
   var brand=document.getElementById('brandVer');
   if(brand && s.app_version){ brand.textContent='v'+s.app_version; }
@@ -7084,11 +7599,13 @@ function renderProviders(){
     var modelText = enabled.length ? esc(enabled[0].id || enabled[0].name || '') : '未选择模型';
     var temp = p.temperature != null ? p.temperature : '-';
     var maxT = p.max_tokens != null ? p.max_tokens : '-';
-    var key = p.api_key || '';
+    var key = p.api_key || p.api_key_masked || '';
     var keyMasked = '';
     if (key) {
       var tail = key.length > 4 ? key.slice(-4) : key;
       keyMasked = '<span class="provider-key"><span class="key-dot">••••</span>'+esc(tail)+'</span>';
+    } else if (p.api_key_configured) {
+      keyMasked = '<span class="provider-key"><span class="key-dot">••••</span>已配置</span>';
     }
     var merchant = p.preset || p.kind || (p.local ? '本地' : '自定义');
 
@@ -7142,21 +7659,6 @@ function renderProviders(){
     });
   }
 }
-function deleteProvider(i){
-  var p=_cfg.providers[i]; if(!p) return;
-  var pname = p.name || p.id || '未命名';
-  if(_cfg.active_provider === pname){ toast('当前使用中的模型不可删除，请先切换到其他模型'); return; }
-  var msg = '确定删除模型「'+pname+'」？\n\n';
-  if(p.base_url) msg += 'Base URL: '+p.base_url+'\n';
-  msg += '该模型下 '+((p.models||[]).length)+' 个模型配置将被移除。\n\n此操作不可撤销！';
-  if(!confirm(msg)) return;
-  _cfg.providers.splice(i, 1);
-  // 同时从回退列表移除
-  if(_cfg.fallback_providers && _cfg.fallback_providers.length){
-    _cfg.fallback_providers = _cfg.fallback_providers.filter(function(n){ return n !== pname; });
-  }
-  saveConfig(); renderProviders(); toast('已删除模型：'+pname);
-}
 function activateProvider(i){
   var p=_cfg.providers[i]; if(!p) return;
   _cfg.active_provider = p.name || p.id;
@@ -7178,78 +7680,24 @@ function unsetFallbackProvider(i){
   _cfg.fallback_providers = _cfg.fallback_providers.filter(function(n){ return n!==pname; });
   apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已取消回退：'+pname); }).catch(function(e){ toast('保存失败：'+e.message); });
 }
+function deleteProvider(i){
+  var p=_cfg.providers[i]; if(!p) return;
+  var pname = p.name || p.id;
+  if(!confirm('确定删除模型服务「'+pname+'」吗？此操作不可恢复。')) return;
+  _cfg.providers.splice(i,1);
+  // 若删除的是当前默认，自动切到第一个；同时从回退列表移除
+  if(_cfg.active_provider===pname){ _cfg.active_provider = (_cfg.providers[0]&&(_cfg.providers[0].name||_cfg.providers[0].id))||''; }
+  if(_cfg.fallback_providers){ _cfg.fallback_providers=_cfg.fallback_providers.filter(function(n){ return n!==pname; }); }
+  apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已删除：'+pname); }).catch(function(e){ toast('保存失败：'+e.message); });
+}
 function openProviderModal(){ editProvider(null); }
-/* 完全自定义 select：读取原生 select 的 options，渲染成 button + ul 弹层（彻底解决 WebView 原生下拉按钮问题） */
-function initCustomSelect(selId, options){
-  var sel=document.getElementById(selId); if(!sel) return;
-  var btnId=selId+'Btn'; var listId=selId+'List';
-  var btn=document.getElementById(btnId); var list=document.getElementById(listId);
-  if(!btn||!list) return;
-  // 渲染 options
-  list.innerHTML = (options||[]).map(function(o){
-    var active = (sel.value===o.value);
-    return '<li data-value="'+esc(o.value)+'" class="'+(active?'active':'')+'" onclick="pickCustomSelect(\''+selId+'\',this)">'+esc(o.label)+'</li>';
-  }).join('');
-  // 显示当前值
-  var cur = (options||[]).find(function(o){ return o.value===sel.value; });
-  var valEl = btn.querySelector('.cs-value');
-  if(valEl) valEl.textContent = cur ? cur.label : (sel.value || '—');
-  // 监听 select 变化时同步 button 显示
-  sel.addEventListener('change', function(){
-    var c = (options||[]).find(function(o){ return o.value===sel.value; });
-    if(valEl) valEl.textContent = c ? c.label : (sel.value || '—');
-    list.querySelectorAll('li').forEach(function(li){
-      li.classList.toggle('active', li.getAttribute('data-value')===sel.value);
-    });
-  });
-}
-function openCustomSelect(selId){
-  var list = document.getElementById(selId+'List');
-  var btn = document.getElementById(selId+'Btn');
-  if(!list||!btn) return;
-  // 关闭其他打开的
-  document.querySelectorAll('.cs-options.open').forEach(function(o){
-    if(o.id!==selId+'List'){ o.classList.remove('open'); var b=document.getElementById(o.id.replace('List','Btn')); if(b) b.setAttribute('aria-expanded','false'); }
-  });
-  var open = list.classList.toggle('open');
-  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-}
-function pickCustomSelect(selId, li){
-  var sel=document.getElementById(selId); if(!sel) return;
-  var value = li.getAttribute('data-value');
-  // 同步原生 select
-  sel.value = value;
-  // 触发 onchange（模拟原生）
-  sel.dispatchEvent(new Event('change'));
-  // 关闭弹层
-  var list=document.getElementById(selId+'List'); var btn=document.getElementById(selId+'Btn');
-  if(list) list.classList.remove('open'); if(btn) btn.setAttribute('aria-expanded','false');
-}
-document.addEventListener('click', function(e){
-  if(!e.target.closest('.select-wrap')){
-    document.querySelectorAll('.cs-options.open').forEach(function(o){ o.classList.remove('open'); var b=document.getElementById(o.id.replace('List','Btn')); if(b) b.setAttribute('aria-expanded','false'); });
-  }
-});
 function addProvider(){
-  // 添加模型服务：默认选第一个云端预设（让用户编辑）
+  // 添加模型服务：默认「自定义」，不预填任何模型
   openProviderModal();
-  setTimeout(function(){
-    var preset = document.getElementById('providerPreset');
-    if (preset) {
-      var cloudKey = null;
-      Object.keys(PV.providerPresets || {}).forEach(function(k){
-        var p = PV.providerPresets[k];
-        if (!cloudKey && p && !p.local) cloudKey = k;
-      });
-      if (cloudKey) {
-        preset.value = cloudKey;
-        if (typeof onProviderPresetChange === 'function') onProviderPresetChange();
-      }
-    }
-  }, 50);
 }
-function closeProviderModal(){ var m=document.getElementById('providerModal'); if(m) m.style.display='none'; _providerModelCache=null; }
+function closeProviderModal(){ var m=document.getElementById('providerModal'); if(m) m.style.display='none'; _providerModelCache=null; _providerModelTestResults={}; }
 var _providerModelCache = null; // 编辑 Provider 时的模型列表 [{id,name,enabled,default}]
+var _providerModelTestResults = {}; // 「测试所有模型」结果缓存：{ 列表下标: {ok, latency, error} }
 function editProvider(idx){
   var m=document.getElementById('providerModal'); if(!m) return;
   // Portal：移到 body 直接子元素，避开 .page.active (display:flex) 的 stacking context
@@ -7261,21 +7709,14 @@ function editProvider(idx){
     Object.keys(PV.providerPresets).forEach(function(k){
       var o=document.createElement('option'); o.value=k; o.textContent=PV.providerPresets[k].name; presetSel.appendChild(o);
     });
-    // 初始化自定义下拉 UI（隐藏原生 select，用 button+ul 渲染）
-    initCustomSelect('providerPreset', [{value:'',label:'自定义'}].concat(
-      Object.keys(PV.providerPresets).map(function(k){ return {value:k,label:PV.providerPresets[k].name}; })
-    ));
   }
   var p = (idx!=null && _cfg.providers[idx]) ? _cfg.providers[idx] : null;
+  var titleEl=document.getElementById('providerModalTitle'); if(titleEl) titleEl.textContent = p ? '编辑模型提供商' : '添加模型提供商';
+  _providerModelTestResults = {};
   document.getElementById('providerId').value = p ? (p.id||idx) : '';
   document.getElementById('providerName').value = p ? (p.name||'') : '';
   document.getElementById('providerBaseUrl').value = p ? (p.base_url||'') : '';
-  // API Key：后端 GET 只返回 api_key_masked（不返回真实 key），input 留空 + placeholder 提示
-  var keyEl = document.getElementById('providerKey');
-  keyEl.value = '';
-  keyEl.placeholder = (p && (p.api_key_masked || p.api_key_configured))
-    ? '已配置 Key（'+ (p.api_key_masked || '****') +'），修改请直接输入新 Key，留空保留原值'
-    : 'sk-...';
+  document.getElementById('providerKey').value = p ? (p.api_key&&String(p.api_key).indexOf('****')!==0 ? p.api_key : '') : '';
   document.getElementById('providerNote').value = p ? (p.note||'') : '';
   document.getElementById('providerTemp').value = p && p.temperature!=null ? p.temperature : '0.7';
   document.getElementById('providerMaxTokens').value = p && p.max_tokens!=null ? p.max_tokens : '4096';
@@ -7295,8 +7736,11 @@ function onProviderPresetChange(){
   if(def && def.base_url) document.getElementById('providerBaseUrl').value = def.base_url;
   if(def && def.models && def.models.length){
     _providerModelCache = def.models.map(function(mo){ return _normModel({ id: mo, name: mo, enabled: true, default: false }); });
-    renderProviderModels();
+  } else {
+    // 选择「自定义」或预设无模型列表时，清空模型缓存（不残留上一个预设的模型）
+    _providerModelCache = [];
   }
+  renderProviderModels();
 }
 function _normModel(mo){
   mo = mo||{};
@@ -7329,56 +7773,37 @@ function renderProviderModelList(){
   var el=document.getElementById('providerModelList'); if(!el) return;
   var list=_providerModelCache||[];
   var search=((document.getElementById('providerModelSearch')||{}).value||'').trim().toLowerCase();
-  if(!list.length){ el.innerHTML='<div class="conn-hint">点击右上「获取模型列表」或下方「+ 添加」手动新增。</div>'; return; }
-  // 按 Provider（id 前缀）分组；custom_* 归入「自定义」
-  var groups = {};
-  list.forEach(function(mo, idx){
-    var mid = mo.id || mo.name || '';
-    var sep = mid.indexOf('/');
-    var prov = sep>0 ? mid.slice(0, sep) : (mo.provider || '模型列表');
-    if(prov.indexOf('custom_')===0) prov = '自定义';
-    if(prov === '其他') prov = '模型列表';
-    if(!groups[prov]) groups[prov] = [];
-    groups[prov].push({ m: mo, i: idx });
-  });
-  var html = '';
-  Object.keys(groups).sort().forEach(function(prov){
-    var items = groups[prov];
-    var filtered = !search ? items : items.filter(function(it){
-      var mid = (it.m.id||it.m.name||'').toLowerCase();
-      var mname = (it.m.name||'').toLowerCase();
-      return mid.indexOf(search)>=0 || mname.indexOf(search)>=0 || prov.toLowerCase().indexOf(search)>=0;
+  if(!list.length){ el.innerHTML='<div class="conn-hint">点击右上角「获取模型」自动拉取全部模型，或用上方「+ 添加」手动新增。</div>'; return; }
+  // 平铺展示全部模型（不再分组折叠），整个列表可上下滚动选择
+  var items = list.map(function(m,i){ return {m:m,i:i}; });
+  if(search){
+    items = items.filter(function(it){
+      var mid=(it.m.id||it.m.name||'').toLowerCase();
+      var mname=(it.m.name||'').toLowerCase();
+      var prov=(it.m.provider||'').toLowerCase();
+      return mid.indexOf(search)>=0||mname.indexOf(search)>=0||prov.indexOf(search)>=0;
     });
-    if(!filtered.length) return;
-    html += '<div class="model-group" data-prov="'+esc(prov)+'">'+
-      '<div class="model-group-head" onclick="toggleModelGroup(this)">'+
-        '<span class="chevron">▾</span>'+
-        '<span class="name">'+esc(prov)+'</span>'+
-        '<span class="count">'+filtered.length+'</span>'+
-      '</div>'+
-      '<div class="model-group-body">'+
-        filtered.map(function(it){
-          var m = it.m; var i = it.i;
-          var isDefault = m.default===true;
-          var mid = esc(m.id||m.name||'');
-          var mname = esc(m.name||m.id||'');
-          var tempBadge = m.temperature!=null ? '<span class="model-mini-badge">t='+m.temperature+'</span>' : '';
-          var maxBadge = m.max_tokens!=null ? '<span class="model-mini-badge">m='+m.max_tokens+'</span>' : '';
-          var ctxBadge = m.context_window ? '<span class="model-mini-badge">'+ (m.context_window>=1000000?'1M':(m.context_window>=256000?'256K':(m.context_window/1000+'K'))) +'</span>' : '';
-          return '<div class="model-item '+(m.enabled===false?'disabled':'')+(isDefault?' applied':'')+'" data-idx="'+i+'">'+
-            '<span class="model-id" onclick="selectModelInList('+i+', event)">'+mid+'</span>'+
-            '<span class="model-badges">'+
-              (isDefault?'<span class="model-tick">✓</span>':'')+
-              tempBadge+maxBadge+ctxBadge+
-              '<button class="model-cfg-btn" title="独立配置（覆盖 Provider 默认参数）" onclick="openModelEditModal('+i+', event)">⚙</button>'+
-              '<button class="model-test-btn" title="测试该模型连通性" onclick="testProviderModel('+i+', event)">⚡</button>'+
-            '</span>'+
-          '</div>';
-        }).join('')+
-      '</div>'+
+  }
+  if(!items.length){ el.innerHTML='<div class="conn-hint">没有匹配的模型。</div>'; return; }
+  el.innerHTML = items.map(function(it){
+    var m=it.m; var i=it.i;
+    var isDefault=m.default===true;
+    var mid=esc(m.id||m.name||'');
+    var tempBadge=m.temperature!=null?'<span class="model-mini-badge">t='+m.temperature+'</span>':'';
+    var maxBadge=m.max_tokens!=null?'<span class="model-mini-badge">m='+m.max_tokens+'</span>':'';
+    var ctxBadge=m.context_window?'<span class="model-mini-badge">'+(m.context_window>=1000000?'1M':(m.context_window>=256000?'256K':(m.context_window/1000+'K')))+'</span>':'';
+    var tr=(_providerModelTestResults||{})[i];
+    var testBadge=tr?(tr.ok?'<span class="model-mini-badge" style="color:var(--success);border-color:var(--success)">✓'+(tr.latency!=null?' '+tr.latency+'ms':'')+'</span>':'<span class="model-mini-badge" title="'+esc(tr.error||'')+'" style="color:#e5534b;border-color:#e5534b">✗</span>'):'';
+    return '<div class="model-item '+(m.enabled===false?'disabled':'')+(isDefault?' applied':'')+'" data-idx="'+i+'">'+
+      '<span class="model-id" onclick="selectModelInList('+i+', event)">'+mid+'</span>'+
+      '<span class="model-badges">'+
+        (isDefault?'<span class="model-tick">✓</span>':'')+
+        testBadge+tempBadge+maxBadge+ctxBadge+
+        '<button class="model-cfg-btn" title="独立配置（覆盖 Provider 默认参数）" onclick="openModelEditModal('+i+', event)">⚙</button>'+
+        '<button class="model-test-btn" title="测试该模型连通性" onclick="testProviderModel('+i+', event)">⚡</button>'+
+      '</span>'+
     '</div>';
-  });
-  el.innerHTML = html || '<div class="conn-hint">没有匹配的模型。</div>';
+  }).join('');
 }
 function toggleModelGroup(headEl){
   var body = headEl.nextElementSibling; if(!body) return;
@@ -7390,16 +7815,6 @@ function toggleModelGroup(headEl){
 function selectModelInList(i, ev){
   ev && ev.stopPropagation();
   setDefaultProviderModel(i);
-  // 单击自动收起其他 group
-  var el=document.getElementById('providerModelList');
-  if(el){
-    el.querySelectorAll('.model-group').forEach(function(g){
-      var body=g.querySelector('.model-group-body');
-      if(body && g.getAttribute('data-prov')!==el.querySelector('.model-item.applied')?.closest('.model-group')?.getAttribute('data-prov')){
-        // keep others as-is
-      }
-    });
-  }
   toast('已应用模型：'+((_providerModelCache[i]||{}).id||''));
 }
 function openModelEditModal(i, ev){
@@ -7484,12 +7899,24 @@ function updateProviderModelName(i, el){
   m.name = v; m.id = v;
 }
 function fillModelOptionsFromList(list){
-  // 兼容旧入口：获取模型后写入管理列表
-  _providerModelCache = (list||[]).map(function(mo){
+  // 获取模型后写入管理列表：以接口返回为准，仅保留用户对「仍存在」模型的参数编辑
+  var incoming = (list||[]).map(function(mo){
     return _normModel(typeof mo==='string' ? { id: mo, name: mo, enabled: true, default: false } : mo);
   });
+  var prev = _providerModelCache || [];
+  var prevById = {};
+  prev.forEach(function(m){ var k=m.id||m.name; if(k) prevById[k]=m; });
+  var result = incoming.map(function(m){
+    var k = m.id||m.name;
+    var old = prevById[k];
+    if(!old) return m;
+    // 保留用户对同一模型的参数编辑
+    return Object.assign({}, m, old, { id: m.id||old.id, name: m.name||old.name||m.id });
+  });
+  _providerModelCache = result;
+  _providerModelTestResults = {};
   renderProviderModels();
-  toast('已获取 '+_providerModelCache.length+' 个模型');
+  toast('已获取 '+result.length+' 个模型');
 }
 // 从 Provider 的 /v1/models 接口拉取模型列表（经后端代理，规避 CORS）
 function fetchProviderModels(){
@@ -7536,32 +7963,28 @@ function testProviderModel(i, ev){
     toast('测试失败：'+e.message);
   });
 }
+function testAllProviderModels(){
+  var list=_providerModelCache||[];
+  if(!list.length){ toast('请先获取或添加模型'); return; }
+  var provider=buildProviderObj();
+  if(!provider.base_url){ toast('请先填写 Base URL'); return; }
+  toast('正在测试 '+list.length+' 个模型…');
+  _providerModelTestResults = {};
+  var targets=list.map(function(m,i){ return { id:m.id||m.name, i:i }; });
+  Promise.all(targets.map(function(t){
+    return apiPost('/api/config/test', { provider: provider, model: t.id }).then(function(r){
+      _providerModelTestResults[t.i] = { ok: !!(r&&r.ok), latency: (r&&r.latency_ms!=null)?r.latency_ms:null, error: (r&&r.error)||'' };
+    }).catch(function(e){ _providerModelTestResults[t.i] = { ok:false, error:e.message }; });
+  })).then(function(){
+    var ok=0, fail=0;
+    targets.forEach(function(t){ var r=_providerModelTestResults[t.i]; if(r&&r.ok) ok++; else fail++; });
+    renderProviderModelList();
+    toast('测试完成：✅ '+ok+' 个可用'+(fail?'，❌ '+fail+' 个不可用':''));
+  });
+}
 function toggleKeyVisibility(){
   var inp=document.getElementById('providerKey');
   inp.type = inp.type==='password' ? 'text' : 'password';
-}
-/* 工作流 popup CTA：应用当前工作流（如果还没启用）并切到聊天页 */
-function pickWorkflowAndSend(){
-  var wf = _cfg.extensions.workflow;
-  if(!wf || !wf.enabled){
-    toast('请先在上方选择一个工作流模板');
-    return;
-  }
-  closeMini();
-  // 切到聊天页（如果在其他页）
-  if(typeof switchPage === 'function') switchPage('chat');
-  // 预填输入框提示
-  setTimeout(function(){
-    var inp = document.getElementById('chatInput');
-    if(inp){
-      inp.value = '请用「'+wf.name+'」工作流处理：';
-      inp.focus();
-      // 把光标移到末尾
-      inp.setSelectionRange(inp.value.length, inp.value.length);
-      autoResize(inp);
-    }
-    toast('已激活工作流「'+wf.name+'」，编辑消息后按 Enter 发送（自动按 DAG 顺序执行）');
-  }, 100);
 }
 function validateProvider(){
   var provider = buildProviderObj();
@@ -7570,8 +7993,7 @@ function validateProvider(){
   apiPost('/api/config/test', { provider: provider }).then(function(r){
     var models=(r&&r.models)?r.models:[];
     if(models.length){
-      fillModelOptionsFromList(models);
-      toast('验证成功，已载入 '+models.length+' 个模型');
+      fillModelOptionsFromList(models);   // 合并写入（保留已有配置），提示由其内部发出
     } else if(r && r.ok){
       toast('验证成功，但未返回可用模型');
     } else {
@@ -7661,13 +8083,14 @@ function extSwitchTab(el, key){
   if(key==='skills') renderSkills('local');
 }
 function extSkillSubtab(el, key){
-  document.querySelectorAll('#ext-skills .ch-filter').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#ext-skills .skill-subtabs .ch-filter').forEach(function(t){ t.classList.remove('active'); });
   el.classList.add('active');
-  renderSkills(key);
+  var bar=document.getElementById('skillMarketBar');
+  if(bar) bar.style.display = (key==='market') ? 'block' : 'none';
+  if(key==='market'){ renderSkillMarket(); } else { renderSkills(key); }
 }
 function renderExtensions(){
   renderToolsets(); renderSkills('local'); renderPersonas(); renderExperts(); renderTeam(); renderMemory(); renderWorkflow();
-  if(typeof renderChatChips==='function') renderChatChips();
 }
 function renderToolsets(){
   var el=document.getElementById('toolsetList'); if(!el) return;
@@ -7850,6 +8273,171 @@ function toggleSkill(i){
   toast('本地技能启停需重启 Hermes 后生效（已记录）');
   // 本地仅做 UI 标记，真实启停由后端安装/重启决定
 }
+// ── 技能市场（扩展→技能→技能市场：精选目录 + SkillHub 搜索，安装/卸载/配置/获取指引）──
+var _skillMarketItems = [];    // 当前市场技能列表（精选目录或搜索结果）
+var _skillMarketFilter = 'all';
+var _installedSkillNames = []; // 全部已安装技能目录名（供搜索结果对照安装状态）
+var _marketCfgCurrent = null;  // 正在配置的市场技能
+function renderSkillMarket(){
+  var el=document.getElementById('skillGrid'); if(!el) return;
+  apiGet('/api/extensions/skills/market-catalog').then(function(res){
+    if(res && res.ok && res.items){
+      _skillMarketItems = res.items;
+      _installedSkillNames = res.installed_names || [];
+      renderSkillMarketGrid();
+    } else {
+      el.innerHTML='<div class="empty-state">加载技能市场失败，请部署后重试。</div>';
+    }
+  });
+}
+function renderSkillMarketCatalog(){
+  var el=document.getElementById('skillMarketSearch'); if(el) el.value='';
+  renderSkillMarket();
+}
+function setSkillMarketFilter(btn, f){
+  _skillMarketFilter = f;
+  ['smFilterAll','smFilterInstalled','smFilterOfficial'].forEach(function(id){ var b=document.getElementById(id); if(b) b.classList.remove('active'); });
+  if(btn) btn.classList.add('active');
+  renderSkillMarketGrid();
+}
+function renderSkillMarketGrid(){
+  var el=document.getElementById('skillGrid'); if(!el) return;
+  var rows=[];
+  (_skillMarketItems||[]).forEach(function(it, i){
+    if(_skillMarketFilter==='installed' && !it.installed) return;
+    if(_skillMarketFilter==='official' && !it.official) return;
+    rows.push({ it:it, i:i });
+  });
+  if(!rows.length){ el.innerHTML='<div class="empty-state">没有匹配的技能。</div>'; return; }
+  el.innerHTML = rows.map(function(r){ return renderSkillMarketCard(r.it, r.i); }).join('');
+}
+function renderSkillMarketCard(it, i){
+  var installed=!!it.installed;
+  var icon=it.icon||'🧩';
+  var official=it.official?'<span class="conn-badge" style="background:rgba(139,92,246,.15);color:#a78bfa;border-color:rgba(139,92,246,.4)">官方</span>':'';
+  var desc=esc((it.desc||it.description||'').slice(0,80));
+  var meta='';
+  if(it._search){
+    var bits=[];
+    if(it.downloads) bits.push(it.downloads+' 次安装');
+    if(it.stars) bits.push(it.stars+' 星');
+    if(bits.length) meta='<div class="conn-hint" style="margin:0 0 10px">'+esc(bits.join(' · '))+'</div>';
+  }
+  var actions='';
+  if(installed){
+    actions+='<button class="action danger" onclick="event.stopPropagation();uninstallMarketSkill('+i+')">卸载</button>';
+    actions+='<button class="action secondary" onclick="event.stopPropagation();configMarketSkill('+i+')">配置</button>';
+  } else {
+    actions+='<button class="action primary" onclick="event.stopPropagation();installMarketSkill('+i+')">安装</button>';
+  }
+  actions+='<button class="action secondary" onclick="event.stopPropagation();openMarketGuide('+i+')">获取指引</button>';
+  return '<div class="ext-card">'+
+    '<div class="top"><div class="icon">'+icon+'</div><div><div class="name">'+esc(it.name||'未命名')+official+'</div><div class="status '+(installed?'on':'off')+'">'+(installed?'已安装':'未安装')+'</div></div></div>'+
+    (desc?'<div class="desc">'+desc+'</div>':'')+
+    meta+
+    '<div class="actions">'+actions+'</div></div>';
+}
+function installMarketSkill(i){
+  var it=_skillMarketItems[i]; if(!it) return;
+  var payload={ slug: it.slug, namespace: it.namespace, name: it.id || it.slug };
+  if(it.mcp && it.mcp.url){ payload.mcp={ name: it.mcp.name, url: it.mcp.url, headers:{} }; }
+  toast('正在安装 '+it.name+'…');
+  apiPost('/api/extensions/skills/install-package', payload).then(function(res){
+    if(res && res.ok){
+      toast('✅ '+it.name+' 安装成功'+((it.mcp&&it.mcp.fields)?'，请点击「配置」输入凭证':''));
+      renderSkillMarket();
+    } else {
+      toast('❌ 安装失败：'+((res&&res.error)||'未知错误'));
+    }
+  });
+}
+function uninstallMarketSkill(i){
+  var it=_skillMarketItems[i]; if(!it) return;
+  var name=it.id || it.slug;
+  if(!confirm('确定卸载技能「'+(it.name||name)+'」？\n将删除其本地文件与注册信息（含 MCP 服务器）。')) return;
+  toast('正在卸载 '+it.name+'…');
+  var payload={ name: name };
+  if(it.mcp && it.mcp.name) payload.mcp_name=it.mcp.name;
+  apiPost('/api/extensions/skills/uninstall', payload).then(function(res){
+    if(res && res.ok){ toast('🗑️ '+it.name+' 已卸载'); renderSkillMarket(); }
+    else { toast('❌ 卸载失败：'+((res&&res.error)||'未知错误')); }
+  });
+}
+function configMarketSkill(i){
+  var it=_skillMarketItems[i]; if(!it) return;
+  _marketCfgCurrent=it;
+  var title=document.getElementById('marketCfgTitle');
+  var body=document.getElementById('marketCfgBody');
+  if(title) title.textContent=(it.name||'技能')+' 配置';
+  if(!body) return;
+  var html='';
+  if(it.mcp && it.mcp.fields && it.mcp.fields.length){
+    if(it.desc||it.description) html+='<div class="conn-desc">'+esc(it.desc||it.description)+'</div>';
+    if(it.cred_hint) html+='<div class="conn-hint">💡 '+esc(it.cred_hint)+'</div>';
+    html+='<div class="conn-section-title">凭证</div><div class="conn-fields">';
+    it.mcp.fields.forEach(function(f){
+      html+='<div class="field"><label>'+esc(f.label||f.key)+'</label><input type="password" id="mktCfg_'+esc(f.key)+'" value="" placeholder="留空则保留原值"></div>';
+    });
+    html+='</div>';
+    html+='<div class="conn-hint">保存后将注册为 MCP 服务器，由对话中的智能体调用（自动重启网关生效）。</div>';
+  } else {
+    if(it.desc||it.description) html+='<div class="conn-desc">'+esc(it.desc||it.description)+'</div>';
+    html+='<div class="conn-hint">💡 凭证提示：'+esc(it.cred_hint||'该技能无需额外凭证')+'</div>';
+    html+='<div class="conn-hint">该技能的凭证由其内置脚本管理，请按「获取指引」完成授权。</div>';
+    var gurl=it.guide_url||it.webUrl||'';
+    if(gurl) html+='<a class="conn-doc" href="'+esc(gurl)+'" target="_blank">📄 查看获取指引 →</a>';
+  }
+  body.innerHTML=html;
+  var m=document.getElementById('marketCfgModal');
+  if(m && m.parentElement!==document.body) document.body.appendChild(m);
+  if(m) m.style.display='flex';
+}
+function closeMarketConfig(){ var m=document.getElementById('marketCfgModal'); if(m) m.style.display='none'; _marketCfgCurrent=null; }
+function saveMarketConfig(){
+  var it=_marketCfgCurrent; if(!it){ closeMarketConfig(); return; }
+  if(!(it.mcp && it.mcp.fields && it.mcp.fields.length)){
+    toast('该技能通过内置脚本配置，请参考获取指引');
+    closeMarketConfig(); return;
+  }
+  var headers={};
+  it.mcp.fields.forEach(function(f){
+    var el=document.getElementById('mktCfg_'+f.key);
+    var v=el?el.value.trim():'';
+    if(v) headers[f.header]=(f.prefix||'')+v;
+  });
+  apiPost('/api/extensions/skills/config-mcp', { name: it.mcp.name, url: it.mcp.url, headers: headers }).then(function(res){
+    if(res && res.ok){ toast('✅ 凭证已保存，网关重启后生效'); closeMarketConfig(); }
+    else { toast('❌ 保存失败：'+((res&&res.error)||'未知错误')); }
+  });
+}
+function openMarketGuide(i){
+  var it=_skillMarketItems[i]; if(!it) return;
+  var url=it.guide_url||it.webUrl||('https://www.skillhub.cn/skills/'+(it.slug||''));
+  window.open(url, '_blank');
+}
+function searchSkillMarket(){
+  var el=document.getElementById('skillMarketSearch');
+  var kw=el?el.value.trim():'';
+  if(!kw){ renderSkillMarket(); return; }
+  var grid=document.getElementById('skillGrid');
+  if(grid) grid.innerHTML='<div class="empty-state">正在搜索 SkillHub…</div>';
+  apiGet('/api/extensions/skills/search?keyword='+encodeURIComponent(kw)).then(function(res){
+    if(res && res.ok && res.items){
+      _skillMarketItems=res.items.map(function(it){
+        return {
+          id: it.slug, name: it.name, icon: '', desc: it.description,
+          slug: it.slug, namespace: it.namespace, guide_url: it.webUrl,
+          cred_hint: '', official: false,
+          installed: _installedSkillNames.indexOf(it.slug)>=0,
+          _search: true, downloads: it.downloads, stars: it.stars
+        };
+      });
+      renderSkillMarketGrid();
+    } else {
+      if(grid) grid.innerHTML='<div class="empty-state">搜索失败：'+esc((res&&res.error)||'未知错误')+'</div>';
+    }
+  });
+}
 var _skillCfgCurrent = null; // { kind:'native'|'local', index, name }
 var _toolCfgCurrent = null;  // 当前正在配置的工具 id（替代放在 body 内会被 innerHTML 覆盖的 hidden input）
 function openSkillConfig(name){
@@ -7984,7 +8572,6 @@ function renderWorkflow(){
   var c=document.getElementById('wfConcInline'); if(c) c.value=(wf.concurrency||2);
   renderWfSteps('Inline','wfStepsInline');
   renderWorkflowPresets();
-  if(typeof renderChatChips==='function') renderChatChips();
 }
 function renderWfSteps(token, cid){
   var el=document.getElementById(cid); if(!el) return;
@@ -8062,7 +8649,7 @@ function setCurrentWorkflow(){
 }
 function clearWorkflow(){
   _cfg.extensions.workflow = { enabled:false, active:false, key:'', name:'', concurrency:2, category:'', inputs:[], steps:[] };
-  saveConfig(); renderWorkflow(); toast('已清除工作流');
+  saveConfig(); renderWorkflow(); renderWorkflowBar(); toast('已清除工作流');
 }
 var _wfCat='';
 function renderWorkflowPresets(){
@@ -8070,8 +8657,26 @@ function renderWorkflowPresets(){
   var presets = window.AO_WORKFLOW_PRESETS || [];
   var catLabels={
     '':'全部','data':'数据','department-collab':'部门协作','design':'设计','dev':'开发',
-    'English':'English','hr':'人力资源','legal':'法务','marketing':'营销','ops':'运维',
-    'strategy':'战略','一人公司':'一人公司'
+    'English':'英文','hr':'人力资源','legal':'法务','marketing':'营销','ops':'运维',
+    'strategy':'战略','一人公司':'一人公司',
+    'superpowers':'Superpowers 方法论','中国特色':'中国特色场景'
+  };
+  // 常见英文工作流名 → 中文
+  var nameLabels={
+    'Business Plan':'商业计划书','Code Architecture Review':'代码架构审查',
+    'Competitor Analysis Report':'竞品分析报告','Customer Discovery':'客户调研',
+    'Customer Persona':'用户画像','Daily Standup':'每日站会','Data Audit':'数据审计',
+    'Data Migration':'数据迁移','Decision Memo':'决策备忘','Design Review':'设计评审',
+    'Documentation Sprint':'文档冲刺','Feature Spec':'功能规格说明书',
+    'Go-to-Market Plan':'上市推广方案','Hiring Pipeline':'招聘流程',
+    'Incident Response':'事故应急响应','Launch Checklist':'上线检查清单',
+    'Marketing Campaign':'营销活动','Onboarding Plan':'入职培训计划',
+    'OKR Setting':'OKR 制定','Performance Review':'绩效评估',
+    'Postmortem':'事后复盘','Pricing Experiment':'定价实验',
+    'Quarterly Planning':'季度规划','Release Notes':'发布说明',
+    'Roadmap':'路线图','Sprint Planning':'Sprint 计划',
+    'Stakeholder Update':'利益相关方同步','Strategy Memo':'战略备忘',
+    'User Interview Synthesis':'用户访谈汇总','一人公司:全灵大会':'一人公司:全灵大会'
   };
   var cats=[{id:'',label:catLabels['']||'全部'}];
   presets.forEach(function(p){ if(p.category && !cats.some(function(c){return c.id===p.category;})) cats.push({id:p.category,label:catLabels[p.category]||p.category}); });
@@ -8083,9 +8688,9 @@ function renderWorkflowPresets(){
   grid.innerHTML = presets.filter(function(p){ return !_wfCat || p.category===_wfCat; }).map(function(p){
     var applied = (p.key===appliedKey);
     var catLabel = catLabels[p.category]||p.category||'通用';
-    // 保持原名（不翻译英文工作流名）
+    var nameZh = nameLabels[p.name] || p.name;
     return '<div class="ext-card'+(applied?' active':'')+'">'+
-      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(p.name)+'</div><div class="status">'+esc(catLabel)+(applied?' · 已应用':'')+'</div></div></div>'+
+      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(nameZh)+'</div><div class="status">'+esc(catLabel)+(applied?' · 已应用':'')+'</div></div></div>'+
       '<div class="conn-desc">'+esc(p.description||'')+'</div>'+
       '<button class="action" onclick="applyWorkflow(\''+esc(p.key)+'\')">'+(applied?'重新应用':'应用')+'</button></div>';
   }).join('') || '<div class="empty-state">暂无工作流模板。</div>';
@@ -8096,10 +8701,12 @@ function applyWorkflow(key){
   if(!p) return;
   _cfg.extensions.workflow = {
     key:p.key, name:p.name, description:p.description,
-    enabled:true, concurrency:(p.concurrency||2), category:(p.category||''),
+    enabled:true, active:true, concurrency:(p.concurrency||2), category:(p.category||''),
     inputs:(p.inputs||[]), steps:(p.steps||[])
   };
-  saveConfig(); renderWorkflow(); toast('已应用工作流：'+p.name);
+  if(!_cfg.extensions.toolsets) _cfg.extensions.toolsets={};
+  _cfg.extensions.toolsets.delegation=true;
+  saveConfig(); renderWorkflow(); renderWorkflowBar(); toast('已应用工作流：'+p.name+'（发送消息即触发）');
 }
 function toggleWorkflow(){
   var wf=_cfg.extensions.workflow;
@@ -8111,34 +8718,11 @@ function toggleWorkflow(){
 /* persona 内置映射 */
 var EXT_PERSONAS = {
   default:{emoji:'🤖',label:'默认助手',prompt:'你是用户的默认主力助手。'},
+  fnos:{emoji:'🐮',label:'飞牛操作员',prompt:'你是飞牛 NAS 的资深运维操作员，熟练掌握飞牛操作系统（fnOS）的全部技能，负责管控整台 NAS 系统。\n\n你的能力范围：\n- 应用管理：安装/卸载/升级/启停飞牛应用中心的应用，查看应用日志与资源占用\n- 存储管理：磁盘健康检查、存储池/RAID 状态、容量规划、快照与备份恢复\n- 文件服务：SMB/NFS/WebDAV/FTP 共享配置，文件检索与权限管理\n- 网络配置：IP/端口/DNS/防火墙、DDNS 与远程访问、Docker 网络\n- Docker 容器：容器的创建/启停/日志/资源限制，compose 编排\n- 系统运维：CPU/内存/温度监控，系统更新，用户与权限管理，计划任务\n- 故障排查：根据日志定位服务异常，给出修复步骤\n\n工作原则：\n1. 优先使用 trim-cli 等飞牛官方命令行工具执行操作，而不是空谈\n2. 涉及删除/格式化/重启等高危操作前，必须先向用户确认\n3. 回答简洁、给出可执行的命令或步骤，必要时主动调用工具获取实时状态'},
   coder:{emoji:'💻',label:'程序员',prompt:'你是一位资深全栈工程师。'},
   researcher:{emoji:'🔬',label:'研究员',prompt:'你是一位严谨的研究员。'},
   writer:{emoji:'✍️',label:'写作助手',prompt:'你是一位专业的写作助手。'},
-  analyst:{emoji:'📊',label:'数据分析师',prompt:'你是一位数据分析师。'},
-  fnos_operator:{
-    emoji:'🛠️',
-    label:'飞牛操作员',
-    prompt:
-'你是「飞牛操作员」，用户专属的 fnOS（飞牛 NAS）系统管家。\n'+
-'你熟练掌握飞牛 NAS 的全部技能，能用自然语言操控整个 NAS 系统的设置、文件、用户、应用、权限、网络、备份与服务。\n\n'+
-'【核心能力】\n'+
-'1. **文件与存储**：目录浏览/复制/移动/删除/重命名/压缩解压；权限查看/修改；空间占用分析与清理；快照与回收站管理；SMB/NFS/WebDAV/iSCSI 共享配置。\n'+
-'2. **应用管理**：查看已装应用（含 Docker、虚拟机、套件应用）；启动/停止/重启/卸载；日志查看与故障排查；端口映射、卷挂载、环境变量。\n'+
-'3. **用户与权限**：用户/用户组增删改查；共享空间配额；多因子认证；AD/LDAP 接入。\n'+
-'4. **网络与安全**：防火墙规则；DDNS、VPN、Tailscale、ZeroTier；SSL 证书申请与续签；SSH 密钥管理；IP 黑白名单；WAF。\n'+
-'5. **备份与同步**：快照计划、备份链、外置备份目的地、Rsync、Btrfs send/receive、对象存储同步。\n'+
-'6. **系统监控**：CPU/内存/磁盘/网络/温度/风扇；进程与服务；SMART 健康；定时任务。\n'+
-'7. **智能体/MCP**：调用已配置的连接器（飞牛官方 Skills、第三方 MCP、本地技能），用自然语言调度 NAS 一切操作。\n\n'+
-'【工作方式】\n'+
-'1. 用户提出需求时，先快速评估影响范围（数据风险/服务中断/权限变更），给出明确的执行步骤与回滚方案。\n'+
-'2. 删除、覆盖、回滚等高风险操作前必须先确认，绝不静默执行。\n'+
-'3. 在不确定的命令上，**先列出该命令的解释**再请求确认，不直接对生产路径动手。\n'+
-'4. 优先用飞牛原生界面/CLI/Skills；若只能 SSH 操作，提示用户开启 SSH 并说明临时风险。\n'+
-'5. 任何涉及「密码、API Key、私钥」一律本地落档 `.env.providers` 或 `~/.ssh/`，不要回显到对话。\n\n'+
-'【输出风格】\n'+
-'简洁、口语化、术语准确；带「操作清单 + 影响 + 回滚」三段式；文件路径/服务名/容器 ID 一律加反引号。\n'+
-'若用户的中文描述含糊，主动询问参数（源目录/目标目录/服务名/端口等），不臆测。'
-  }
+  analyst:{emoji:'📊',label:'数据分析师',prompt:'你是一位数据分析师。'}
 };
 function allPersonas(){
   var out={};
@@ -8229,83 +8813,6 @@ function selectPersona(id){
   renderSelectedExpertBar();
   renderPersonas(); saveConfig();
 }
-
-/* Chat composer 顶部 chip 行：渲染当前 persona + 工作流/专家团激活状态 */
-function renderChatChips(){
-  var box=document.getElementById('chatChips'); if(!box) return;
-  var html='';
-  // Persona chips（默认显示前 6 个：内置 + 自定义各取 3）
-  var personas=allPersonas();
-  var pKeys = Object.keys(personas);
-  var builtin = pKeys.filter(function(k){ return !!EXT_PERSONAS[k]; });
-  var custom  = pKeys.filter(function(k){ return !EXT_PERSONAS[k]; });
-  var showKeys = builtin.slice(0,4).concat(custom.slice(0,2));
-  showKeys.forEach(function(k){
-    var p=personas[k]; var active=(_persona===k);
-    html += '<button class="chat-chip'+(active?' active':'')+'" onclick="selectPersonaChip(\''+esc(k).replace(/'/g,"\\'")+'\')" title="'+(active?'当前角色: ':'切换到 ')+esc(p.label||k)+'">'+(p.emoji||'🤖')+' '+esc(p.label||k)+'</button>';
-  });
-  html += '<span class="chat-chip delimiter" style="border:none;background:transparent;padding:0 4px;cursor:default"></span>';
-  // 专家团 chip（激活状态高亮）
-  var teamOn = !!(_cfg.extensions && _cfg.extensions.team_enabled);
-  var teamCount = (_cfg.extensions && _cfg.extensions.team) ? _cfg.extensions.team.length : 0;
-  html += '<button class="chat-chip'+(teamOn?' active':'')+'" onclick="onClickTeamChip()" title="'+(teamOn?'已启用专家团（'+teamCount+' 人），点击管理':'点击启用专家团多智能体协作')+'">👥 专家团'+(teamOn?' +':'')+'</button>';
-  // 工作流 chip（激活状态高亮）
-  var wf = _cfg.extensions && _cfg.extensions.workflow;
-  var wfOn = !!(wf && wf.enabled);
-  var wfName = (wf && wf.name) ? wf.name : '';
-  html += '<button class="chat-chip'+(wfOn?' active':'')+'" onclick="onClickWorkflowChip()" title="'+(wfOn?'已应用工作流: '+esc(wfName)+'，点击查看':'点击设置工作流')+'">⚙ 工作流'+(wfOn?' · '+esc(wfName).slice(0,8):'')+'</button>';
-  box.innerHTML = html;
-}
-function selectPersonaChip(id){
-  if(_persona===id){ toast('当前已是该角色'); return; }
-  selectPersona(id);
-}
-function onClickTeamChip(){
-  // 直接打开 expert popup 并切到「专家团」tab
-  var btn = document.getElementById('btnExpert');
-  if(!btn){ switchPage('extensions'); return; }
-  closeMini();
-  _expertPickerTab = 'team';
-  activeBtn = btn; activePanel = 'expert';
-  popup = document.getElementById('miniPopup');
-  var d = buildMiniData().expert;
-  document.getElementById('popupTitle').textContent = d.title;
-  document.getElementById('popupSearchWrap').style.display = 'block';
-  document.getElementById('popupSearch').placeholder = '搜索专家';
-  var foot = document.getElementById('popupFoot'); if(foot) foot.style.display = 'none';
-  var tabs = document.getElementById('popupTabs');
-  tabs.style.display = 'flex';
-  tabs.innerHTML = '<div class="mini-popup-tab" onclick="switchExpertPickerTab(\'single\')">专家</div>'+
-    '<div class="mini-popup-tab active" onclick="switchExpertPickerTab(\'team\')">专家团</div>'+
-    '<div class="mini-popup-tab" onclick="switchExpertPickerTab(\'workflow\')">工作流</div>';
-  document.getElementById('popupBody').innerHTML = buildMiniPopupBody('expert', d);
-  popup.classList.remove('wide');
-  popup.classList.add('open');
-  positionPopup(btn);
-}
-function onClickWorkflowChip(){
-  // 直接打开 expert popup 并切到「工作流」tab
-  var btn = document.getElementById('btnExpert');
-  if(!btn){ switchPage('extensions'); return; }
-  closeMini();
-  _expertPickerTab = 'workflow';
-  activeBtn = btn; activePanel = 'expert';
-  popup = document.getElementById('miniPopup');
-  var d = buildMiniData().expert;
-  document.getElementById('popupTitle').textContent = d.title;
-  document.getElementById('popupSearchWrap').style.display = 'block';
-  document.getElementById('popupSearch').placeholder = '搜索专家';
-  var foot = document.getElementById('popupFoot'); if(foot) foot.style.display = 'none';
-  var tabs = document.getElementById('popupTabs');
-  tabs.style.display = 'flex';
-  tabs.innerHTML = '<div class="mini-popup-tab" onclick="switchExpertPickerTab(\'single\')">专家</div>'+
-    '<div class="mini-popup-tab" onclick="switchExpertPickerTab(\'team\')">专家团</div>'+
-    '<div class="mini-popup-tab active" onclick="switchExpertPickerTab(\'workflow\')">工作流</div>';
-  document.getElementById('popupBody').innerHTML = buildMiniPopupBody('expert', d);
-  popup.classList.remove('wide');
-  popup.classList.add('open');
-  positionPopup(btn);
-}
 var _expFilter=''; var _expDept='';
 function renderExperts(){
   var el=document.getElementById('expertGrid'); if(!el) return;
@@ -8330,7 +8837,8 @@ function renderExperts(){
   }
   window.__expRendered = true;
   var list = expertsList();
-  var cnt=document.getElementById('expCount'); if(cnt) cnt.textContent='共 '+list.length+' 位专家';
+  var cnt=document.getElementById('expCount');
+  if(cnt){ cnt.textContent = (window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length) ? ('共 '+list.length+' 位专家') : '专家库加载中…'; }
   var deptWrap=document.getElementById('expDepts');
   var depts = (window.AGENCY_DEPTS && window.AGENCY_DEPTS.length) ? window.AGENCY_DEPTS : [];
   if(deptWrap){
@@ -8408,116 +8916,56 @@ function renderTeam(){
       '<div class="actions"><button class="action" onclick="removeTeamMember(\''+esc(m.id)+'\')">移除</button></div>'+
       '</div>';
   }).join('') || '<div class="empty-state">团队为空，从「专家」页添加成员。</div>';
-  if(typeof renderChatChips==='function') renderChatChips();
 }
 function buildAndUseTeam(){
-  buildTeam();
+  // 直接采用当前已选成员（用户在「专家」页手动添加、或「🎲 随机组建」后的结果）并启用，
+  // 不在此处重新随机，避免覆盖用户手动挑选的专家团（修复：手动选好后点确认被随机刷掉）。
+  _cfg.extensions.team_name = (document.getElementById('teamName').value)||'我的团队';
+  if(!_cfg.extensions.team || !_cfg.extensions.team.length){
+    toast('团队为空：请先从「专家」页添加成员，或点击「🎲 随机组建」');
+    return;
+  }
   _cfg.extensions.team_enabled=true;
   if(!_cfg.extensions.toolsets) _cfg.extensions.toolsets={};
   _cfg.extensions.toolsets.delegation=true;
+  // 互斥：停用工作流
+  if(_cfg.extensions.workflow&&_cfg.extensions.workflow.enabled){ _cfg.extensions.workflow.enabled=false; _cfg.extensions.workflow.active=false; renderWorkflowBar(); }
   setToggle('teamEnabledToggle', true);
-  saveConfig(); renderTeam();
+  saveConfig(); renderTeam(); renderTeamBar();
+  enterTeamSession();
   toast('已组建并启用专家团（'+_cfg.extensions.team.length+' 人）');
 }
 function toggleTeam(){
   if(_cfg.extensions.team_enabled===undefined) _cfg.extensions.team_enabled=false;
   _cfg.extensions.team_enabled=!_cfg.extensions.team_enabled;
-  if(_cfg.extensions.team_enabled){ if(!_cfg.extensions.toolsets)_cfg.extensions.toolsets={}; _cfg.extensions.toolsets.delegation=true; }
+  if(_cfg.extensions.team_enabled){
+    if(!_cfg.extensions.toolsets)_cfg.extensions.toolsets={}; _cfg.extensions.toolsets.delegation=true;
+    // 互斥：停用工作流
+    if(_cfg.extensions.workflow&&_cfg.extensions.workflow.enabled){ _cfg.extensions.workflow.enabled=false; _cfg.extensions.workflow.active=false; renderWorkflowBar(); }
+  }
   setToggle('teamEnabledToggle', _cfg.extensions.team_enabled);
-  saveConfig(); renderTeam();
+  saveConfig(); renderTeam(); renderTeamBar();
+  if(_cfg.extensions.team_enabled) enterTeamSession();
   toast(_cfg.extensions.team_enabled?'已启用专家团（已自动开启任务委派）':'已关闭专家团');
 }
-
-/* 20 个内置专家团预设（参考 agency-agents-zh + superpowers-zh 行业场景），
-   每次点击「组建并使用专家团」随机抽一个场景，按该场景的岗位要求从 agency-agents-zh 库挑选成员。 */
-window.TEAM_PRESETS = [
-  { id:'product',name:'产品研发团队',icon:'🚀',roles:['product','engineering','design','qa','data','marketing'] },
-  { id:'frontend',name:'前端工程团队',icon:'💻',roles:['frontend','design','ux','engineering','data'] },
-  { id:'backend',name:'后端工程团队',icon:'⚙️',roles:['backend','engineering','devops','data','security'] },
-  { id:'mobile',name:'移动端团队',icon:'📱',roles:['mobile','design','ux','engineering','qa'] },
-  { id:'devops',name:'DevOps 团队',icon:'🛠️',roles:['devops','security','backend','engineering'] },
-  { id:'data',name:'数据分析师团队',icon:'📊',roles:['data','analytics','engineering','product'] },
-  { id:'ai',name:'AI / ML 团队',icon:'🤖',roles:['ai','ml','engineering','data','research'] },
-  { id:'security',name:'安全团队',icon:'🔒',roles:['security','devops','backend'] },
-  { id:'qa',name:'QA 测试团队',icon:'🧪',roles:['qa','engineering','security'] },
-  { id:'design',name:'设计创意团队',icon:'🎨',roles:['design','ux','content','marketing','branding'] },
-  { id:'marketing',name:'市场推广团队',icon:'📣',roles:['marketing','content','sales','branding','social'] },
-  { id:'sales',name:'销售转化团队',icon:'💼',roles:['sales','marketing','product','data'] },
-  { id:'content',name:'内容创作团队',icon:'✍️',roles:['content','writing','marketing','design','social'] },
-  { id:'hr',name:'HR 招聘团队',icon:'👥',roles:['hr','leadership','product','marketing'] },
-  { id:'finance',name:'财务运营团队',icon:'💰',roles:['finance','analytics','leadership','data'] },
-  { id:'legal',name:'法务合规团队',icon:'⚖️',roles:['legal','security','compliance','leadership'] },
-  { id:'strategy',name:'战略咨询团队',icon:'🎯',roles:['strategy','leadership','finance','product','analytics'] },
-  { id:'education',name:'教育培训团队',icon:'📚',roles:['education','content','design','marketing'] },
-  { id:'healthcare',name:'医疗健康团队',icon:'🏥',roles:['healthcare','data','research','product'] },
-  { id:'sustainability',name:'可持续发展团队',icon:'🌱',roles:['sustainability','research','marketing','policy'] },
-  { id:'research',name:'学术研究团队',icon:'🔬',roles:['research','data','academic','writing'] },
-  { id:'gaming',name:'游戏开发团队',icon:'🎮',roles:['gaming','design','engineering','art','narrative'] },
-  { id:'media',name:'媒体传播团队',icon:'📺',roles:['media','content','social','marketing','writing'] }
-];
-
-function pickRandomPreset(){
-  var presets = window.TEAM_PRESETS || [];
-  return presets[Math.floor(Math.random()*presets.length)];
-}
-
+function _shuffleArr(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function buildTeam(){
-  _cfg.extensions.team_name = (document.getElementById('teamName').value) || '我的团队';
-  var preset = pickRandomPreset();
-  _cfg.extensions.team_preset_id = preset.id;
-  _cfg.extensions.team_preset_name = preset.name;
-  var ids = [];
+  _cfg.extensions.team_name = (document.getElementById('teamName').value)||'我的团队';
+  var members;
   if(window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length){
-    // 按 preset.roles 列表，每个角色在专家库中找匹配的人（按 dept_label / dept / id 关键词匹配）
-    var personas = window.AGENCY_PERSONAS;
-    var used = {};
-    (preset.roles || []).forEach(function(role){
-      var match = personas.find(function(p){
-        if(used[p.id]) return false;
-        var hay = ((p.dept_label||p.dept||'') + ' ' + (p.id||'') + ' ' + (p.label||p.name||'')).toLowerCase();
-        // 角色关键词映射
-        var keys = {
-          product:['产品','product','pm'], frontend:['前端','frontend','web','react','vue'],
-          backend:['后端','backend','server','api'], mobile:['移动','mobile','ios','android'],
-          devops:['devops','运维','sre','ops'], ai:['ai','ml','人工智能','机器学习','模型'],
-          ml:['ml','ai','机器学习','深度学习'], data:['数据','data','分析师','analytics'],
-          analytics:['分析','analytics','bi'], design:['设计','design','ui','visual'],
-          ux:['ux','用户体验','交互'], qa:['测试','qa','quality'],
-          security:['安全','security','sec'], engineering:['工程','engineer','开发'],
-          marketing:['市场','marketing','运营','推广'], sales:['销售','sales','商务'],
-          content:['内容','content','编辑','文案'], writing:['写作','writing','编辑'],
-          hr:['hr','人力','招聘'], finance:['财务','finance','会计'],
-          legal:['法务','legal','合规','律师'], compliance:['合规','compliance'],
-          strategy:['战略','strategy','咨询'], leadership:['领导','管理','leader','ceo'],
-          branding:['品牌','branding'], social:['社媒','social','社交'],
-          education:['教育','education','培训'], research:['研究','research','科研'],
-          academic:['学术','academic','学者'], healthcare:['医疗','health','医学','健康'],
-          sustainability:['可持续','sustainability','环保'], policy:['政策','policy'],
-          gaming:['游戏','gaming','game'], art:['美术','art','视觉'],
-          narrative:['叙事','narrative','剧情'], media:['媒体','media','传播']
-        }[role] || [role];
-        return keys.some(function(k){ return hay.indexOf(k)>=0; });
-      });
-      if(match) { used[match.id] = true; ids.push(match); }
-    });
-    // 兜底：不足 3 人时按部门各取 1 位
-    if(ids.length < 3){
-      personas.forEach(function(p){
-        if(ids.length >= 6) return;
-        if(used[p.id]) return;
-        if(ids.find(function(x){ return (x.dept||'') === (p.dept||''); })) return;
-        used[p.id] = true; ids.push(p);
-      });
-    }
+    // 每次点击随机挑选不同行业（部门），每个行业随机抽一位专家
+    var byDept={};
+    window.AGENCY_PERSONAS.forEach(function(p){ var d=p.dept||'其他'; if(!byDept[d]) byDept[d]=[]; byDept[d].push(p); });
+    var depts=_shuffleArr(Object.keys(byDept)).slice(0,6);
+    members=depts.map(function(d){ var arr=byDept[d]; return arr[Math.floor(Math.random()*arr.length)]; });
   } else {
-    ids = (PV.experts || []).slice(0, 4);
+    members=_shuffleArr(PV.experts.slice()).slice(0,3);
   }
-  _cfg.extensions.team = ids.map(function(p){ return { id:p.id, name:(p.label||p.name), dept:(p.dept_label||p.dept), icon:(p.emoji||p.icon) }; });
-  renderTeam(); saveConfig();
-  toast('已组建「'+preset.name+'」共 '+ids.length+' 人');
+  _cfg.extensions.team = members.map(function(p){ return { id:p.id, name:(p.label||p.name), dept:(p.dept_label||p.dept), icon:(p.emoji||p.icon) }; });
+  renderTeam(); saveConfig(); toast('已随机组建 '+_cfg.extensions.team.length+' 人团队（每次行业不同），确认后点「🚀 组建并使用专家团」启用');
 }
-function clearTeam(){ _cfg.extensions.team=[]; renderTeam(); saveConfig(); }
-function removeTeamMember(id){ _cfg.extensions.team=(_cfg.extensions.team||[]).filter(function(x){ return x.id!==id; }); renderTeam(); saveConfig(); }
+function clearTeam(){ _cfg.extensions.team=[]; renderTeam(); renderTeamBar(); saveConfig(); }
+function removeTeamMember(id){ _cfg.extensions.team=(_cfg.extensions.team||[]).filter(function(x){ return x.id!==id; }); renderTeam(); renderTeamBar(); saveConfig(); }
 
 /* 保存扩展/设置相关配置 */
 function saveConfig(){
@@ -8537,6 +8985,9 @@ function saveConfig(){
   }
   return apiPost('/api/config', payload).then(function(r){
     if(r && r.error) toast('保存配置失败：'+r.error);
+    // 工具集有新增（如启用专家团开启 delegation）时后端会重启网关以加载新工具，
+    // 给用户明确反馈，避免网关重启的几秒内发消息失败造成困惑
+    else if(r && r.gateway_restarting) toast('正在重启网关以加载新工具（如任务委派），请稍候几秒再发送');
   }).catch(function(e){ toast('保存配置失败：'+e.message); });
 }
 
@@ -8593,9 +9044,12 @@ function renderConnectorDetail(c, creds, d){
   body+='<div class="conn-hint">💡 '+esc(c.auth_hint)+'</div>';
   body+='<div class="conn-section-title">凭证</div><div class="conn-fields">';
   c.fields.forEach(function(f){
-    var val=creds[f.key]||'';
-    var type=f.secret?'password':'text';
-    body+='<div class="field"><label>'+esc(f.label)+'</label><input type="'+(f.secret?'password':'text')+'" id="connField_'+f.key+'" value="'+esc(val)+'" placeholder="'+esc(f.placeholder||'')+'"></div>';
+    // creds_set 是「是否已设置」的布尔标志（后端出于安全不回显真实密钥），
+    // 绝不能当作输入框的值回填（否则 Client ID 会变成 "true" 并在保存时覆盖真实凭证）。
+    var isSet=!!creds[f.key];
+    var ph=f.placeholder||'';
+    if(isSet) ph='已设置，留空则保留原值'+(ph?'（'+ph+'）':'');
+    body+='<div class="field"><label>'+esc(f.label)+(isSet?' <span style="color:var(--success);font-size:11px">✓ 已设置</span>':'')+'</label><input type="'+(f.secret?'password':'text')+'" id="connField_'+f.key+'" value="" placeholder="'+esc(ph)+'"></div>';
   });
   body+='</div>';
   body+='<div class="conn-section-title">工具列表</div><div class="conn-tools">';
@@ -8831,7 +9285,7 @@ function chRenderQr(deep, canvasId){
   drawQR(cv, deep).then(function(ok){
     if(!ok){
       var wrap=cv.parentNode;
-      if(wrap){ wrap.innerHTML='<div class="conn-hint" style="color:var(--red)">当前环境无法渲染二维码，请复制以下链接在手机浏览器打开完成授权：</div><div style="word-break:break-all;font-size:12px;background:#f3f4f6;padding:8px;border-radius:6px;margin-top:6px">'+esc(deep)+'</div>'; }
+      if(wrap){ wrap.innerHTML='<div class="conn-hint" style="color:var(--red)">当前环境无法渲染二维码，请复制以下链接在手机浏览器打开完成授权：</div><div style="word-break:break-all;font-size:12px;background:#f3f4f6;padding:8px;border-radius:var(--radius-sm);margin-top:6px">'+esc(deep)+'</div>'; }
     }
   });
 }
@@ -8846,7 +9300,7 @@ function chStartTelegramQr(){
     if(!res || res.error) throw new Error(res&&res.error||'获取二维码失败');
     var deep=res.qr_payload||res.deep_link||'';
     if(!deep){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法生成二维码</div>'; return; }
-    body.innerHTML='<div class="conn-hint">用 Telegram 扫描下方二维码创建机器人。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="tgQR" width="220" height="220" style="width:220px;height:220px;background:#fff;border-radius:8px"></canvas></div><div id="tgQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码创建…</div><div id="tgAllowWrap" style="display:none;margin-top:12px"><input id="tgAllowed" type="text" placeholder="允许的 Telegram 用户 ID（逗号分隔）" style="width:100%"></div>';
+    body.innerHTML='<div class="conn-hint">用 Telegram 扫描下方二维码创建机器人。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="tgQR" width="220" height="220" style="width:220px;height:220px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="tgQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码创建…</div><div id="tgAllowWrap" style="display:none;margin-top:12px"><input id="tgAllowed" type="text" placeholder="允许的 Telegram 用户 ID（逗号分隔）" style="width:100%"></div>';
     chRenderQr(deep, 'tgQR');
     chPollTelegramQr(res.pairing_id);
   }).catch(function(e){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
@@ -8876,7 +9330,7 @@ function chStartWhatsAppQr(){
     if(res.status==='connected'){ chApplyWhatsAppQr(res.pairing_id); return; }
     var waDeep=res.qr_payload||res.deep_link||'';
     if(!waDeep){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">二维码生成失败</div>'; return; }
-    body.innerHTML='<div class="conn-hint">用 WhatsApp 扫描上方二维码 → 设置 → 关联设备。</div><div style="display:flex;justify-content:center;padding:8px"><canvas id="waQR" width="240" height="240" style="width:240px;height:240px;background:#fff;border-radius:8px"></canvas></div><div id="waQrStatus" style="font-size:13px;color:var(--text3)">等待在 WhatsApp 中确认…</div>';
+    body.innerHTML='<div class="conn-hint">用 WhatsApp 扫描上方二维码 → 设置 → 关联设备。</div><div style="display:flex;justify-content:center;padding:8px"><canvas id="waQR" width="240" height="240" style="width:240px;height:240px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="waQrStatus" style="font-size:13px;color:var(--text3)">等待在 WhatsApp 中确认…</div>';
     chRenderQr(waDeep, 'waQR');
     chPollWhatsAppQr(res.pairing_id);
   }).catch(function(e){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">启动失败：'+(e.message||e)+'</div>'; });
@@ -8903,7 +9357,7 @@ function chStartWeixinQr(){
     var deep=res.qrcode_url||res.qrcode_img||'';
     if(!deep && res.qrcode) deep='https://ilinkai.weixin.qq.com/ilink/bot/scan?qrcode='+encodeURIComponent(res.qrcode);
     if(!deep){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">二维码生成失败</div>'; return; }
-    body.innerHTML='<div class="conn-hint">请用微信扫描下方二维码完成登录（腾讯 iLink 官方接口）。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="wxQR" width="200" height="200" style="width:200px;height:200px;background:#fff;border-radius:8px"></canvas></div><div id="wxQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码…</div>';
+    body.innerHTML='<div class="conn-hint">请用微信扫描下方二维码完成登录（腾讯 iLink 官方接口）。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="wxQR" width="200" height="200" style="width:200px;height:200px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="wxQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码…</div>';
     chRenderQr(deep, 'wxQR');
     chPollWeixinQr(res.qrcode);
   }).catch(function(e){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
@@ -8927,7 +9381,7 @@ function chStartWecomQr(){
     if(!res || res.error) throw new Error(res.error||'获取二维码失败');
     var deep=res.qr_payload||res.qr_url||res.deep_link||'';
     if(!deep){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法生成二维码，请先在「手动输入」中填写 Corp ID / Agent ID / Secret。</div>'; return; }
-    body.innerHTML='<div class="conn-hint">用企业微信扫描下方二维码，授权自建应用（扫码后点「完成」启用）。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="wcQR" width="220" height="220" style="width:220px;height:220px;background:#fff;border-radius:8px"></canvas></div><div id="wcQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待在企业微信中授权…</div>';
+    body.innerHTML='<div class="conn-hint">用企业微信扫描下方二维码，授权自建应用（扫码后点「完成」启用）。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="wcQR" width="220" height="220" style="width:220px;height:220px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="wcQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待在企业微信中授权…</div>';
     chRenderQr(deep, 'wcQR');
     var foot=document.getElementById('chModalFoot'); if(foot) foot.innerHTML='<button class="action primary" onclick="chApplyWecomQr()">我已在企业微信中完成授权</button>';
   }).catch(function(e){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
@@ -8971,11 +9425,20 @@ function checkAppUpdate(){
   }).catch(function(){ toast('检查应用更新失败'); });
 }
 function confirmAppUpdate(){
-  // 直接跳转到 GitHub releases 页面下载最新 FPK（不需要 PAT，无需触发 Actions 构建）
-  var url = 'https://github.com/veenyi/fnos-hermes-agent/releases/latest';
-  if(window.confirm('将打开 GitHub releases 页面下载最新 FPK 安装包，是否继续？\n\n下载后请通过 fnOS 应用中心上传安装。')){
-    window.open(url, '_blank');
-  }
+  if(!confirm('确认更新 Hermes Agent 应用？')) return;
+  apiPost('/api/app/update/dispatch', {}).then(function(data){
+    if(data && data.error){ toast('启动更新失败：'+data.error); return; }
+    toast('应用更新中…');
+    var tries=0;
+    (function poll(){
+      tries++;
+      apiGet('/api/app/update/status').then(function(d){
+        if(d && d.status==='done'){ toast('应用更新完成'); var btn=document.getElementById('appUpdateBtn'); if(btn) btn.style.display='none'; }
+        else if(d && d.status==='error'){ toast('更新失败'); }
+        else if(tries<40){ setTimeout(poll, 2000); }
+      }).catch(function(){ if(tries<40) setTimeout(poll,2000); });
+    })();
+  }).catch(function(e){ toast('启动更新失败：'+e.message); });
 }
 
 /* ============================ 设置页 ============================ */
@@ -9011,15 +9474,52 @@ document.addEventListener('click', function(e){
   if(popup && !popup.contains(e.target) && !(e.target.closest && e.target.closest('.tool-btn'))) closeMini();
 });
 
+/* ============================ 飞牛桌面会话保活 ============================ */
+// Hermes 以同源 iframe 嵌入飞牛（fnOS）桌面（经 fnOS gateway 反向代理，带 BASE_PATH 前缀）。
+// 用户在 iframe 内的鼠标/键盘操作不会冒泡到飞牛顶层文档的活动监听器，飞牛空闲计时器
+// 会误判为「无操作」，超时后把整个桌面登出（弹「您已被登出」）。
+// 这里在嵌入环境下周期性向顶层文档派发合成 mousemove 事件，重置飞牛空闲计时器，
+// 恢复「打开 Hermes 聊天界面期间飞牛不被登出」的旧版行为。独立端口（顶层窗口）访问时自动跳过。
+function setupFnosKeepAlive(){
+  try {
+    if(window.self === window.top) return;            // 独立窗口访问，无需保活
+    var topWin = window.top;
+    var topDoc = topWin && topWin.document;
+    if(!topDoc) return;
+    try { void topDoc.body; } catch(e){ return; }     // 跨域（不同源）无法访问顶层文档，跳过
+    // 向顶层文档/窗口派发「无害活动事件」（mousemove/pointermove），重置飞牛桌面空闲计时器。
+    // 只用鼠标移动类事件，避免 keydown/wheel 误触飞牛快捷键或滚动桌面。
+    var fire = function(){
+      try {
+        if(document.hidden) return;                   // 切到其他飞牛应用时停止保活，交还飞牛空闲计时
+        ['mousemove','pointermove'].forEach(function(t){
+          try { topDoc.dispatchEvent(new topWin.MouseEvent(t, { bubbles:true, cancelable:true, view:topWin })); } catch(e){}
+          try { topWin.dispatchEvent(new topWin.MouseEvent(t, { bubbles:true, cancelable:true, view:topWin })); } catch(e){}
+        });
+      } catch(e){}
+    };
+    setInterval(fire, 30000);                         // 周期保活，远短于飞牛空闲超时
+    setTimeout(fire, 1500);                           // 载入后先打一次，避免首分钟内被判定空闲
+    // 用户在 iframe 内真实操作鼠标时，同步向顶层文档转发活动事件，使活跃期间持续重置飞牛空闲计时。
+    ['mousemove','pointermove','mousedown'].forEach(function(t){
+      try {
+        document.addEventListener(t, function(){
+          try { if(!document.hidden) topDoc.dispatchEvent(new topWin.MouseEvent(t, { bubbles:true, cancelable:true, view:topWin })); } catch(e){}
+        }, { passive:true, capture:true });
+      } catch(e){}
+    });
+  } catch(e){}
+}
+
 document.addEventListener('DOMContentLoaded', function(){
   BASE = _resolveBase();
   setTheme(localStorage.getItem('fnos-theme-mode')||'auto');
   initSettingsToggles();
+  setupFnosKeepAlive();
   var inp=document.getElementById('chatInput');
   if(inp){ inp.addEventListener('input', function(){ autoResize(this); }); autoResize(inp); }
   switchPage('chat');
-  // 专家库可能未在打包后加载或被旧缓存命中：强制重新拉取最新版（带缓存破坏），加载完成后重渲染专家网格/选择器
-  bootstrapPersonasLibrary();
+  // 专家库改为按需懒加载：进入「扩展→专家库/专家团」或打开专家胶囊时由 ensurePersonasLibrary 注入（版本号缓存键，不再启动即下载 3.4MB）
   window.__personasOpenMini = function(){
     if(activePanel==='expert'){ var b=document.getElementById('btnExpert'); if(b){ closeMini(); openMini(b,'expert'); } }
     var ec=document.getElementById('expCount'); if(ec) ec.textContent='共 '+expertsList().length+' 位专家';
@@ -9031,8 +9531,17 @@ document.addEventListener('DOMContentLoaded', function(){
       renderExtensions();
       renderConnectors();
       renderChannels();
-    }).catch(function(){});
-    loadSessions();
+      renderWorkflowBar();
+      renderTeamBar();
+      // 恢复上次选择的模型按钮状态
+      if(_selectedModel){
+        var mName = (typeof _selectedModel==='object'&&_selectedModel.model) ? _selectedModel.model : _selectedModel;
+        var bm=document.getElementById('btnModel'); if(bm){ bm.setAttribute('data-tip','模型: '+mName); bm.classList.add('active'); }
+      }
+      // 必须在配置（含 agents 分组与 session→分组映射）恢复之后再加载会话并渲染侧栏，
+      // 否则 loadSessions 的 renderRail 会先用空映射把所有会话归入「默认主力助手」分组
+      loadSessions();
+    }).catch(function(){ loadSessions(); });
     renderOverview();
     tickStatus();
     setInterval(tickStatus, 3000);   // 轻量周期轮询：状态变化（重启/启动/停止后）自动反映，无需阻塞等待
