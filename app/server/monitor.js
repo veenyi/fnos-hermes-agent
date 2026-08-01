@@ -2,7 +2,7 @@
 import { spawn, spawnSync } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync } from "fs";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync, rmSync } from "fs";
 import { randomBytes } from "crypto";
 import { networkInterfaces } from "os";
 import { resolve as resolvePath, dirname, join } from "path";
@@ -199,6 +199,7 @@ function formatUptime(ms) {
 }
 
 const GATEWAY_PORT   = Number(process.env.GATEWAY_PORT || "8742");
+const UI_PORT        = Number(process.env.UI_PORT || "8650");
 const SOCKET_PATH    = (process.env.MONITOR_SOCKET_PATH || "").trim();
 if (!SOCKET_PATH) {
   console.error("[FATAL] MONITOR_SOCKET_PATH is required — unix socket mode only");
@@ -388,6 +389,93 @@ const UPLOAD_FILE_DIR = `${UPLOAD_DIR}/files`;
 const WORKSPACE_DIR   = `${DATA_DIR}/workspace`;
 const GATEWAY_API   = `http://localhost:${GATEWAY_PORT}/v1`;
 const DASHBOARD_BIND = "127.0.0.1";
+
+// ─── MCP stdio 桥接脚本：让 Hermes 网关通过 stdio 传输调用 gateway 模式连接器 ───
+const MCP_BRIDGE_SCRIPT = `${VAR_DIR}/mcp-stdio-bridge.js`;
+function _ensureMcpBridgeScript() {
+  try {
+    const script = [
+      '// MCP stdio bridge: reads JSON-RPC from stdin, forwards to monitor HTTP, writes to stdout',
+      'const http = require("http");',
+      'const kind = process.argv[2];',
+      'const port = parseInt(process.argv[3] || "8650", 10);',
+      'const url = "http://127.0.0.1:" + port + "/mcp-proxy/" + kind;',
+      'function forward(body) {',
+      '  return new Promise(function(resolve, reject) {',
+      '    var data = JSON.stringify(body);',
+      '    var u = new URL(url);',
+      '    var opts = { hostname: u.hostname, port: u.port, path: u.pathname, method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) } };',
+      '    var req = http.request(opts, function(res) {',
+      '      var chunks = [];',
+      '      res.on("data", function(c) { chunks.push(c); });',
+      '      res.on("end", function() { resolve(Buffer.concat(chunks).toString("utf8")); });',
+      '    });',
+      '    req.on("error", function(e) { reject(e); });',
+      '    req.write(data); req.end();',
+      '  });',
+      '}',
+      'var buf = "";',
+      'process.stdin.setEncoding("utf8");',
+      'process.stdin.on("data", function(chunk) {',
+      '  buf += chunk;',
+      '  var lines = buf.split("\\n"); buf = lines.pop() || "";',
+      '  lines.forEach(function(line) {',
+      '    line = line.trim(); if (!line) return;',
+      '    var msg; try { msg = JSON.parse(line); } catch(e) { return; }',
+      '    forward(msg).then(function(resp) {',
+      '      if (resp && resp.trim()) process.stdout.write(resp.trim() + "\\n");',
+      '    }).catch(function(e) {',
+      '      if (msg.id != null) process.stdout.write(JSON.stringify({jsonrpc:"2.0",id:msg.id,error:{code:-32603,message:e.message}}) + "\\n");',
+      '    });',
+      '  });',
+      '});',
+      'process.stdin.on("end", function() { process.exit(0); });',
+    ].join("\n");
+    writeFileSync(MCP_BRIDGE_SCRIPT, script, { mode: 0o755 });
+  } catch (e) { log("[MCP-BRIDGE] failed to write bridge script: " + e.message); }
+}
+
+// 模块级桥接变量：handleFetch 内部赋值，startServer 的 setTimeout 调用
+let _autoRegisterGatewayMcpFn = null;
+
+// 模块级自动注册：直接操作文件，不依赖 handleFetch 内部函数
+function _moduleLevelAutoRegisterMcp() {
+  try {
+    let st = {};
+    try { if (existsSync(CONNECTORS_STATE)) st = JSON.parse(readFileSync(CONNECTORS_STATE, "utf8") || "{}"); } catch (e) {}
+    let yml = "";
+    try { if (existsSync(HERMES_CONFIG)) yml = readFileSync(HERMES_CONFIG, "utf8"); } catch (e) {}
+    const nodeBin = resolvedNodeBin || "node";
+    let changed = false;
+    CONNECTOR_CATALOG.forEach(function (cat) {
+      if (cat.mcp_mode !== "gateway") return;
+      const creds = st[cat.kind] || {};
+      if (!(cat.fields || []).every(function (f) { return !!creds[f.key]; })) return;
+      const mcpName = "conn-" + cat.kind;
+      // YAML 安全标量：含特殊字符时用双引号包裹
+      function _ys(v) { var s = String(v); return /[\s:"'\\#\[\]{}&*!|>%@`,]/.test(s) || s === "" ? '"' + s.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"' : s; }
+      const entryBlock = "  " + mcpName + ":\n    command: " + _ys(nodeBin) + "\n    args:\n      - " + _ys(MCP_BRIDGE_SCRIPT) + "\n      - " + _ys(cat.kind) + "\n      - " + _ys(String(UI_PORT)) + "\n";
+      const re = new RegExp("^  " + mcpName.replace(/[-]/g, "\\-") + ":\\s*$", "m");
+      if (re.test(yml)) {
+        // 已存在，替换该条目
+        yml = yml.replace(new RegExp("(  " + mcpName.replace(/[-]/g, "\\-") + ":\\n)(?:    .*\\n)*", "m"), entryBlock);
+      } else {
+        // 不存在，追加
+        if (!/^mcp_servers:/m.test(yml)) yml += (yml.endsWith("\n") ? "" : "\n") + "mcp_servers:\n";
+        yml += entryBlock;
+      }
+      changed = true;
+    });
+    if (changed) {
+      try { writeFileSync(HERMES_CONFIG, yml, { mode: 0o644 }); } catch (e) {}
+      log("[MCP-BRIDGE] module-level auto-register: wrote gateway MCP entries to config.yaml");
+    } else {
+      log("[MCP-BRIDGE] module-level auto-register: no configured gateway connectors");
+    }
+  } catch (e) { log("[MCP-BRIDGE] module-level auto-register failed: " + e.message); }
+}
+_ensureMcpBridgeScript();
+_moduleLevelAutoRegisterMcp();
 
 // ─── API Key 自动生成（12位随机字母数字）─────────────────────────────────────
 function generateApiKey() {
@@ -717,6 +805,29 @@ function getActiveProvider() {
   return cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
 }
 
+// 根据前端会话级选择（modelOverride = { model, provider }）解析本次对话实际使用的 provider 列表。
+// 若用户在会话窗口选了具体模型/供应商，则优先用它（并覆盖该 provider 的默认 model），不走全局回退链；
+// 否则回退到全局 active_provider + fallback_providers。
+function resolveChatProviders(cfg, modelOverride) {
+  if (modelOverride && modelOverride.provider) {
+    const sel = cfg.providers.find(p => p.name === modelOverride.provider || String(p.id) === String(modelOverride.provider));
+    if (sel) {
+      const effective = Object.assign({}, sel);
+      if (modelOverride.model) effective.model = modelOverride.model;
+      return [effective];
+    }
+  }
+  const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
+  const allProviders = [primary];
+  if (cfg.fallback_providers && cfg.fallback_providers.length > 0) {
+    for (const fbName of cfg.fallback_providers) {
+      const fb = cfg.providers.find(p => p.name === fbName);
+      if (fb && primary && fb.name !== primary.name) allProviders.push(fb);
+    }
+  }
+  return allProviders;
+}
+
 function sessionFile(id) {
   return `${SESSIONS_DIR}/${id}.json`;
 }
@@ -881,7 +992,7 @@ async function fetchGatewayModels(provider) {
     // LOCAL provider 必须用真实 MONITOR_TOKEN
     const isLocal = (provider.base_url === "LOCAL" || provider.id === "hermes");
     if (!isLocal && !provider.base_url) {
-      return { ok: false, models: [], latency_ms: 0, error: 'base_url 未填写' };
+      return { models: [], latency: 0, error: 'base_url 未填写' };
     }
     if (isLocal) {
       headers["Authorization"] = `Bearer ${MONITOR_TOKEN}`;
@@ -891,10 +1002,10 @@ async function fetchGatewayModels(provider) {
     const baseUrl = isLocal ? GATEWAY_API : provider.base_url.replace(/\/$/, "");
     const r = await fetch(`${baseUrl}/models`, {
       headers,
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(12000),
     });
     const latency = Date.now() - t0;
-    if (!r.ok) return { ok: false, models: [], latency_ms: latency, error: `HTTP ${r.status}` };
+    if (!r.ok) return { models: [], latency, error: `HTTP ${r.status}` };
     const data = await r.json();
     let models = (data.data || data.models || []).map(m => ({ id: m.id, name: m.id }));
     if (isLocal) {
@@ -912,56 +1023,12 @@ async function fetchGatewayModels(provider) {
         models = [{ id: "hermes-agent", name: "hermes-agent", fake: true }];
       }
     }
-    return { ok: true, models, latency_ms: latency };
+    // 成功时必须返回 ok:true：前端 testProviderModel/validateProvider 以 r.ok 判定可用性，
+    // 此前只返回 {models, latency} 导致 r.ok 恒为 undefined，模型测试永远报「模型不可用（接口错误）」。
+    // latency_ms 供前端展示延迟（前端读 r.latency_ms）。
+    return { ok: true, models, latency, latency_ms: latency };
   } catch (e) {
-    return { ok: false, models: [], latency_ms: Date.now() - t0, error: e.message };
-  }
-}
-
-/* 测试单个模型：向 /chat/completions 发一条最小请求，验证该模型能否调用成功 */
-async function testOneModelCall(provider, modelId) {
-  const t0 = Date.now();
-  try {
-    const isLocal = (provider.base_url === "LOCAL" || provider.id === "hermes");
-    const baseUrl = isLocal ? GATEWAY_API : (provider.base_url || '').replace(/\/$/, "");
-    if (!baseUrl) return { ok: false, error: 'base_url 未填写' };
-    const headers = { "Content-Type": "application/json" };
-    if (isLocal) {
-      headers["Authorization"] = `Bearer ${MONITOR_TOKEN}`;
-    } else if (provider.api_key && provider.api_key !== "none") {
-      headers["Authorization"] = `Bearer ${provider.api_key}`;
-    }
-    const r = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers,
-      signal: AbortSignal.timeout(15000),
-      body: JSON.stringify({
-        model: modelId,
-        messages: [
-          { role: "system", content: "Reply with a single word." },
-          { role: "user", content: "ping" },
-        ],
-        max_tokens: 8,
-        temperature: 0,
-        stream: false,
-      }),
-    });
-    const latency = Date.now() - t0;
-    if (!r.ok) {
-      const errText = await r.text().catch(() => '');
-      let errMsg = `HTTP ${r.status}`;
-      try {
-        const j = JSON.parse(errText);
-        if (j && j.error) errMsg = j.error.message || j.error || errMsg;
-      } catch {}
-      return { ok: false, error: errMsg, latency_ms: latency };
-    }
-    const data = await r.json().catch(() => null);
-    if (!data) return { ok: false, error: '响应不是合法 JSON', latency_ms: latency };
-    const reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-    return { ok: true, latency_ms: latency, message: '模型返回：' + String(reply).slice(0, 40) };
-  } catch (e) {
-    return { ok: false, error: e.message || '请求失败', latency_ms: Date.now() - t0 };
+    return { models: [], latency: Date.now() - t0, error: e.message };
   }
 }
 
@@ -1293,7 +1360,7 @@ function finalizeAssistantMessage(sessionId, content, options = {}) {
 }
 
 
-function createChatStream(sessionId, message, reqSignal, systemOverride) {
+function createChatStream(sessionId, message, reqSignal, systemOverride, modelOverride) {
   const enc = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
@@ -1337,14 +1404,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride) {
         const history = buildChatHistory(session, (systemOverride ? systemOverride + "\n\n" : "") + UI_CAPABILITIES_PROMPT);
 
         const cfg = getChatConfig();
-        const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
-        const allProviders = [primary];
-        if (cfg.fallback_providers && cfg.fallback_providers.length > 0) {
-          for (const fbName of cfg.fallback_providers) {
-            const fb = cfg.providers.find(p => p.name === fbName);
-            if (fb && fb.name !== primary.name) allProviders.push(fb);
-          }
-        }
+        const allProviders = resolveChatProviders(cfg, modelOverride);
 
         let fullReply = "";
         let requestError = null;
@@ -1485,7 +1545,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride) {
 // 前端流程：POST /api/chat/ws-send 入队消息 → 建 ws://.../api/chat/ws 连接取流
 const wsClients = new Map(); // session_id → ws
 
-async function runChatWS(ws, sessionId, message, systemOverride) {
+async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) {
   const sendJSON = (obj) => { try { ws.send(JSON.stringify(obj)); } catch {} };
 
   const stopCtrl = new AbortController();
@@ -1524,14 +1584,7 @@ async function runChatWS(ws, sessionId, message, systemOverride) {
     const history = buildChatHistory(session, (systemOverride ? systemOverride + "\n\n" : "") + UI_CAPABILITIES_PROMPT);
 
     const cfg = getChatConfig();
-    const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
-    const allProviders = [primary];
-    if (cfg.fallback_providers && cfg.fallback_providers.length > 0) {
-      for (const fbName of cfg.fallback_providers) {
-        const fb = cfg.providers.find(p => p.name === fbName);
-        if (fb && fb.name !== primary.name) allProviders.push(fb);
-      }
-    }
+    const allProviders = resolveChatProviders(cfg, modelOverride);
 
     let fullReply = "";
     let requestError = null;
@@ -1752,9 +1805,9 @@ function attachWsHandlers(ws) {
     setupDashboardProxy(ws);
   } else {
     // 聊天 WS
-    const { sessionId, message } = ws.data;
+    const { sessionId, message, system, model, provider } = ws.data;
     log(`[WS] open session=${sessionId}`);
-    runChatWS(ws, sessionId, message).catch(err => {
+    runChatWS(ws, sessionId, message, system, { model: model || "", provider: provider || "" }).catch(err => {
       log(`[WS] runChatWS error: ${err?.message || err}`);
       try { ws.send(JSON.stringify({ error: err?.message || "internal error" })); } catch {}
       try { ws.send(JSON.stringify({ done: true })); } catch {}
@@ -2215,6 +2268,8 @@ let lastGatewayRestartTs = 0;
 // 不依赖重启请求是否经代理、也不依赖日志时间戳解析，避免 monitor 重启、
 // 或日志被常驻网关写满截断时 settle 永不触发导致「重启中」卡死。
 let restartFirstSeen = { pid: 0, ts: 0 };
+// Dashboard 自愈冷却：避免并发请求在 Dashboard 挂死时反复杀进程+重启（10 秒内最多自愈一次）
+let lastDashboardHealTs = 0;
 
 async function proxyDashboard(req) {
   const url     = new URL(req.url);
@@ -2602,11 +2657,28 @@ async function proxyDashboard(req) {
     const msg = e?.message || '';
     const isConnErr = /connect|refused|abort|ECONN/i.test(msg);
 
-    // 若 Dashboard 未运行，尝试自动拉起并最多重试一次（自愈 502）
+    // 自愈 502：Dashboard 无响应时尝试拉起/重启并重试一次。
+    // 健康判据用「端口是否在 LISTEN」而非 pidAlive：进程挂死/变 zombie 时 kill(pid,0) 仍返回存活，
+    // 旧逻辑据此跳过重启；且 spawnHermes 的 readPid 守卫也会因 pid 文件中的进程“存活”而返回
+    // already_running 拒绝重启 → 端口永远无人监听，所有请求永久 502（即“Hermes 网关总是 502”）。
     if (isConnErr || /fetch failed|undici/i.test(msg)) {
-      const dp = readPid(PID_DASHBOARD);
-      if (!dp || !pidAlive(dp)) {
-        log(`[proxyDashboard] Dashboard 无响应且未运行，尝试自动拉起…`);
+      const portUp = isPortListening(DASHBOARD_PORT);
+      const healAllowed = Date.now() - lastDashboardHealTs > 10000;
+      if (!portUp && healAllowed) {
+        lastDashboardHealTs = Date.now();
+        const dp = readRawPid(PID_DASHBOARD);
+        // 进程仍在（挂死/zombie）但端口未监听：先杀掉并清理 pid 文件，否则 spawnHermes 会判定 already_running
+        if (dp && pidAlive(dp)) {
+          log(`[proxyDashboard] Dashboard 进程 pid=${dp} 存活但端口 ${DASHBOARD_PORT} 未监听（挂死），杀掉后重启…`);
+          try { process.kill(dp, "SIGTERM"); } catch {}
+          const killDeadline = Date.now() + 2500;
+          while (pidAlive(dp) && Date.now() < killDeadline) await new Promise(r => setTimeout(r, 100));
+          if (pidAlive(dp)) { try { process.kill(dp, "SIGKILL"); } catch {} await new Promise(r => setTimeout(r, 200)); }
+          try { unlinkSync(PID_DASHBOARD); } catch {}
+        } else {
+          log(`[proxyDashboard] Dashboard 无响应且未运行，尝试自动拉起…`);
+          try { unlinkSync(PID_DASHBOARD); } catch {}
+        }
         try {
           spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
           // 等待 dashboard ready（最多 5 秒）
@@ -2712,12 +2784,28 @@ function createLogStream(req, lastOffset) {
 }
 
 // ─── 静态文件服务 ─────────────────────────────────────────────────────
-function serveFile(filePath, contentType) {
+function serveFile(filePath, contentType, opts) {
   if (!existsSync(filePath)) return new Response("Not Found", { status: 404 });
+  opts = opts || {};
+  // 基于 mtime+size 生成弱 ETag 与 Last-Modified，供浏览器条件请求复用缓存（避免 3.4MB 专家库等大文件重复传输）
+  const headers = { "Content-Type": contentType };
+  let etag = null;
+  try {
+    const stat = statSync(filePath);
+    etag = 'W/"' + stat.size.toString(16) + '-' + Math.floor(stat.mtimeMs).toString(16) + '"';
+    headers["ETag"] = etag;
+    headers["Last-Modified"] = stat.mtime.toUTCString();
+    headers["Cache-Control"] = opts.cacheable ? "public, max-age=3600" : "no-cache";
+  } catch {}
+  // 条件请求命中返回 304（仅当调用方传入 req 时启用）
+  if (etag && opts.req) {
+    const inm = opts.req.headers.get("if-none-match");
+    if (inm && (inm === etag || inm.trim() === "*")) {
+      return new Response(null, { status: 304, headers });
+    }
+  }
   const stream = Readable.toWeb(createReadStream(filePath));
-  return new Response(stream, {
-    headers: { "Content-Type": contentType },
-  });
+  return new Response(stream, { headers });
 }
 
 // ─── 请求处理器 ─────────────────────────────────────────────────────────
@@ -3553,24 +3641,32 @@ async function handleFetch(req) {
     const obj = {};
     if (!block.trim()) return obj;
     const lines = block.split("\n");
-    let curName = null, curEntry = null, inHeaders = false;
+    let curName = null, curEntry = null, inHeaders = false, inList = null;
     for (const line of lines){
       const nm = line.match(/^  ([A-Za-z0-9_-]+):\s*$/);
       if (nm && !inHeaders){
         if (curName) obj[curName] = curEntry;
-        curName = nm[1]; curEntry = {}; inHeaders = false; continue;
+        curName = nm[1]; curEntry = {}; inHeaders = false; inList = null; continue;
+      }
+      // list item (6-space indent + dash): collect into current list key
+      const li = line.match(/^      -\s*(.*)$/);
+      if (li && curEntry && inList){
+        let val = li[1].trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
+        curEntry[inList].push(val);
+        continue;
       }
       const sk = line.match(/^    ([A-Za-z0-9_-]+):\s*(.*)$/);
       if (sk && curName && curEntry){
         const k = sk[1], v = sk[2].trim();
-        if (k === "headers"){ curEntry.headers = {}; inHeaders = true; continue; }
+        if (k === "headers"){ curEntry.headers = {}; inHeaders = true; inList = null; continue; }
         inHeaders = false;
-        curEntry[k] = v === "" ? {} : v;
+        if (v === ""){ curEntry[k] = []; inList = k; } else { curEntry[k] = v; inList = null; }
         continue;
       }
       const hk = line.match(/^      ([A-Za-z0-9_-]+):\s*(.*)$/);
       if (hk && curEntry && curEntry.headers && typeof curEntry.headers === "object"){
-        curEntry.headers[hk[1]] = hk[2].trim();
+        curEntry.headers[hk[1]] = hk[2].trim(); inList = null;
       }
     }
     if (curName) obj[curName] = curEntry;
@@ -4507,6 +4603,160 @@ async function handleFetch(req) {
     }
   }
 
+  // ── 连接器/技能市场：精选目录（连接器能力改由 SkillHub 技能交付，技能由网关原生加载，根治「调用失败」）──
+  // 每条目：id（安装目录名）/name/icon/desc/slug/namespace/guide_url（获取指引外链）/cred_hint（凭证提示）/official（官方认证）/mcp（MCP 型技能的服务器与凭证字段）
+  const SKILL_MARKET_CATALOG = [
+    { id: "ima", name: "腾讯 IMA", icon: "📚", desc: "腾讯 IMA 笔记 / 知识库读写与智能检索", slug: "ima-skills", namespace: "@tencent-adm", guide_url: "https://www.skillhub.cn/skills/tencent-adm/ima-skills", cred_hint: "IMA API Key", official: true },
+    { id: "tencent-news", name: "腾讯新闻", icon: "📰", desc: "7×24 实时新闻搜索与热点追踪", slug: "tencent-news", namespace: "@tencent-adm", guide_url: "https://www.skillhub.cn/skills/tencent-adm/tencent-news", cred_hint: "腾讯新闻 API Key", official: true },
+    { id: "tencent-docs", name: "腾讯文档", icon: "📝", desc: "docs.qq.com 文档读写 / 协作全功能", slug: "tencent-docs", namespace: "@tencent-adm", guide_url: "https://www.skillhub.cn/skills/tencent-adm/tencent-docs", cred_hint: "腾讯文档 API Key", official: true },
+    { id: "wecom", name: "企业微信", icon: "💼", desc: "通讯录 / 消息 / 文档 / 日程 / 会议 / 待办", slug: "wecom-unified", namespace: "@tencent-adm", guide_url: "https://www.skillhub.cn/skills/tencent-adm/wecom-unified", cred_hint: "企业微信 Bot ID / Secret", official: true },
+    { id: "tencent-meeting", name: "腾讯会议", icon: "🎥", desc: "会议预约 / 纪要 / 转写 / 录制", slug: "tencent-meeting-skill", namespace: "@wemeeting", guide_url: "https://www.skillhub.cn/skills/wemeeting/tencent-meeting-skill", cred_hint: "腾讯会议身份认证 Token", official: true },
+    { id: "mail", name: "个人邮箱", icon: "📧", desc: "QQ / 网易 / Gmail / 新浪 / 搜狐 邮箱（Agently Mail）", slug: "agently-mail", namespace: "@tencent-adm", guide_url: "https://www.skillhub.cn/skills/tencent-adm/agently-mail", cred_hint: "邮箱授权码 / 应用专用密码", official: true },
+    { id: "tencent-esign", name: "腾讯电子签", icon: "✍️", desc: "合同起草 / 审查 / 对比 / 法条法规检索", slug: "tencent-esign-contract", namespace: "@tencent-adm", guide_url: "https://www.skillhub.cn/skills/tencent-adm/tencent-esign-contract", cred_hint: "SIGN-TOKEN（qian.tencent.com/aiSkill 获取）", official: true },
+    { id: "tencentmap", name: "腾讯地图", icon: "🗺️", desc: "地点搜索 / 路线规划 / 天气 / 旅游攻略", slug: "tencentmap-map-assistant", namespace: "@tencent-adm", guide_url: "https://www.skillhub.cn/skills/tencent-adm/tencentmap-map-assistant", cred_hint: "腾讯位置服务 Key（lbs.qq.com 获取）", official: true },
+    { id: "baidu-netdisk", name: "百度网盘", icon: "💾", desc: "网盘文件上传 / 下载 / 转存 / 分享 / 搜索", slug: "baidu-netdisk-skills", namespace: "@wscats", guide_url: "https://www.skillhub.cn/skills/wscats/baidu-netdisk-skills", cred_hint: "百度网盘授权码（技能内 login.sh 引导）" },
+    { id: "mcdonalds", name: "麦当劳点餐", icon: "🍔", desc: "门店 / 餐品 / 优惠券查询与点餐（MCP）", slug: "mcdonalds-mcp-china", namespace: "@meteorsliu", guide_url: "https://www.skillhub.cn/skills/meteorsliu/mcdonalds-mcp-china", cred_hint: "麦当劳 MCP Token（open.mcd.cn/mcp 获取）", mcp: { name: "mcd-mcp", url: "https://mcp.mcd.cn", fields: [{ key: "token", label: "MCP Token", header: "Authorization", prefix: "Bearer " }] } },
+    { id: "lexiang", name: "腾讯乐享", icon: "🤝", desc: "腾讯乐享知识库检索（MCP）", slug: "lexiang-mcp-skill", namespace: "@lexiang", guide_url: "https://www.skillhub.cn/skills/lexiang/lexiang-mcp-skill", cred_hint: "乐享 Token + Company From", official: true, mcp: { name: "lexiang-mcp", url: "https://mcp.lexiang-app.com/mcp", fields: [{ key: "token", label: "乐享 Token", header: "Authorization", prefix: "Bearer " }, { key: "company_from", label: "Company From", header: "X-Company-From" }] } },
+    { id: "weread", name: "微信读书", icon: "📖", desc: "搜书 / 书架 / 笔记 / 书评 / 阅读统计", slug: "weread-skills-official", namespace: "@user_0b9d349a", guide_url: "https://www.skillhub.cn/skills/user_0b9d349a/weread-skills-official", cred_hint: "微信读书 API Key" },
+    { id: "ctrip-wendao", name: "携程问道", icon: "✈️", desc: "携程官方 AI 旅伴（行程 / 机酒规划）", slug: "wendao-skill", namespace: "@trips-ai", guide_url: "https://www.skillhub.cn/skills/trips-ai/wendao-skill", cred_hint: "携程问道 API Token" },
+    { id: "meituan-travel", name: "美团旅行", icon: "🏨", desc: "酒店 / 机票 / 火车票 / 门票查询预订", slug: "meituan-travel", namespace: "@user_fe933096", guide_url: "https://www.skillhub.cn/skills/user_fe933096/meituan-travel", cred_hint: "美团旅行助手 Token" },
+    { id: "youdaonote", name: "有道云笔记", icon: "🗒️", desc: "笔记剪藏 / 资讯推送 / 知识管理", slug: "youdaonote-clip", namespace: "@lephix", guide_url: "https://www.skillhub.cn/skills/lephix/youdaonote-clip", cred_hint: "有道云笔记 API Key" },
+    { id: "fliggy", name: "飞猪旅行", icon: "🧳", desc: "飞猪旅行搜索（机票 / 酒店 / 度假）", slug: "fliggy-travel-new", namespace: "@user_b95ee7e5", guide_url: "https://www.skillhub.cn/skills/user_b95ee7e5/fliggy-travel-new", cred_hint: "飞猪 API Key" },
+    { id: "baidu-map", name: "百度地图", icon: "🧭", desc: "附近地点 / 地图热点检索", slug: "baidu-nearby", namespace: "@longjf25", guide_url: "https://www.skillhub.cn/skills/longjf25/baidu-nearby", cred_hint: "百度地图 API Key" },
+    { id: "qq-music", name: "QQ音乐", icon: "🎵", desc: "音乐搜索 / 歌单 / 播放控制", slug: "qq-music", namespace: "@mike47512", guide_url: "https://www.skillhub.cn/skills/mike47512/qq-music", cred_hint: "QQ音乐 API Key" },
+    { id: "legal", name: "元典法律", icon: "⚖️", desc: "法律数据库检索（案例 / 法规 / 企业）", slug: "legal-search", namespace: "@user_72ffbadb", guide_url: "https://www.skillhub.cn/skills/user_72ffbadb/legal-search", cred_hint: "元典法律智能 API Key" },
+  ];
+
+  // GET /api/extensions/skills/market-catalog → 精选连接器技能目录（含已安装状态 + 全部已安装目录名，供搜索结果对照）
+  if (path === "/api/extensions/skills/market-catalog" && req.method === "GET") {
+    try {
+      const installedNames = [];
+      const skillsRoot = join(VAR_DIR, "skills");
+      try {
+        if (_isDir(skillsRoot)) readdirSync(skillsRoot).forEach(n => { const d = join(skillsRoot, n); if (_isDir(d) && existsSync(join(d, "SKILL.md"))) installedNames.push(n); });
+      } catch (e) {}
+      const installed = new Set(installedNames);
+      const items = SKILL_MARKET_CATALOG.map(c => Object.assign({}, c, { installed: installed.has(c.id) }));
+      return new Response(JSON.stringify({ ok: true, items, installed_names: installedNames }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/extensions/skills/install-package → 下载 SkillHub 完整技能包（含 scripts/references 子目录），注册 skills_dirs；MCP 型同时注册 MCP 服务器
+  // body: { slug, namespace, name?, mcp?: { name, url, headers } }
+  if (path === "/api/extensions/skills/install-package" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const slug = (body.slug || "").trim();
+      const namespace = (body.namespace || "").trim();
+      if (!slug) return new Response(JSON.stringify({ ok: false, error: "missing slug" }), { status: 400, headers: jsonHeaders() });
+
+      const apiBase = "https://api.skillhub.cn/api/v1/skills/" + encodeURIComponent(slug);
+      const nsQ = namespace ? ("namespace=" + encodeURIComponent(namespace)) : "";
+      const hdrs = { "User-Agent": "Mozilla/5.0 (compatible; HermesDashboard/1.0)", "Accept": "application/json, text/markdown, */*", "Origin": "https://www.skillhub.cn", "Referer": "https://www.skillhub.cn/" };
+
+      // 1. 文件列表（version 缺省取最新）
+      const listR = await fetch(apiBase + "/files" + (nsQ ? ("?" + nsQ) : ""), { headers: hdrs, signal: AbortSignal.timeout(20000) });
+      if (!listR.ok) return new Response(JSON.stringify({ ok: false, error: "SkillHub 文件列表返回 " + listR.status }), { status: 502, headers: jsonHeaders() });
+      const listJ = await listR.json().catch(() => ({}));
+      const files = Array.isArray(listJ.files) ? listJ.files : [];
+      if (!files.length) return new Response(JSON.stringify({ ok: false, error: "该技能没有可下载的文件" }), { status: 422, headers: jsonHeaders() });
+
+      // 2. 目标目录（前端传 name 指定，默认用 slug）
+      const name = ((body.name || slug).trim().replace(/[^\w.-]/g, "_")) || ("skill-" + Date.now());
+      const destDir = join(VAR_DIR, "skills", name);
+      mkdirSync(destDir, { recursive: true });
+
+      // 3. 逐文件下载：/file 端点 302→COS，默认跟随重定向（版本/存储桶无关）
+      const downloaded = []; const failed = [];
+      for (const f of files) {
+        const relPath = String(f.path || "");
+        if (!relPath || relPath.includes("..") || /^[\\/]/.test(relPath)) { failed.push({ path: relPath, error: "非法路径" }); continue; }
+        const fileUrl = apiBase + "/file?path=" + encodeURIComponent(relPath) + (nsQ ? ("&" + nsQ) : "");
+        try {
+          const fr = await fetch(fileUrl, { headers: hdrs, signal: AbortSignal.timeout(30000) });
+          if (!fr.ok) { failed.push({ path: relPath, error: "HTTP " + fr.status }); continue; }
+          const buf = Buffer.from(await fr.arrayBuffer());
+          const destPath = join(destDir, relPath);
+          mkdirSync(dirname(destPath), { recursive: true });
+          writeFileSync(destPath, buf);
+          downloaded.push(relPath);
+        } catch (e) { failed.push({ path: relPath, error: e.message }); }
+      }
+      if (!downloaded.length) return new Response(JSON.stringify({ ok: false, error: "未能下载任何文件", failed }), { status: 502, headers: jsonHeaders() });
+
+      // 4. 注册 skills_dirs（extensions.json + config.yaml）
+      const ext = _readExtensionsFile() || { toolsets: {}, mcp_servers: [], skills_dirs: [], persona: "default", memory: { enabled: true, char_limit: 2200 } };
+      ext.skills_dirs = ext.skills_dirs || [];
+      if (!ext.skills_dirs.includes(destDir)) ext.skills_dirs.push(destDir);
+      _writeExtensionsFile(ext);
+      const yamlPath = `${DATA_DIR}/config.yaml`;
+      if (existsSync(yamlPath)) { let y = readFileSync(yamlPath, "utf8"); y = _mergeSkillsExternalDirs(y, ext.skills_dirs); writeFileSync(yamlPath, y); }
+
+      // 5. MCP 型技能：注册 MCP 服务器
+      let mcpRegistered = null;
+      if (body.mcp && body.mcp.url) {
+        const mName = body.mcp.name || (name + "-mcp");
+        _upsertMcpServer(mName, { url: body.mcp.url, headers: body.mcp.headers || {} });
+        mcpRegistered = body.mcp.url;
+      }
+
+      // 6. 触发网关重启以加载新技能 / MCP（skills_dirs 或 mcp_servers 变更均需重启后对 AI 生效）
+      _triggerGatewayRestart("skill-install-" + name);
+
+      return new Response(JSON.stringify({ ok: true, name, dir: destDir, files: downloaded, failed, mcp: mcpRegistered, restart: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/extensions/skills/uninstall -> uninstall an installed skill: remove dir, drop from skills_dirs & config.yaml, restart gateway
+  // body: { name } (skill install dir name)
+  if (path === "/api/extensions/skills/uninstall" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const name = String(body.name || "").trim();
+      if (!name || name.indexOf("/") >= 0 || name.indexOf("..") >= 0) return new Response(JSON.stringify({ ok: false, error: "invalid name" }), { status: 400, headers: jsonHeaders() });
+      const destDir = join(VAR_DIR, "skills", name);
+      const ext = _readExtensionsFile() || { toolsets: {}, mcp_servers: [], skills_dirs: [], persona: "default", memory: { enabled: true, char_limit: 2200 } };
+      ext.skills_dirs = (ext.skills_dirs || []).filter(function (d) { return d !== destDir && _expandHome(d) !== destDir; });
+      _writeExtensionsFile(ext);
+      const yamlPath = `${DATA_DIR}/config.yaml`;
+      if (existsSync(yamlPath)) { let y = readFileSync(yamlPath, "utf8"); y = _mergeSkillsExternalDirs(y, ext.skills_dirs); writeFileSync(yamlPath, y); }
+      let removed = false;
+      try { if (_isDir(destDir)) { rmSync(destDir, { recursive: true, force: true }); removed = true; } } catch (e) {}
+      // MCP 型技能：同步移除已注册的 MCP 服务器（避免遗留指向已删除技能的失效 MCP）
+      const mcpName = String(body.mcp_name || "").trim();
+      if (mcpName) { try { _upsertMcpServer(mcpName, null); } catch (e) {} }
+      _triggerGatewayRestart("skill-uninstall-" + name);
+      return new Response(JSON.stringify({ ok: true, name, removed, restart: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/extensions/skills/config-mcp -> save MCP skill credentials (write into the MCP server headers, restart gateway)
+  // body: { name (mcp server name), url, headers: { headerName: value } } —— blank values keep previously saved ones
+  if (path === "/api/extensions/skills/config-mcp" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const name = String(body.name || "").trim();
+      const url = String(body.url || "").trim();
+      if (!name || !url) return new Response(JSON.stringify({ ok: false, error: "missing name/url" }), { status: 400, headers: jsonHeaders() });
+      const incoming = (body.headers && typeof body.headers === "object") ? body.headers : {};
+      // merge with existing headers: blank input keeps the saved value, so re-saving never wipes configured creds
+      const current = _parseMcpServers(_readHermesConfig())[name] || {};
+      const headers = Object.assign({}, (current.headers && typeof current.headers === "object") ? current.headers : {});
+      Object.keys(incoming).forEach(function (k) { const v = String(incoming[k] == null ? "" : incoming[k]).trim(); if (v !== "") headers[k] = v; });
+      _upsertMcpServer(name, { url: url, headers: headers });
+      _triggerGatewayRestart("skill-config-mcp-" + name);
+      return new Response(JSON.stringify({ ok: true, name, restart: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
   // ── 平台频道 / 通讯 ────────────────────────────────────────────────
   if (path === "/api/channels" && req.method === "GET") {
     try {
@@ -4607,6 +4857,8 @@ async function handleFetch(req) {
       log(`[gw-restart] ${tag}: 异常 ${e?.message || e}`);
     }
   }
+
+  // 启动时自动注册已由模块级 _moduleLevelAutoRegisterMcp() 完成，此处无需重复
 
   // ── Telegram 扫码创建机器人 ───────────────────────────────────────────
   // GET /api/channels/telegram/qr  → 创建配对，返回 deep_link/qr_payload
@@ -4790,6 +5042,87 @@ async function handleFetch(req) {
     }
   }
 
+  // ── 诊断端点：查看 MCP 配置状态 ──
+  if (path === "/api/debug/mcp-status" && req.method === "GET") {
+    try {
+      const yml = _readHermesConfig();
+      const mcpBlock = _yamlBlockOf(yml, "mcp_servers");
+      const parsed = _parseMcpServers(yml);
+      const st = _readConnectorsState();
+      const gwConns = CONNECTOR_CATALOG.filter(function (c) { return c.mcp_mode === "gateway"; }).map(function (c) {
+        const creds = st[c.kind] || {};
+        return { kind: c.kind, name: c.name, has_creds: (c.fields || []).every(function (f) { return !!creds[f.key]; }), mcp_name: "conn-" + c.kind, in_config: !!parsed["conn-" + c.kind] };
+      });
+      return new Response(JSON.stringify({
+        ok: true,
+        hermes_config_path: HERMES_CONFIG,
+        bridge_script_path: MCP_BRIDGE_SCRIPT,
+        bridge_script_exists: existsSync(MCP_BRIDGE_SCRIPT),
+        resolved_node_bin: resolvedNodeBin || null,
+        ui_port: UI_PORT,
+        mcp_servers_in_config: parsed,
+        mcp_block_raw: mcpBlock.slice(0, 2000),
+        gateway_connectors: gwConns
+      }, null, 2), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ── MCP 代理：把 gateway 模式连接器的工具暴露为 MCP 协议，让 Hermes 网关（AI）可调用 ──
+  const _mcpProxyMatch = path.match(/^\/mcp-proxy\/([A-Za-z0-9_-]+)$/);
+  if (_mcpProxyMatch && req.method === "POST") {
+    const kind = _mcpProxyMatch[1];
+    const cat = getConnector(kind);
+    try {
+      const rpcBody = await req.json().catch(() => ({}));
+      const method = rpcBody.method || "";
+      const id = rpcBody.id;
+      const mcpJsonHeaders = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
+      // JSON-RPC 通知（无 id）：返回 202 Accepted，无 body
+      if (id === undefined || id === null) {
+        return new Response(null, { status: 202, headers: mcpJsonHeaders });
+      }
+      if (method === "initialize") {
+        return new Response(JSON.stringify({ jsonrpc: "2.0", id, result: {
+          protocolVersion: "2024-11-05",
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: "hermes-conn-" + kind, version: "1.0.0" }
+        }}), { headers: mcpJsonHeaders });
+      }
+      if (method === "tools/list") {
+        if (!cat) return new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32601, message: "unknown connector" } }), { headers: mcpJsonHeaders });
+        const tools = (cat.tools || []).map(function (t) {
+          return { name: t.name, description: t.description || "", inputSchema: t.inputSchema || { type: "object", properties: {} } };
+        });
+        return new Response(JSON.stringify({ jsonrpc: "2.0", id, result: { tools } }), { headers: mcpJsonHeaders });
+      }
+      if (method === "tools/call") {
+        if (!cat) return new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32601, message: "unknown connector" } }), { headers: mcpJsonHeaders });
+        const toolName = (rpcBody.params && rpcBody.params.name) || "";
+        const toolArgs = (rpcBody.params && rpcBody.params.arguments) || {};
+        const st = _readConnectorsState()[kind] || {};
+        if (!(cat.fields || []).every(function (f) { return !!st[f.key]; })) {
+          return new Response(JSON.stringify({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "连接器未配置凭证，请先在连接器页面配置并保存。" }], isError: true } }), { headers: mcpJsonHeaders });
+        }
+        try {
+          const result = await callConnectorTool(kind, st, toolName, toolArgs);
+          const text = (typeof result === "string") ? result : JSON.stringify(result, null, 2);
+          return new Response(JSON.stringify({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text }] } }), { headers: mcpJsonHeaders });
+        } catch (ce) {
+          return new Response(JSON.stringify({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "调用失败: " + (ce.message || String(ce)) }], isError: true } }), { headers: mcpJsonHeaders });
+        }
+      }
+      // ping 或未识别方法
+      if (method === "ping") {
+        return new Response(JSON.stringify({ jsonrpc: "2.0", id, result: {} }), { headers: mcpJsonHeaders });
+      }
+      return new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32601, message: "method not found: " + method } }), { headers: mcpJsonHeaders });
+    } catch (e) {
+      return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32603, message: e.message } }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+  }
+
   // ── 连接器（OCTOP 风格：catalog + 真实 callTool）──
   if (path === "/api/connectors" && req.method === "GET") {
     try {
@@ -4829,12 +5162,21 @@ async function handleFetch(req) {
       if (req.method === "DELETE" && !isCall) {
         const state = _readConnectorsState(); delete state[kind]; _writeConnectorsState(state);
         if (cat.mcp_mode === "remote") _upsertMcpServer(kind, null);
+        if (cat.mcp_mode === "gateway") _upsertMcpServer("conn-" + kind, null);
+        _triggerGatewayRestart("connector-delete-" + kind);
         return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
       }
       if (req.method === "POST" && !isCall) {
         const body = await req.json().catch(function () { return {}; });
+        const prev = _readConnectorsState()[kind] || {};
         const creds = {};
-        (cat.fields || []).forEach(function (f) { const v = body[f.key]; creds[f.key] = (v == null ? "" : String(v)); });
+        // 留空表示保留已保存的原值：前端不再回填布尔标志（也不回显密钥），
+        // 避免「测试连接/保存」把已配置的凭证覆盖成空或 "true"。
+        (cat.fields || []).forEach(function (f) {
+          const v = body[f.key];
+          const s = (v == null ? "" : String(v).trim());
+          creds[f.key] = s !== "" ? s : (prev[f.key] || "");
+        });
         if ((cat.fields || []).some(function (f) { return !creds[f.key]; })) {
           return new Response(JSON.stringify({ ok: false, error: "请填写所有必填凭证" }), { status: 400, headers: jsonHeaders() });
         }
@@ -4850,6 +5192,13 @@ async function handleFetch(req) {
           if (cat.kind === "tencent-lexiang" && creds.company_from) headers["X-Company-From"] = creds.company_from;
           _upsertMcpServer(kind, { url: cat.mcp_url, headers: headers });
           _triggerGatewayRestart("connector-remote-" + kind);
+        }
+        if (cat.mcp_mode === "gateway") {
+          // 注册 stdio MCP 桥接，让 Hermes 网关（AI）能在对话中调用此连接器的工具
+          _ensureMcpBridgeScript();
+          const nodeBin = resolvedNodeBin || "node";
+          _upsertMcpServer("conn-" + kind, { command: nodeBin, args: [MCP_BRIDGE_SCRIPT, kind, String(UI_PORT)] });
+          _triggerGatewayRestart("connector-gateway-mcp-" + kind);
         }
         return new Response(JSON.stringify({ ok: true, configured: true }), { headers: jsonHeaders() });
       }
@@ -5076,6 +5425,10 @@ async function handleFetch(req) {
       }
 
       // ── 扩展能力（LightAgent 集成）：toolsets / mcp_servers / skills / persona ──
+      // 网关只在启动时一次性加载 config.yaml 的 toolsets：新工具集（如 delegation）写入后
+      // 必须重启网关才能真正加载对应工具（delegate_task 等）。此处追踪 toolsets 是否有新增，
+      // 写盘后据此触发网关重启，否则「启用专家团」后 delegate_task 永远不可用、委派形同虚设。
+      let _toolsetsChanged = false;
       if (body.extensions && typeof body.extensions === "object") {
         try {
           _writeExtensionsFile(body.extensions);
@@ -5088,11 +5441,14 @@ async function handleFetch(req) {
             const BASE_TS = ["hermes-cli"];
             const TOGGLE_TS = ["code_execution","terminal","file","web","browser","vision","memory","todo","skills","clarify","delegation"];
             let mergedTs = _extractYamlList(y2, "toolsets");
+            const _beforeTs = new Set(mergedTs);
             const seen = new Set(mergedTs);
             BASE_TS.forEach(b => { if (!seen.has(b)) { mergedTs.unshift(b); seen.add(b); } });
             const tsMap = body.extensions.toolsets || {};
             TOGGLE_TS.forEach(n => { if (tsMap[n] && !seen.has(n)) { mergedTs.push(n); seen.add(n); } });
             y2 = _setYamlListBlock(y2, "toolsets", mergedTs);
+            // 检测是否有新增工具集（如启用专家团时开启 delegation）：网关需重启才能加载新工具
+            _toolsetsChanged = mergedTs.some(t => !_beforeTs.has(t));
             // mcp_servers
             const mcpObj = {};
             (body.extensions.mcp_servers || []).forEach(s => {
@@ -5123,6 +5479,13 @@ async function handleFetch(req) {
         } catch (e) {
           log("extensions/config.yaml write failed: " + e.message);
         }
+      }
+
+      // ── toolsets 变化时重启网关（异步、尽力而为，与频道绑定行为一致）──
+      // 启用专家团会把 delegation 写入 config.yaml，但运行中的网关不会热加载，
+      // delegate_task 工具直到网关重启才可用。此处触发重启使任务委派真正生效。
+      if (_toolsetsChanged) {
+        _triggerGatewayRestart("toolsets-change");
       }
 
       // ── 强制 Markdown 格式输出（Issue #12）：网关默认 strip 会剥离所有格式 ──
@@ -5286,7 +5649,7 @@ async function handleFetch(req) {
         saveChatConfig(chatCfg);
       } catch {}
 
-      return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
+      return new Response(JSON.stringify({ ok: true, gateway_restarting: _toolsetsChanged }), { headers: jsonHeaders() });
     }
 
   // ─── 主模型 API（读写 config.yaml 中的 model.provider + model.default） ──
@@ -5368,35 +5731,8 @@ async function handleFetch(req) {
       const realKey = resolveRealApiKey(provider);
       if (realKey) provider.api_key = realKey;
     }
-    // 1) 始终先验证 provider 配置（拉取 /models 列表）
-    const baseResult = await fetchGatewayModels(provider);
-    let models = baseResult.models || [];
-    let latency = baseResult.latency || 0;
-    let error = baseResult.error || '';
-    // 2) 如果指定了具体 model（前端 testProviderModel 传入），做一次真实调用
-    const targetModel = body.model;
-    if (targetModel && !error) {
-      const testResult = await testOneModelCall(provider, targetModel);
-      latency = testResult.latency_ms || latency;
-      if (testResult.ok) {
-        return new Response(JSON.stringify({
-          ok: true, models, latency_ms: latency,
-          model: targetModel, model_ok: true,
-          message: testResult.message || '模型可用',
-        }), { headers: jsonHeaders() });
-      } else {
-        return new Response(JSON.stringify({
-          ok: false, models, latency_ms: latency,
-          model: targetModel, model_ok: false,
-          error: '模型「' + targetModel + '」调用失败：' + (testResult.error || '未知错误'),
-        }), { status: 200, headers: jsonHeaders() });
-      }
-    }
-    // 3) 没指定 model：返回 provider 配置验证结果
-    return new Response(JSON.stringify({
-      ok: !error, models, latency_ms: latency,
-      error: error || undefined,
-    }), { status: 200, headers: jsonHeaders() });
+    const result = await fetchGatewayModels(provider);
+    return new Response(JSON.stringify(result), { headers: jsonHeaders() });
   }
 
   // ─── 聊天：模型 API ──────────────────────────────────────────────────────
@@ -5507,14 +5843,15 @@ async function handleFetch(req) {
   // ─── Chat: WebSocket 消息队列（前端先 POST 消息入队，再建 WS 连接取流）──────
   if (path === "/api/chat/ws-send" && req.method === "POST") {
     const body = await req.json();
-    const { session_id, message, system } = body;
+    const { session_id, message, system, model, provider } = body;
     const messageEmpty = message == null || (Array.isArray(message) && message.length === 0) || (typeof message === "string" && message.length === 0);
     if (!session_id || messageEmpty) {
       return new Response(JSON.stringify({ error: "session_id and message required" }), { status: 400, headers: jsonHeaders() });
     }
     // system 字段携带 persona / 专家团提示，由 createChatStream 注入 system prompt，
     // 避免把人格提示拼进用户消息污染对话历史
-    wsMessageQueue.set(session_id, { message, system: system || "" });
+    // model/provider 为会话级模型选择，由 resolveChatProviders 优先采用
+    wsMessageQueue.set(session_id, { message, system: system || "", model: model || "", provider: provider || "" });
     // 30秒后自动清除（防止 WS 连接未建立导致泄漏）
     setTimeout(() => wsMessageQueue.delete(session_id), 30000);
     return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
@@ -5523,7 +5860,7 @@ async function handleFetch(req) {
   // ─── 聊天：流式 API ──────────────────────────────────────────────────────
   if (path === "/api/chat/stream" && req.method === "POST") {
     const body = await req.json();
-    const { session_id, message, system } = body;
+    const { session_id, message, system, model, provider } = body;
     const messageEmpty = message == null || (Array.isArray(message) && message.length === 0) || (typeof message === "string" && message.length === 0);
     if (!session_id || messageEmpty) {
       return new Response(JSON.stringify({ error: "session_id and message required" }), {
@@ -5531,7 +5868,7 @@ async function handleFetch(req) {
         headers: jsonHeaders(),
       });
     }
-    return new Response(createChatStream(session_id, message, req.signal, system), {
+    return new Response(createChatStream(session_id, message, req.signal, system, { model: model || "", provider: provider || "" }), {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
@@ -5647,7 +5984,7 @@ async function handleFetch(req) {
 
   // 静态 UI — 根路径返回 index.html
   if (path === "/") {
-    return serveFile(`${STATIC_DIR}/index.html`, "text/html; charset=utf-8");
+    return serveFile(`${STATIC_DIR}/index.html`, "text/html; charset=utf-8", { req, cacheable: false });
   }
 
   // /images/、/css/、/js/、/scripts/ 等路径下的静态资源
@@ -5661,7 +5998,7 @@ async function handleFetch(req) {
               : ext === "png" ? "image/png"
               : ext === "svg" ? "image/svg+xml"
               : "text/plain";
-    return serveFile(fp, ct);
+    return serveFile(fp, ct, { req, cacheable: true });
   }
 
   // 持久化上传（图片 + 文件），从 DATA_DIR/uploads（= HERMES_HOME/uploads）提供
@@ -5871,7 +6208,7 @@ function startServer() {
       }
       wsMessageQueue.delete(sessionId);
       wss.handleUpgrade(req, socket, head, (ws) => {
-        ws.data = { sessionId, message: _q.message, system: _q.system || "", stopCtrl: null };
+        ws.data = { sessionId, message: _q.message, system: _q.system || "", model: _q.model || "", provider: _q.provider || "", stopCtrl: null };
         attachWsHandlers(ws);
       });
       return;
@@ -5914,6 +6251,27 @@ function startServer() {
     // 若已存在模型配置，自动启动 Gateway/Dashboard（覆盖安装/升级后无需手动点启动）
     setTimeout(() => maybeAutoStartServices(), 2500);
   });
+
+  // ─── 独立 TCP 端口：浏览器直接访问（脱离飞牛框架，自定义 favicon/标签） ───
+  const tcpServer = http.createServer(async (req, res) => {
+    try {
+      const request = await toWebRequest(req);
+      const response = await handleFetch(request);
+      await writeWebResponse(res, response);
+    } catch (err) {
+      log(`TCP server error: ${err?.message || err}`);
+      if (!res.headersSent) { res.writeHead(500, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Internal error" })); }
+      else { try { res.end(); } catch {} }
+    }
+  });
+  tcpServer.on("error", (err) => {
+    if (err?.code === "EADDRINUSE") log(`[WARN] UI TCP port ${UI_PORT} already in use, standalone access disabled`);
+    else log(`TCP server error: ${err?.message || err}`);
+  });
+  tcpServer.listen(UI_PORT, "0.0.0.0", () => {
+    log(`Standalone UI available at http://0.0.0.0:${UI_PORT}/`);
+  });
+
   return server;
 }
 
