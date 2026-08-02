@@ -603,8 +603,10 @@ function pidAliveSync(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 try {
-  // spawnSync 已在顶部从 child_process 导入
-  spawnSync(["pkill", "-SIGKILL", "-f", "hermes.*(gateway|dashboard)"]);
+  // spawnSync 已在顶部从 child_process 导入。
+  // 注意必须用 (cmd, args) 两参形式：早前误写成 spawnSync(["pkill", ...]) 数组形式，
+  // 会把整个数组转成命令名导致 ENOENT 静默失败，旧 gateway/dashboard 杀不掉 → 更新后网关无法干净重启。
+  spawnSync("pkill", ["-SIGKILL", "-f", "hermes.*(gateway|dashboard)"]);
 } catch {}
 for (const pidFile of [PID_GATEWAY, PID_DASHBOARD]) {
   const oldPid = readPidSync(pidFile);
@@ -3327,8 +3329,6 @@ async function handleFetch(req) {
   // ── 应用包更新（GitHub Releases / Actions）────────────────────────────────
   const GITHUB_REPO = process.env.GITHUB_REPO || "veenyi/fnos-hermes-agent";
   const GITHUB_PAT_FILE = `${VAR_DIR}/github_pat`;
-  // 完整更新进度状态（前端 GET /api/app/update/status 轮询）
-  let fullUpdateState = { status: "idle", version: "", startedAt: 0, hint: "" };
 
   function getGitHubPAT() {
     try {
@@ -3511,8 +3511,17 @@ async function handleFetch(req) {
       if (patchManifest.version) writeAppVersion(patchManifest.version);
 
       const allOk = results.every(r => r.ok);
-      // 7. 若含后端文件变更，自重启加载新代码
+      // 7. 若含后端文件变更：先停掉 gateway/dashboard，再自重启加载新代码。
+      //    新 monitor 启动时 maybeAutoStartServices 会全新拉起两者，确保「更新后网关一定重启」，
+      //    不依赖旧 pid 存活探测（此前旧网关存活会导致自动启动被跳过）。
       if (allOk && needRestart) {
+        try {
+          await stopPid(PID_GATEWAY);
+          await stopPid(PID_DASHBOARD);
+          await forceKillHermes();
+          resetGatewayCrashLoop();
+          log("[HotPatch] gateway/dashboard 已停止，monitor 自重启后将自动重新拉起");
+        } catch (e) { log(`[HotPatch] 停止服务失败（非致命）: ${e && e.message}`); }
         scheduleMonitorRestart("HotPatch", 2000);
       }
 
@@ -3607,98 +3616,41 @@ async function handleFetch(req) {
     }
   }
 
-  // ─── 完整更新：从最新 Release 下载全部应用文件并本地替换（真正安装，非仅触发 CI 构建） ───
-  if (path === "/api/app/update/full" && req.method === "POST") {
-    if (fullUpdateState.status === "updating") {
-      return new Response(JSON.stringify({ ok: false, error: "完整更新正在进行中，请等待" }), { status: 409, headers: jsonHeaders() });
-    }
+  // ─── 完整安装：中转下载最新 Release 的 .fpk 安装包（私有仓库需认证，浏览器无法直接下载） ───
+  // 前端「完整安装」按钮打开此 URL → 浏览器下载 fpk → 用户在 fnOS 应用中心手动安装/覆盖。
+  // 注意：完整安装不再在服务端自动替换文件（旧 /api/app/update/full 已移除），文件级替换请走「热更新」按钮。
+  if (path === "/api/app/update/fpk") {
     try {
       const pat = getGitHubPAT();
       const ghHeaders = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
       if (pat) ghHeaders["Authorization"] = `Bearer ${pat}`;
-      const dlHeaders = { "Accept": "application/octet-stream", "User-Agent": "fnos-hermes-agent" };
-      if (pat) dlHeaders["Authorization"] = `Bearer ${pat}`;
-
-      fullUpdateState = { status: "updating", version: "", startedAt: Date.now(), hint: "正在下载最新版本文件…" };
-
-      // 1. 获取最新 release
       const relRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
         signal: AbortSignal.timeout(15000), headers: ghHeaders,
       });
       if (!relRes.ok) throw new Error(`GitHub API ${relRes.status}`);
       const relData = await relRes.json();
-      const tag = String(relData.tag_name || "");
-      const version = tag.replace(/^fnos-hermes-agent_v|^v/, "").trim();
-      if (!version) throw new Error("Release 缺少版本 tag");
-      if (compareVersions(version, APP_VERSION) <= 0) {
-        fullUpdateState = { status: "idle", version: "", startedAt: 0, hint: "" };
-        return new Response(JSON.stringify({ ok: false, error: `当前已是最新版本（${APP_VERSION}），无需更新` }), { headers: jsonHeaders() });
+      const fpkAsset = (relData.assets || []).find(a => /\.fpk$/i.test(a.name || ""));
+      if (!fpkAsset) {
+        return new Response(JSON.stringify({ ok: false, error: "该版本 Release 没有 .fpk 安装包，请到 GitHub 发布页下载" }), { status: 404, headers: jsonHeaders() });
       }
-
-      // 2. 资产名 → 本地目标路径映射（兼容 hotpatch_ 前缀与裸文件名两种命名）
-      const targetMap = {
-        "monitor.js": "server/monitor.js",
-        "hotpatch_server_monitor.js": "server/monitor.js",
-        "index.html": "ui/index.html",
-        "hotpatch_ui_index.html": "ui/index.html",
-      };
-      const picked = {}; // target -> asset
-      for (const a of (relData.assets || [])) {
-        const t = targetMap[a.name || ""];
-        if (t && !picked[t]) picked[t] = a;
-      }
-      const targets = Object.keys(picked);
-      if (!targets.length) throw new Error("Release 中无可更新的应用文件（monitor.js / index.html）");
-
-      // 3. 逐个下载并替换（旧文件备份为 .hot-bak，供 crash-loop 回滚机制使用）
-      const results = [];
-      for (const target of targets) {
-        const a = picked[target];
-        const targetPath = `${APP_DIR}/${target}`;
-        const bakPath = targetPath + ".hot-bak";
-        try {
-          const fileRes = await fetch(a.url, { signal: AbortSignal.timeout(120000), headers: dlHeaders });
-          if (!fileRes.ok) { results.push({ path: target, ok: false, error: "HTTP " + fileRes.status }); continue; }
-          const buf = Buffer.from(await fileRes.arrayBuffer());
-          if (existsSync(targetPath)) { try { copyFileSync(targetPath, bakPath); } catch {} }
-          const dir = targetPath.substring(0, targetPath.lastIndexOf("/"));
-          if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-          writeFileSync(targetPath, buf, { mode: 0o644 });
-          results.push({ path: target, ok: true, size: buf.length });
-        } catch (fe) {
-          results.push({ path: target, ok: false, error: fe.message });
-        }
-      }
-      const allOk = results.every(r => r.ok);
-      if (!allOk) {
-        fullUpdateState = { status: "error", version, startedAt: Date.now(), hint: "部分文件下载失败" };
-        return new Response(JSON.stringify({ ok: false, error: "更新文件下载失败: " + results.filter(r => !r.ok).map(f => f.path + "(" + f.error + ")").join(", "), results }), { status: 502, headers: jsonHeaders() });
-      }
-
-      // 4. 持久化版本号（manifest 或兜底覆盖文件），令当前进程立即上报新版本（概览页不再显示旧版本）
-      writeAppVersion(version);
-
-      fullUpdateState = { status: "done", version, startedAt: Date.now(), hint: `已更新到 v${version}，服务即将自动重启` };
-      log(`[FullUpdate] 已更新到 ${version}，文件: ${results.map(r => r.path).join(", ")}`);
-
-      // 5. 3 秒后自重启加载新代码
-      scheduleMonitorRestart("FullUpdate", 3000);
-
-      return new Response(JSON.stringify({
-        ok: true, version, results,
-        hint: `已更新到 v${version}，服务将在 3 秒后自动重启，页面会自动刷新`,
-      }), { headers: jsonHeaders() });
+      const dlHeaders = { "Accept": "application/octet-stream", "User-Agent": "fnos-hermes-agent" };
+      if (pat) dlHeaders["Authorization"] = `Bearer ${pat}`;
+      const fileRes = await fetch(fpkAsset.url, { signal: AbortSignal.timeout(300000), headers: dlHeaders });
+      if (!fileRes.ok) throw new Error(`安装包下载失败: HTTP ${fileRes.status}`);
+      const buf = Buffer.from(await fileRes.arrayBuffer());
+      log(`[完整安装] 中转下载 fpk 安装包: ${fpkAsset.name} (${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
+      return new Response(buf, {
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Content-Disposition": `attachment; filename="${fpkAsset.name}"`,
+          "Content-Length": String(buf.length),
+        },
+      });
     } catch (e) {
-      fullUpdateState = { status: "error", version: "", startedAt: Date.now(), hint: e.message || String(e) };
       return new Response(JSON.stringify({ ok: false, error: e.message || String(e) }), { status: 502, headers: jsonHeaders() });
     }
   }
-
-  // 完整更新进度查询（前端点击「完整安装」后轮询此端点）
-  if (path === "/api/app/update/status") {
-    return new Response(JSON.stringify(fullUpdateState), { headers: jsonHeaders() });
-  }
-
+  
   if (path === "/api/start" && req.method === "POST") {
     // 启动前检查：必须有至少一个真实模型服务商（非 Hermes Gateway 自身）
     const statePath = `${VAR_DIR}/providers-state.yaml`;
@@ -7704,6 +7656,23 @@ function maybeAutoStartServices() {
     log(`Auto-start error: ${err?.message || err}`);
   }
 }
+
+// ─── 单实例守卫：避免自重启/fnOS 框架重复拉起导致双 monitor 并存 ───
+// 双 monitor 会互相争抢 TCP 8650、反复 pkill 对方刚拉起的 gateway/dashboard、覆盖 unix socket。
+// 规则：启动较早（pid 较小）的进程保留，较晚的主动退出；二者互相扫描时必有一方 pid 较小，结果确定。
+try {
+  for (const d of readdirSync("/proc").filter(x => /^\d+$/.test(x))) {
+    const pid = Number(d);
+    if (!pid || pid === process.pid) continue;
+    try {
+      const cmd = readFileSync(`/proc/${d}/cmdline`, "utf8").replace(/\0/g, " ");
+      if (/node/.test(cmd) && /monitor\.js/.test(cmd) && pid < process.pid) {
+        log(`[单实例] 检测到更早启动的 monitor 进程 (pid=${pid})，本进程退出以避免双实例冲突`);
+        process.exit(0);
+      }
+    } catch {}
+  }
+} catch {}
 
 // 启动前清理可能残留的旧 socket，避免 EADDRINUSE 导致启动失败
 try { unlinkSync(SOCKET_PATH); } catch {}
