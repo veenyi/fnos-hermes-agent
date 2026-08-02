@@ -61,7 +61,8 @@ jobs:
           curl -fsSL "$FNPACK_URL" -o fnpack
           chmod +x fnpack
           mv fnpack /usr/local/bin/
-          fnpack --version
+          # fnpack 不支持 --version 参数（会报错退出），用无参调用验证可执行性
+          fnpack || true
           echo "fnpack 已安装并可用"
 
       # 6. 更新 manifest 版本号
