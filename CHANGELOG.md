@@ -17,6 +17,7 @@
 - **更新后网关不重启**：启动清理的 pkill 误写成数组形式 `spawnSync(["pkill", ...])` 导致 ENOENT 静默失败，旧 gateway/dashboard 杀不掉；且旧进程存活时自动启动被跳过。现修复清理命令，并在热更新后先显式停止 gateway/dashboard，新 monitor 启动后必定全新拉起。
 - **双 monitor 并存**：自重启后 fnOS 框架可能另行拉起一个 monitor，双进程互抢 TCP 8650、反复杀对方刚拉起的网关。新增单实例守卫：启动较早（pid 较小）的进程保留，较晚的自行退出。
 - **版本号体系回退**：按小版本迭代原则，将误升的 v0.22.0 回退为 v0.21.6（Release/hot-patch/NAS 同步更新）。
+- **fpk CI 构建失败**：fnpack 1.0.4 不支持 `--version` 参数（报错退出），workflow 改为无参调用验证可执行性。
 - **manifest 不可写导致版本不更新**：fnOS 安装目录的 manifest 属 root，应用用户无写权限，版本写入被静默吞掉。新增 `writeAppVersion()`：逐个尝试候选 manifest，全部失败则写 `${VAR_DIR}/app_version` 覆盖文件（readAppVersion 优先读它）。
 - **自重启端口竞争**：热更/完整更新后新进程在旧进程退出前启动，抢不到 TCP 8650 导致 standalone UI 不可用。改为 shell 延迟 1.5 秒再拉新进程，确保端口已释放。
 - **热更资产名不匹配**：Release 资产以裸文件名（monitor.js/index.html）上传，而热更端点只找 hotpatch_ 前缀名导致下载失败。现兼容两种命名。
