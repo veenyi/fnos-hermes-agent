@@ -9089,17 +9089,17 @@ function toggleKeyVisibility(){
 function validateProvider(){
   var provider = buildProviderObj();
   if(!provider.base_url){ toast('请先填写 Base URL 后再验证连接'); return; }
+  // 纯连接测试：只验证当前配置（Base URL + Key）能否连通，
+  // 绝不刷新/覆盖模型列表配置（获取模型请用「获取模型列表」按钮）。
+  var btn=event&&event.target; if(btn){btn.disabled=true;btn.textContent='验证中…';}
   toast('正在验证连接…');
-  apiPost('/api/config/test', { provider: provider }).then(function(r){
-    var models=(r&&r.models)?r.models:[];
-    if(models.length){
-      fillModelOptionsFromList(models);   // 合并写入（保留已有配置），提示由其内部发出
-    } else if(r && r.ok){
-      toast('验证成功，但未返回可用模型');
+  apiPost('/api/config/test', { provider: provider, mode: 'connectivity' }).then(function(r){
+    if(r && r.ok){
+      toast('✅ 连接成功：'+(r.model_count!=null?('端点可用，共 '+r.model_count+' 个模型，'):'')+('延迟 '+(r.latency_ms!=null?r.latency_ms:(r.latency||0))+'ms')+'。当前模型配置未改动');
     } else {
-      toast('验证失败：'+(r&&r.error ? r.error : '接口未返回明确结果'));
+      toast('❌ 连接失败：'+((r&&r.error)||'接口未返回明确结果'));
     }
-  }).catch(function(e){ toast('验证失败：'+e.message); });
+  }).catch(function(e){ toast('❌ 连接失败：'+e.message); }).finally(function(){ if(btn){btn.disabled=false;btn.textContent='验证连接';} });
 }
 function buildProviderObj(){
   var id=document.getElementById('providerId').value;
