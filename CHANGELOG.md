@@ -1,4 +1,31 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.0)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.5)
+
+---
+
+# v0.21.5 — MCP 自动注册根因修复 + Dashboard 稳定性 + 热更新
+
+### 问题修复
+- **模块级注册读不到凭证（ReferenceError 静默）**：`CONNECTORS_STATE` 常量此前定义在 `handleFetch` 内部，模块级 `_moduleLevelAutoRegisterMcp` 引用时抛 ReferenceError 被 catch 吞掉，凭证状态永远为空 → 自动注册永远跳过（日志始终为 "no configured gateway connectors"）。现已在模块级定义该常量，删除 handleFetch 内重复声明。
+- **config.yaml 重复顶层键污染**：hermes 官方模板使用 inline 形态 `mcp_servers: {}`，而 `_setYamlMapBlock`/`_setYamlFlatMap`/`_setYamlListBlock` 只匹配 block 形态（`key:` 独立行），每次写入都匹配失败并在文件末尾追加新块。实测 NAS 上 config.yaml 被污染 34 行重复 `mcp_servers: {}`，导致 `_parseMcpServers` 解析为空、MCP 注册全部失效（v0.20.98–v0.21.4 反复"修复"无效的根因）。
+- **修复方案**：以上三个写入函数全部改用健壮的 `_setTopLevelBlock`（兼容 inline 与 block 形态，且清除历史遗留的重复顶层键）；`_yamlBlockOf` 增加 inline 形态兼容；模块级新增 `_replaceTopLevelKey`，`_moduleLevelAutoRegisterMcp` 改为一次性收集全部 gateway 连接器条目后整体替换写入（不再逐条追加）。
+- **热回滚命令模板字符串语法错误**：`execSync` 中 `${1%.hot-bak}` 被解析为模板占位符导致 SyntaxError（该文件用 node 直接启动会失败），已转义为 `\${1%.hot-bak}`。
+- **WebSocket 断连不重连**：上游 dashboard 偶发断连（code 1006/1001/1011/4xxx）后 WS proxy 直接关闭浏览器连接，用户看到"连接似乎已断开"。现改为指数退避自动重连（最多 10 次），error 事件也触发重连。
+- **GitHub PAT 未配置报 502**：更新检查请求 GitHub API 返回 401/403 时，proxy 抛 502 到前端。现优雅降级返回 `rateLimited: true` + 友好提示，前端显示"未配置 PAT"引导而非报错。
+- **Dashboard 版本显示 v0.21.1**：dashboard 自身 `/api/status` 返回硬编码旧版本。现 proxy 层拦截该响应并注入 manifest 中的 `app_version`（0.21.5）。
+- **版本比较误报更新**：`latest !== current` 字符串比较导致本地 0.21.5 > GitHub 0.21.2 时仍提示"有更新"。改用 `compareVersions(latest, current) > 0` 语义化比较。
+
+### 新增
+- **热更新（hot-patch）机制**：Release 附带 `hot-patch.json` 时，Dashboard 显示"⚡ 快速更新"按钮，仅下载变更文件（~934KB）原子替换，含后端文件时自动重启。
+- **热更新回滚保护**：启动时检测 `.hot-restart` 标记超时（crash loop），自动回滚所有 `.hot-bak` 备份文件。
+- **GitHub Release v0.21.5 发布**：包含完整 fpk 安装包 + hot-patch 资产，支持全量安装和增量热更两种升级路径。
+
+---
+
+## v0.21.1 – v0.21.4 — 部署与诊断迭代
+
+### 变更
+- v0.21.1-v0.21.3：连接器/专家团相关迭代与部署调试。
+- v0.21.4：monitor.js 调整与打包。
 
 ---
 
