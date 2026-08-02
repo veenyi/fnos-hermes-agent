@@ -17,6 +17,7 @@
 - **manifest 不可写导致版本不更新**：fnOS 安装目录的 manifest 属 root，应用用户无写权限，版本写入被静默吞掉。新增 `writeAppVersion()`：逐个尝试候选 manifest，全部失败则写 `${VAR_DIR}/app_version` 覆盖文件（readAppVersion 优先读它）。
 - **自重启端口竞争**：热更/完整更新后新进程在旧进程退出前启动，抢不到 TCP 8650 导致 standalone UI 不可用。改为 shell 延迟 1.5 秒再拉新进程，确保端口已释放。
 - **热更资产名不匹配**：Release 资产以裸文件名（monitor.js/index.html）上传，而热更端点只找 hotpatch_ 前缀名导致下载失败。现兼容两种命名。
+- **「验证连接」误刷新全部模型配置**：模型编辑弹窗的「验证连接」按钮原本调用获取模型列表逻辑（fillModelOptionsFromList），会把该 provider 的所有模型配置重写一遍。现改为纯连通性测试：后端 `/api/config/test` 新增 `mode=connectivity`（只返回连通性 + 模型数量 + 延迟，不返回模型列表），前端只提示结果不改动任何配置；「获取模型列表」按钮行为不变。
 - 修复「检查更新」页面图标丢失；定时任务「创建任务」按钮无响应（CSS 类名不匹配）；微信通道会话点击报错（showPage → switchPage）；工作流模板专家不存在导致不可用。
 
 ---
