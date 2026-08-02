@@ -75,13 +75,21 @@ stop_process() {
             kill -TERM "${pid}"
             for i in $(seq 1 10); do
                 sleep 1
-                kill -0 "${pid}" 2>/dev/null || { log_msg "Stopped"; rm -f "${PID_FILE}"; rm -f "${SOCKET_PATH}"; return 0; }
+                kill -0 "${pid}" 2>/dev/null || { log_msg "Stopped"; break; }
             done
-            kill -KILL "${pid}"
+            kill -KILL "${pid}" 2>/dev/null
         fi
-        rm -f "${PID_FILE}"
     fi
+    # 兜底清理不在 PID 文件中的残留进程（如手动部署拉起的 monitor、孤儿 gateway/dashboard）
+    # 否则下次 start 时残留进程占端口/socket，新实例无法正常接管，应用显示「已停止」且启用无效
+    pkill -TERM -f "node.*monitor\.js" 2>/dev/null || true
+    sleep 1
+    pkill -9 -f "node.*monitor\.js" 2>/dev/null || true
+    pkill -9 -f "hermes.*gateway" 2>/dev/null || true
+    pkill -9 -f "hermes.*dashboard" 2>/dev/null || true
+    rm -f "${PID_FILE}"
     rm -f "${SOCKET_PATH}"
+    log_msg "Stopped (incl. leftover cleanup)"
     return 0
 }
 
