@@ -1,7 +1,7 @@
 {
-  "version": "0.21.6",
-  "base_version": "0.21.5",
-  "description": "v0.21.6 热更新包：回复状态指示器、语音播放、消息引用、Fork话题、多 Agent 圆桌讨论、模型预配置库、定时任务模板、工作流修复、更新链路修复",
+  "version": "0.21.7",
+  "base_version": "0.21.6",
+  "description": "v0.21.7 热更新包：修复单实例守卫导致应用无法启动（改为接管式）、框架 stop/安装/升级脚本残留进程清理",
   "files": [
     { "path": "server/monitor.js" },
     { "path": "ui/index.html" }
