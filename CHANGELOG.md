@@ -1,4 +1,13 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.6)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.7)
+
+---
+
+# v0.21.7 — 修复应用无法启动：单实例守卫改为接管式 + 残留进程清理
+
+### 问题修复
+- **应用在 fnOS 应用中心永远「已停止」、点启用无效（v0.21.6 单实例守卫副作用）**：框架 stop 只杀 app.pid 记录的进程，手动部署/残留的 monitor 杀不掉时，框架 start 的新实例被守卫（「较晚者退出」策略）逼退，框架又把死进程 pid 写回 app.pid → 死循环。现改为**接管式守卫**：新实例检测到更早的 monitor 时请求其退出（SIGTERM→SIGKILL）并继续启动；只有较大 pid 对较小 pid 单向行动，不会互杀；热更自重启/覆盖安装/框架重启均能正确接管。
+- **cmd/main stop 残留进程不清理**：stop 只处理 PID 文件中的进程，孤儿 gateway/dashboard、手动拉起的 monitor 会一直占端口/socket。现 stop 末尾兜底 pkill node monitor.js / hermes gateway / dashboard。
+- **install_init/upgrade_init 清理模式错误**：只 pkill `bun.*monitor.js`，而实际运行时是 node，残留 monitor 在安装/升级时杀不掉。现同时匹配 node 与 bun 模式。
 
 ---
 
