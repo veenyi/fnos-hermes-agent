@@ -6656,6 +6656,7 @@ function buildMiniData(){
   var modelGroups = [];
   (_cfg.providers||[]).forEach(function(p){
     var provName = p.name || p.id;
+    var provId = p.id || p.name;
     var models = (p.models && p.models.length) ? p.models : [{ id:p.model||'auto', name:p.model||'auto', enabled:true }];
     var enabledModels = [];
     models.forEach(function(m){
