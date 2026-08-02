@@ -7657,20 +7657,32 @@ function maybeAutoStartServices() {
   }
 }
 
-// ─── 单实例守卫：避免自重启/fnOS 框架重复拉起导致双 monitor 并存 ───
-// 双 monitor 会互相争抢 TCP 8650、反复 pkill 对方刚拉起的 gateway/dashboard、覆盖 unix socket。
-// 规则：启动较早（pid 较小）的进程保留，较晚的主动退出；二者互相扫描时必有一方 pid 较小，结果确定。
+// ─── 单实例守卫（接管式）：最新启动的实例接管，旧实例退出 ───
+// 历史教训：早期版本是「较晚的主动退出」，但 fnOS 框架 stop 只杀 app.pid 记录的进程，
+// 手动部署/残留的 monitor 杀不掉时，框架 start 的新实例会被守卫逼退 → 应用永远显示「已停止」、点启用无效。
+// 现改为接管：检测到更早的 monitor 时，请求其退出（SIGTERM→SIGKILL），本进程继续启动。
+// 只有较大 pid 对较小 pid 单向行动，不会出现互杀；热更自重启/覆盖安装/框架重启均能正确接管。
 try {
+  const earlier = [];
   for (const d of readdirSync("/proc").filter(x => /^\d+$/.test(x))) {
     const pid = Number(d);
     if (!pid || pid === process.pid) continue;
     try {
       const cmd = readFileSync(`/proc/${d}/cmdline`, "utf8").replace(/\0/g, " ");
-      if (/node/.test(cmd) && /monitor\.js/.test(cmd) && pid < process.pid) {
-        log(`[单实例] 检测到更早启动的 monitor 进程 (pid=${pid})，本进程退出以避免双实例冲突`);
-        process.exit(0);
-      }
+      if (/node/.test(cmd) && /monitor\.js/.test(cmd) && pid < process.pid) earlier.push(pid);
     } catch {}
+  }
+  if (earlier.length) {
+    log(`[单实例] 检测到更早的 monitor 进程 (pid=${earlier.join(",")})，本实例接管：请求旧实例退出...`);
+    for (const p of earlier) { try { process.kill(p, "SIGTERM"); } catch {}
+    }
+    // 等待优雅退出（最多 6 秒）
+    const alive = (p) => { try { process.kill(p, 0); return true; } catch { return false; } };
+    const deadline = Date.now() + 6000;
+    while (Date.now() < deadline && earlier.some(alive)) spawnSync("sleep", ["0.3"]);
+    for (const p of earlier) { if (alive(p)) { try { process.kill(p, "SIGKILL"); } catch {} } }
+    spawnSync("sleep", ["0.5"]);
+    log(`[单实例] 接管完成，继续启动`);
   }
 } catch {}
 
