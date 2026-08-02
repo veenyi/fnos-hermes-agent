@@ -810,7 +810,50 @@ function getActiveProvider() {
 // 否则回退到全局 active_provider + fallback_providers。
 function resolveChatProviders(cfg, modelOverride) {
   if (modelOverride && modelOverride.provider) {
-    const sel = cfg.providers.find(p => p.name === modelOverride.provider || String(p.id) === String(modelOverride.provider));
+    // 先在 config.json providers 中查找
+    let sel = cfg.providers.find(p => p.name === modelOverride.provider || String(p.id) === String(modelOverride.provider));
+    // 回退：从 providers-state.yaml 查找（兼容未同步到 config.json 的情况）
+    if (!sel) {
+      try {
+        const statePath = `${VAR_DIR}/providers-state.yaml`;
+        if (existsSync(statePath)) {
+          const stateYml = readFileSync(statePath, "utf8");
+          const blockMatch = stateYml.match(/^providers:\n([\s\S]*)$/m);
+          if (blockMatch) {
+            const lines = blockMatch[1].split("\n");
+            let curId = null, curModel = "", curBase = "", curName = "";
+            const provEntries = [];
+            lines.forEach(line => {
+              const km = line.match(/^  ([a-zA-Z0-9_-]+):\s*$/);
+              if (km) {
+                if (curId) provEntries.push({ id: curId, model: curModel, base_url: curBase, name: curName });
+                curId = km[1]; curModel = ""; curBase = ""; curName = "";
+                return;
+              }
+              const mm = line.match(/^    model:\s*(.+)\s*$/);
+              if (mm && curId) { curModel = mm[1].trim(); return; }
+              const bm = line.match(/^    base_url:\s*(.+)\s*$/);
+              if (bm && curId) { curBase = bm[1].trim(); return; }
+              const nm = line.match(/^    name:\s*(.+)\s*$/);
+              if (nm && curId) { try { curName = JSON.parse(nm[1].trim()); } catch { curName = nm[1].trim(); } }
+            });
+            if (curId) provEntries.push({ id: curId, model: curModel, base_url: curBase, name: curName });
+            const matchEntry = provEntries.find(e => e.id === modelOverride.provider || e.name === modelOverride.provider);
+            if (matchEntry) {
+              const preset = PROVIDER_PRESETS[matchEntry.id];
+              sel = {
+                id: matchEntry.id,
+                name: matchEntry.name || matchEntry.id,
+                base_url: matchEntry.base_url || (preset ? preset.base_url : ""),
+                model: matchEntry.model || "auto",
+                type: "openai-compatible",
+                is_custom: !preset,
+              };
+            }
+          }
+        }
+      } catch (e) { /* non-fatal */ }
+    }
     if (sel) {
       const effective = Object.assign({}, sel);
       if (modelOverride.model) effective.model = modelOverride.model;
@@ -1033,6 +1076,11 @@ async function fetchGatewayModels(provider) {
 }
 
 function resolveProviderBase(provider) {
+  // 会话级模型切换：若用户选了非 Gateway 的 provider，直接请求该 provider 的 API（绕过 Gateway）
+  // 这样不同窗口选不同模型才能真正生效；Gateway 仅用于默认 provider（保留工具调用能力）
+  if (provider && provider.base_url && provider.base_url !== "LOCAL" && provider.id !== "hermes") {
+    return provider.base_url.replace(/\/$/, "");
+  }
   return GATEWAY_API.replace(/\/$/, "");
 }
 
@@ -1131,7 +1179,9 @@ async function chatRequest(provider, message, history, reqSignal) {
     );
     const isKnownPreset = !!officialEntry;
     const isLocal = !provider.base_url || provider.base_url === "LOCAL" || provider.base_url === GATEWAY_API;
-    if (!isLocal && !isKnownPreset) {
+    // 自定义 provider：用户显式配置且有 API key 的，允许直连
+    const isCustomConfigured = provider.is_custom || (PROVIDER_API_KEYS[provider.id] || customEnvKey(provider.id));
+    if (!isLocal && !isKnownPreset && !isCustomConfigured) {
       throw new Error(`Provider "${provider.name}" 的 base_url 未在预设列表中，拒绝发送 API key`);
     }
   }
@@ -5643,9 +5693,16 @@ async function handleFetch(req) {
       try {
         const chatCfg = getChatConfig();
         chatCfg.active_provider = activeProv.name;
-        if (!chatCfg.providers.find(p => p.id === activeProv.id)) {
-          chatCfg.providers.unshift(activeProv);
-        }
+        // 同步所有 provider 到 config.json，确保 resolveChatProviders 能找到任意 provider
+        (body.providers || []).forEach(p => {
+          if (!p.id) return;
+          const idx = chatCfg.providers.findIndex(cp => cp.id === p.id || cp.name === p.name);
+          if (idx >= 0) {
+            chatCfg.providers[idx] = Object.assign({}, chatCfg.providers[idx], p);
+          } else {
+            chatCfg.providers.push(p);
+          }
+        });
         saveChatConfig(chatCfg);
       } catch {}
 
