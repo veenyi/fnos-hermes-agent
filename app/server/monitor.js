@@ -16,14 +16,14 @@ const _require = createRequire(import.meta.url);
 const wsLib = _require("./_vendor/ws/index.js");
 const { WebSocketServer, WebSocket } = wsLib;
 
-// 自定义 provider 环境变量名：剥离 id 中 "custom-" 前缀后规范化大写
+// 自定义 provider 环境变量名：剥离 id 中 "custom-" 或 "custom_" 前缀后规范化大写
 function customEnvKey(id) {
-  const bare = String(id).replace(/^custom-/i, '');
+  const bare = String(id).replace(/^custom[-_]/i, '');
   return `CUSTOM_${bare.replace(/[^A-Za-z0-9_]/g, '_').toUpperCase()}_API_KEY`;
 }
 // 兼容旧格式（CUSTOM_PROVIDER_*_API_KEY）用于读取迁移
 function legacyCustomEnvKey(id) {
-  const bare = String(id).replace(/^custom-/i, '');
+  const bare = String(id).replace(/^custom[-_]/i, '');
   return `CUSTOM_PROVIDER_${bare.replace(/[^A-Za-z0-9_]/g, '_').toUpperCase()}_API_KEY`;
 }
 
@@ -40,8 +40,11 @@ const START_TIME     = Date.now();
 
 // 应用包版本（来自 manifest，与应用中心安装包版本一致）。
 // 注意：它和「hermes-agent PyPI 版本」(HERMES_VERSION) 是两个不同概念，UI 必须分开展示，避免混淆。
+// 版本覆盖文件：热更/完整更新写入 manifest 失败时（如 manifest 不存在/不可写）的兜底持久化位置，优先级最高。
+const VERSION_OVERRIDE_FILE = `${VAR_DIR}/app_version`;
 function readAppVersion() {
   const candidates = [
+    VERSION_OVERRIDE_FILE,
     MANIFEST_FILE,
     "/var/apps/hermes-agent/manifest",
     `${process.cwd()}/manifest`,
@@ -75,8 +78,52 @@ function compareVersions(a, b) {
   }
   return 0;
 }
-const APP_VERSION = readAppVersion();
+let APP_VERSION = readAppVersion();
 log(`[启动检测] 应用包版本(manifest): ${APP_VERSION}`);
+// 热更新/完整更新写入 manifest 后调用，令运行中的进程立即上报新版本号，
+// 避免「更新完成但概览页仍显示旧版本」的问题。
+function reloadAppVersion() {
+  const v = readAppVersion();
+  if (v && v !== "unknown") {
+    if (v !== APP_VERSION) log(`[版本] 应用包版本已刷新: ${APP_VERSION} → ${v}`);
+    APP_VERSION = v;
+  }
+  return APP_VERSION;
+}
+
+// 热更新/完整更新后持久化新版本号：优先更新已存在的 manifest（用启动时实际读到的路径），
+// 全部失败则写版本覆盖文件；最后刷新当前进程的 APP_VERSION。
+function writeAppVersion(version) {
+  let wrote = false;
+  const targets = [MANIFEST_FILE, "/var/apps/hermes-agent/manifest", `${process.cwd()}/manifest`];
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    targets.push(join(here, "../../manifest"), join(here, "../manifest"));
+  } catch {}
+  for (const fp of targets) {
+    try {
+      if (!existsSync(fp)) continue;
+      let mf = readFileSync(fp, "utf8");
+      if (/^version\s*=/m.test(mf)) {
+        mf = mf.replace(/^version\s*=\s*.+$/m, "version               = " + version);
+        writeFileSync(fp, mf);
+        wrote = true;
+        log(`[版本] manifest 已更新: ${fp} → ${version}`);
+        break;
+      }
+    } catch {}
+  }
+  if (!wrote) {
+    // 兜底：manifest 不存在或不可写，写入版本覆盖文件（readAppVersion 优先读它）
+    try {
+      writeFileSync(VERSION_OVERRIDE_FILE, "version = " + version + "\n");
+      log(`[版本] manifest 不可写，已写入覆盖文件: ${VERSION_OVERRIDE_FILE} → ${version}`);
+    } catch (e) {
+      log(`[版本] 版本号持久化失败: ${e.message}`);
+    }
+  }
+  return reloadAppVersion();
+}
 
 // hermes-agent PyPI 版本对应的发布日期，仅用于 UI 展示区分（例如 v0.19.0 (2026.7.20)）。
 // 默认值取 0.19.0 的发布日期；后台尝试从 PyPI 拉取当前版本的准确日期覆盖之（失败则保留默认值）。
@@ -403,6 +450,8 @@ const DASHBOARD_BIND = "127.0.0.1";
 
 // ─── MCP stdio 桥接脚本：让 Hermes 网关通过 stdio 传输调用 gateway 模式连接器 ───
 const MCP_BRIDGE_SCRIPT = `${VAR_DIR}/mcp-stdio-bridge.js`;
+// 连接器凭证状态文件（模块级定义：模块级 MCP 自动注册必须能直接访问，不能放在 handleFetch 内部）
+const CONNECTORS_STATE = `${DATA_DIR}/connectors-state.json`;
 function _ensureMcpBridgeScript() {
   try {
     const script = [
@@ -449,6 +498,31 @@ function _ensureMcpBridgeScript() {
 // 模块级桥接变量：handleFetch 内部赋值，startServer 的 setTimeout 调用
 let _autoRegisterGatewayMcpFn = null;
 
+// 模块级：替换 config.yaml 顶层键（兼容 inline `key: {}` 与 block 形态），删除全部重复键
+// hermes 官方模板用 inline 形态（如 `mcp_servers: {}`），旧版行级匹配无法命中，
+// 导致每次写入都追加新块、config.yaml 被重复顶层键污染（网关解析异常 + 注册失效）。
+function _replaceTopLevelKey(raw, key, block) {
+  if (!raw) return block;
+  const lines = raw.split("\n");
+  const idx = [];
+  lines.forEach(function (l, i) {
+    if (/^\s/.test(l)) return;
+    if (l === key + ":" || l.startsWith(key + ":")) idx.push(i);
+  });
+  if (idx.length === 0) return (raw.endsWith("\n") || raw === "") ? raw + block : raw + "\n" + block;
+  const out = [];
+  let inserted = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (idx.indexOf(i) !== -1) {
+      if (i === idx[0] && !inserted) { out.push(block); inserted = true; }
+      if (lines[i] === key + ":") { let j = i + 1; while (j < lines.length && (lines[j].startsWith(" ") || lines[j].startsWith("\t"))) j++; i = j - 1; }
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out.join("\n");
+}
+
 // 模块级自动注册：直接操作文件，不依赖 handleFetch 内部函数
 function _moduleLevelAutoRegisterMcp() {
   try {
@@ -457,32 +531,29 @@ function _moduleLevelAutoRegisterMcp() {
     let yml = "";
     try { if (existsSync(HERMES_CONFIG)) yml = readFileSync(HERMES_CONFIG, "utf8"); } catch (e) {}
     const nodeBin = resolvedNodeBin || "node";
-    let changed = false;
+    const mcpObj = {};
     CONNECTOR_CATALOG.forEach(function (cat) {
       if (cat.mcp_mode !== "gateway") return;
       const creds = st[cat.kind] || {};
       if (!(cat.fields || []).every(function (f) { return !!creds[f.key]; })) return;
-      const mcpName = "conn-" + cat.kind;
-      // YAML 安全标量：含特殊字符时用双引号包裹
-      function _ys(v) { var s = String(v); return /[\s:"'\\#\[\]{}&*!|>%@`,]/.test(s) || s === "" ? '"' + s.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"' : s; }
-      const entryBlock = "  " + mcpName + ":\n    command: " + _ys(nodeBin) + "\n    args:\n      - " + _ys(MCP_BRIDGE_SCRIPT) + "\n      - " + _ys(cat.kind) + "\n      - " + _ys(String(UI_PORT)) + "\n";
-      const re = new RegExp("^  " + mcpName.replace(/[-]/g, "\\-") + ":\\s*$", "m");
-      if (re.test(yml)) {
-        // 已存在，替换该条目
-        yml = yml.replace(new RegExp("(  " + mcpName.replace(/[-]/g, "\\-") + ":\\n)(?:    .*\\n)*", "m"), entryBlock);
-      } else {
-        // 不存在，追加
-        if (!/^mcp_servers:/m.test(yml)) yml += (yml.endsWith("\n") ? "" : "\n") + "mcp_servers:\n";
-        yml += entryBlock;
-      }
-      changed = true;
+      mcpObj["conn-" + cat.kind] = { command: nodeBin, args: [MCP_BRIDGE_SCRIPT, cat.kind, String(UI_PORT)] };
     });
-    if (changed) {
-      try { writeFileSync(HERMES_CONFIG, yml, { mode: 0o644 }); } catch (e) {}
-      log("[MCP-BRIDGE] module-level auto-register: wrote gateway MCP entries to config.yaml");
+    const names = Object.keys(mcpObj);
+    let block;
+    if (names.length === 0) {
+      block = "mcp_servers: {}";
     } else {
-      log("[MCP-BRIDGE] module-level auto-register: no configured gateway connectors");
+      block = "mcp_servers:\n" + names.map(function (n) {
+        const e = mcpObj[n];
+        return "  " + n + ":\n    command: " + JSON.stringify(e.command) + "\n    args:\n" +
+          e.args.map(function (a) { return "      - " + JSON.stringify(a); }).join("\n");
+      }).join("\n");
     }
+    yml = _replaceTopLevelKey(yml, "mcp_servers", block);
+    try { writeFileSync(HERMES_CONFIG, yml, { mode: 0o644 }); } catch (e) {}
+    log(names.length > 0
+      ? "[MCP-BRIDGE] module-level auto-register: wrote " + names.length + " gateway connector(s) to config.yaml"
+      : "[MCP-BRIDGE] module-level auto-register: no configured gateway connectors");
   } catch (e) { log("[MCP-BRIDGE] module-level auto-register failed: " + e.message); }
 }
 _ensureMcpBridgeScript();
@@ -1504,6 +1575,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
         if (activeChatStreams.get(sessionId) === stopCtrl) activeChatStreams.delete(sessionId);
       };
 
+      let checkpointInterval = null;
       try {
         const normalizedMessage = await normalizeMessage(message);
         const session = getSession(sessionId);
@@ -1535,7 +1607,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
         // 每 5 秒 / 每 1000 字符做一次增量 checkpoint，异常时也能保留进度
         let lastCheckpointLen = 0;
         let lastCheckpointTs = Date.now();
-        const checkpointInterval = setInterval(() => {
+        checkpointInterval = setInterval(() => {
           if (fullReply.length > 0 && (fullReply.length - lastCheckpointLen >= 1000 || Date.now() - lastCheckpointTs >= 5000)) {
             checkpointAssistantMessage(sessionId, fullReply);
             lastCheckpointLen = fullReply.length;
@@ -1640,7 +1712,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
         finalizeAssistantMessage(sessionId, _assistantContent, { tools: responseTools });
 
         if (session.title === "New Chat" && session.messages.length >= 2) {
-          autoTitle(message, primary).then(title => {
+          autoTitle(message, allProviders[0]).then(title => {
             const s2 = getSession(sessionId);
             if (s2 && s2.title === "New Chat") {
               s2.title = title;
@@ -1685,6 +1757,7 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
     wsClients.delete(sessionId);
   };
 
+  let checkpointInterval = null;
   let session = null;
   try {
     const normalizedMessage = await normalizeMessage(message);
@@ -1710,11 +1783,12 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
     let fullReply = "";
     let requestError = null;
     let hadToolCalls = false;
+    let responseTools = [];
 
     // 每 5 秒 / 每 1000 字符做一次增量 checkpoint
     let lastCheckpointLen = 0;
     let lastCheckpointTs = Date.now();
-    const checkpointInterval = setInterval(() => {
+    checkpointInterval = setInterval(() => {
       if (fullReply.length > 0 && (fullReply.length - lastCheckpointLen >= 1000 || Date.now() - lastCheckpointTs >= 5000)) {
         checkpointAssistantMessage(sessionId, fullReply);
         lastCheckpointLen = fullReply.length;
@@ -1741,7 +1815,19 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
           (delta) => { fullReply += delta; sendJSON({ delta }); },
           () => {},
           (err) => { requestError = err; sendJSON({ error: err }); },
-          (toolEvent) => { hadToolCalls = true; sendJSON({ tool_progress: toolEvent }); },
+          (toolEvent) => {
+            hadToolCalls = true;
+            sendJSON({ tool_progress: toolEvent });
+            responseTools.push({
+              tool: toolEvent.tool,
+              toolCallId: toolEvent.toolCallId,
+              status: toolEvent.status || "done",
+              emoji: toolEvent.emoji || "",
+              label: toolEvent.label || toolEvent.command || toolEvent.summary || "",
+              toolZh: toolEvent.toolZh || toolEvent.tool || "工具",
+              result: (toolEvent.result || "").slice(0, 4000),
+            });
+          },
           (usage) => {
             usageReported = true;
             try {
@@ -1795,7 +1881,7 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
     }
 
     if (!requestError && session.title === "New Chat" && session.messages.length >= 2) {
-      autoTitle(message, primary).then(title => {
+      autoTitle(message, allProviders[0]).then(title => {
         const s2 = getSession(sessionId);
         if (s2 && s2.title === "New Chat") { s2.title = title; saveSession(s2); }
       }).catch(() => {});
@@ -1859,7 +1945,10 @@ function setupDashboardProxy(ws) {
     if (ws.data.closing || ws.readyState !== WebSocket.OPEN) return;
     try {
       const upstream = new WebSocket(targetUrl, {
-        headers: { "Host": `${DASHBOARD_BIND}:${DASHBOARD_PORT}` },
+        headers: {
+          "Host": `${DASHBOARD_BIND}:${DASHBOARD_PORT}`,
+          "X-Hermes-Session-Token": DASHBOARD_SESSION_TOKEN,
+        },
       });
       ws.data.upstream = upstream;
       upstream.on("open", () => {
@@ -1891,16 +1980,21 @@ function setupDashboardProxy(ws) {
           connectUpstream();
           return;
         }
-        if (code === 1006) {
+        // 1006（异常关闭）及 dashboard 偶发断连均尝试重连，而非直接断开浏览器客户端
+        if (code === 1006 || code === 1001 || code === 1011 || code >= 4000) {
           scheduleReconnect();
           return;
         }
-        // 其他正常/错误关闭码透传给浏览器
+        // 其他正常关闭码（1000）透传给浏览器
         cleanup();
         try { ws.close(code, reason?.toString ? reason.toString() : reason); } catch {}
       });
       upstream.on("error", (err) => {
         log(`[WS-PROXY] upstream error: ${err?.message || err}`);
+        // 连接错误也触发重连，避免上游临时不可用导致永久断开
+        if (!ws.data.closing && ws.readyState === WebSocket.OPEN && !ws.data.reconnectTimer) {
+          scheduleReconnect();
+        }
       });
     } catch (e) {
       log(`[WS-PROXY] upstream connect failed: ${e?.message || e}`);
@@ -2769,6 +2863,24 @@ async function proxyDashboard(req) {
       return new Response(html, { status: upstream.status, headers: respHeaders });
     }
 
+    // ── JSON /api/status 响应：注入正确的 app_version（manifest 版本） ──
+    // Dashboard 后端的 /api/status 返回 Python 包版本，但前端应显示应用包(manifest)版本。
+    // 此处在 proxy 层覆写 app_version，确保 UI 显示与 manifest 一致。
+    if (contentType.includes("application/json") && subPath === "/api/status") {
+      try {
+        const body = await upstream.text();
+        const j = JSON.parse(body);
+        if (j && j.app_version !== APP_VERSION) {
+          j.app_version = APP_VERSION;
+          respHeaders.delete("content-length");
+          respHeaders.set("cache-control", "no-store");
+          return new Response(JSON.stringify(j), { status: upstream.status, headers: respHeaders });
+        }
+        respHeaders.delete("content-length");
+        return new Response(body, { status: upstream.status, headers: respHeaders });
+      } catch {}
+    }
+
     // ── 非 HTML 响应：原样透传 ──
     return new Response(upstream.body, {
       status:  upstream.status,
@@ -2776,7 +2888,7 @@ async function proxyDashboard(req) {
     });
   } catch (e) {
     const msg = e?.message || '';
-    const isConnErr = /connect|refused|abort|ECONN/i.test(msg);
+    const isConnErr = /connect|refused|abort|ECONN|fetch failed|undici/i.test(msg);
 
     // 自愈 502：Dashboard 无响应时尝试拉起/重启并重试一次。
     // 健康判据用「端口是否在 LISTEN」而非 pidAlive：进程挂死/变 zombie 时 kill(pid,0) 仍返回存活，
@@ -3107,7 +3219,7 @@ async function handleFetch(req) {
       }
 
       const latestDisplay = latest !== "unknown" ? `v${latest} ${latestDate}`.trim() : "未知";
-      const updateAvailable = latest !== "unknown" && latest !== currentVer;
+      const updateAvailable = latest !== "unknown" && compareVersions(latest, currentVer) > 0;
       return new Response(JSON.stringify({ current, latest: latestDisplay, updateAvailable, date: HERMES_VERSION_DATE }), {
         headers: { "Content-Type": "application/json" },
       });
@@ -3215,6 +3327,8 @@ async function handleFetch(req) {
   // ── 应用包更新（GitHub Releases / Actions）────────────────────────────────
   const GITHUB_REPO = process.env.GITHUB_REPO || "veenyi/fnos-hermes-agent";
   const GITHUB_PAT_FILE = `${VAR_DIR}/github_pat`;
+  // 完整更新进度状态（前端 GET /api/app/update/status 轮询）
+  let fullUpdateState = { status: "idle", version: "", startedAt: 0, hint: "" };
 
   function getGitHubPAT() {
     try {
@@ -3237,25 +3351,48 @@ async function handleFetch(req) {
         headers,
       });
       let data;
+      let rateLimited = false;
       if (r.ok) {
         const list = await r.json();
         data = (Array.isArray(list) && list[0]) || null;
+      } else if (r.status === 401 || r.status === 403) {
+        // 401/403 = PAT 无效或 GitHub API 限流（无 PAT 时 60次/小时）
+        rateLimited = true;
       }
       // 兜底：未认证或没有 release 时尝试 /releases/latest
-      if (!data) {
+      if (!data && !rateLimited) {
         r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
           signal: AbortSignal.timeout(15000),
           headers,
         });
-        if (!r.ok) throw new Error(`GitHub API ${r.status}`);
-        data = await r.json();
+        if (r.ok) {
+          data = await r.json();
+        } else if (r.status === 401 || r.status === 403) {
+          rateLimited = true;
+        } else {
+          throw new Error(`GitHub API ${r.status}`);
+        }
+      }
+      if (rateLimited && !data) {
+        // PAT 未配置或 GitHub 限流：返回友好提示而非502错误
+        const hint = !pat
+          ? "未配置 GitHub PAT，公开仓库限速 60次/小时，当前已耗尽。可在设置页面配置 PAT 解除限速。"
+          : "GitHub API 请求被限流（403），请稍后重试或检查 PAT 权限。";
+        return new Response(JSON.stringify({
+          current: APP_VERSION,
+          latest: APP_VERSION,
+          updateAvailable: false,
+          rateLimited: true,
+          hint,
+        }), { headers: jsonHeaders() });
       }
       if (!data || !data.tag_name) throw new Error("GitHub API 未返回 release 信息");
 
       const tag = String(data.tag_name || "");
       const latest = tag.replace(/^fnos-hermes-agent_v|^v/, "").trim() || "unknown";
       const current = APP_VERSION;
-      const updateAvailable = latest !== "unknown" && latest !== current;
+      // 语义化版本比较：仅当 GitHub 版本严格大于本地版本时才提示更新
+      const updateAvailable = latest !== "unknown" && compareVersions(latest, current) > 0;
 
       // 提取 .fpk 安装包直链，供用户直接下载
       let download_url = "";
@@ -3284,6 +3421,29 @@ async function handleFetch(req) {
   }
 
   // ─── 热更新：下载并替换文件，无需全量 fpk 重装 ───────────────────────────
+  // ─── 自重启助手：更新后拉起新进程（不依赖外部 supervisor） ────────────────
+  // 先 spawn 一个 detached 新进程再退出；新进程启动时会 unlink 旧 socket 文件
+  // 后重新监听，因此新旧进程交接不会发生 EADDRINUSE。若 spawn 失败则退化为
+  // 单纯退出，由 fnOS 应用管理兜底拉起。
+  function scheduleMonitorRestart(reason, delayMs) {
+    try { writeFileSync(`${VAR_DIR}/.hot-restart`, String(Date.now())); } catch {}
+    setTimeout(() => {
+      log(`[自重启] ${reason} — 拉起新 monitor 进程...`);
+      try {
+        const script = fileURLToPath(import.meta.url);
+        // 用 shell 延迟 1.5 秒再拉新进程：确保旧进程先退出并释放 socket / TCP 8650 端口，
+        // 避免新进程绑端口失败导致 standalone UI 不可用。
+        const child = spawn("/bin/sh", ["-c", `sleep 1.5; exec "${process.execPath}" "${script}"`], {
+          detached: true, stdio: "inherit", env: process.env, cwd: process.cwd(),
+        });
+        child.unref();
+      } catch (e) {
+        log(`[自重启] spawn 新进程失败（退化为直接退出，等待外部拉起）: ${e.message}`);
+      }
+      setTimeout(() => process.exit(0), 300);
+    }, delayMs || 2000);
+  }
+
   if (path === "/api/app/hot-patch" && req.method === "POST") {
     try {
       const pat = getGitHubPAT();
@@ -3318,17 +3478,20 @@ async function handleFetch(req) {
       const results = [];
       let needRestart = false;
       // 构建 asset name → API URL 映射（用于私有仓库认证下载）
+      // 兼容两种命名：hotpatch_server_monitor.js / 裸文件名 monitor.js
       const assetUrlMap = {};
       (relData.assets || []).forEach(a => { if (a.name) assetUrlMap[a.name] = a.url; });
       for (const file of (patchManifest.files || [])) {
         const targetPath = `${APP_DIR}/${file.path}`;
         const bakPath = targetPath + ".hot-bak";
         try {
-          // 优先用 API URL（私有仓库认证下载更可靠）
+          // 优先用 API URL（私有仓库认证下载更可靠）；依次尝试 hotpatch_ 前缀名、裸文件名、manifest 内 url
           const assetName = 'hotpatch_' + file.path.replace(/\//g, '_');
-          const dlUrl = assetUrlMap[assetName] || file.url;
+          const baseName = file.path.substring(file.path.lastIndexOf("/") + 1);
+          const dlUrl = assetUrlMap[assetName] || assetUrlMap[baseName] || file.url;
+          if (!dlUrl) { results.push({ path: file.path, ok: false, error: "Release 中未找到对应资产: " + assetName + " / " + baseName }); continue; }
           // 下载文件内容（私有仓库需认证）
-          const fileRes = await fetch(dlUrl, { signal: AbortSignal.timeout(30000), headers: dlHeaders });
+          const fileRes = await fetch(dlUrl, { signal: AbortSignal.timeout(60000), headers: dlHeaders });
           if (!fileRes.ok) { results.push({ path: file.path, ok: false, error: "HTTP " + fileRes.status }); continue; }
           const buf = Buffer.from(await fileRes.arrayBuffer());
           // 备份原文件
@@ -3344,20 +3507,13 @@ async function handleFetch(req) {
         }
       }
 
-      // 6. 更新 manifest 版本号
-      if (patchManifest.version) {
-        try {
-          let mf = readFileSync(MANIFEST_FILE, "utf8");
-          mf = mf.replace(/^version\s*=\s*.+$/m, "version               = " + patchManifest.version);
-          writeFileSync(MANIFEST_FILE, mf);
-        } catch {}
-      }
+      // 6. 持久化版本号（manifest 或兜底覆盖文件），并令当前进程立即上报新版本
+      if (patchManifest.version) writeAppVersion(patchManifest.version);
 
       const allOk = results.every(r => r.ok);
-      // 7. 若含后端文件变更，标记重启
+      // 7. 若含后端文件变更，自重启加载新代码
       if (allOk && needRestart) {
-        try { writeFileSync(`${VAR_DIR}/.hot-restart`, String(Date.now())); } catch {}
-        setTimeout(() => { log("[HotPatch] restarting after hot-patch..."); process.exit(0); }, 2000);
+        scheduleMonitorRestart("HotPatch", 2000);
       }
 
       return new Response(JSON.stringify({
@@ -3449,6 +3605,98 @@ async function handleFetch(req) {
         status: 502, headers: jsonHeaders(),
       });
     }
+  }
+
+  // ─── 完整更新：从最新 Release 下载全部应用文件并本地替换（真正安装，非仅触发 CI 构建） ───
+  if (path === "/api/app/update/full" && req.method === "POST") {
+    if (fullUpdateState.status === "updating") {
+      return new Response(JSON.stringify({ ok: false, error: "完整更新正在进行中，请等待" }), { status: 409, headers: jsonHeaders() });
+    }
+    try {
+      const pat = getGitHubPAT();
+      const ghHeaders = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
+      if (pat) ghHeaders["Authorization"] = `Bearer ${pat}`;
+      const dlHeaders = { "Accept": "application/octet-stream", "User-Agent": "fnos-hermes-agent" };
+      if (pat) dlHeaders["Authorization"] = `Bearer ${pat}`;
+
+      fullUpdateState = { status: "updating", version: "", startedAt: Date.now(), hint: "正在下载最新版本文件…" };
+
+      // 1. 获取最新 release
+      const relRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+        signal: AbortSignal.timeout(15000), headers: ghHeaders,
+      });
+      if (!relRes.ok) throw new Error(`GitHub API ${relRes.status}`);
+      const relData = await relRes.json();
+      const tag = String(relData.tag_name || "");
+      const version = tag.replace(/^fnos-hermes-agent_v|^v/, "").trim();
+      if (!version) throw new Error("Release 缺少版本 tag");
+      if (compareVersions(version, APP_VERSION) <= 0) {
+        fullUpdateState = { status: "idle", version: "", startedAt: 0, hint: "" };
+        return new Response(JSON.stringify({ ok: false, error: `当前已是最新版本（${APP_VERSION}），无需更新` }), { headers: jsonHeaders() });
+      }
+
+      // 2. 资产名 → 本地目标路径映射（兼容 hotpatch_ 前缀与裸文件名两种命名）
+      const targetMap = {
+        "monitor.js": "server/monitor.js",
+        "hotpatch_server_monitor.js": "server/monitor.js",
+        "index.html": "ui/index.html",
+        "hotpatch_ui_index.html": "ui/index.html",
+      };
+      const picked = {}; // target -> asset
+      for (const a of (relData.assets || [])) {
+        const t = targetMap[a.name || ""];
+        if (t && !picked[t]) picked[t] = a;
+      }
+      const targets = Object.keys(picked);
+      if (!targets.length) throw new Error("Release 中无可更新的应用文件（monitor.js / index.html）");
+
+      // 3. 逐个下载并替换（旧文件备份为 .hot-bak，供 crash-loop 回滚机制使用）
+      const results = [];
+      for (const target of targets) {
+        const a = picked[target];
+        const targetPath = `${APP_DIR}/${target}`;
+        const bakPath = targetPath + ".hot-bak";
+        try {
+          const fileRes = await fetch(a.url, { signal: AbortSignal.timeout(120000), headers: dlHeaders });
+          if (!fileRes.ok) { results.push({ path: target, ok: false, error: "HTTP " + fileRes.status }); continue; }
+          const buf = Buffer.from(await fileRes.arrayBuffer());
+          if (existsSync(targetPath)) { try { copyFileSync(targetPath, bakPath); } catch {} }
+          const dir = targetPath.substring(0, targetPath.lastIndexOf("/"));
+          if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+          writeFileSync(targetPath, buf, { mode: 0o644 });
+          results.push({ path: target, ok: true, size: buf.length });
+        } catch (fe) {
+          results.push({ path: target, ok: false, error: fe.message });
+        }
+      }
+      const allOk = results.every(r => r.ok);
+      if (!allOk) {
+        fullUpdateState = { status: "error", version, startedAt: Date.now(), hint: "部分文件下载失败" };
+        return new Response(JSON.stringify({ ok: false, error: "更新文件下载失败: " + results.filter(r => !r.ok).map(f => f.path + "(" + f.error + ")").join(", "), results }), { status: 502, headers: jsonHeaders() });
+      }
+
+      // 4. 持久化版本号（manifest 或兜底覆盖文件），令当前进程立即上报新版本（概览页不再显示旧版本）
+      writeAppVersion(version);
+
+      fullUpdateState = { status: "done", version, startedAt: Date.now(), hint: `已更新到 v${version}，服务即将自动重启` };
+      log(`[FullUpdate] 已更新到 ${version}，文件: ${results.map(r => r.path).join(", ")}`);
+
+      // 5. 3 秒后自重启加载新代码
+      scheduleMonitorRestart("FullUpdate", 3000);
+
+      return new Response(JSON.stringify({
+        ok: true, version, results,
+        hint: `已更新到 v${version}，服务将在 3 秒后自动重启，页面会自动刷新`,
+      }), { headers: jsonHeaders() });
+    } catch (e) {
+      fullUpdateState = { status: "error", version: "", startedAt: Date.now(), hint: e.message || String(e) };
+      return new Response(JSON.stringify({ ok: false, error: e.message || String(e) }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+
+  // 完整更新进度查询（前端点击「完整安装」后轮询此端点）
+  if (path === "/api/app/update/status") {
+    return new Response(JSON.stringify(fullUpdateState), { headers: jsonHeaders() });
   }
 
   if (path === "/api/start" && req.method === "POST") {
@@ -3593,6 +3841,357 @@ async function handleFetch(req) {
     return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
   }
 
+  // ─── Profiles（多 Agent）API ─────────────────────────────────────────────
+  // 与 Hermes 官方 profiles 系统完全对齐（参考 hermesagent.org.cn/docs/user-guide/profiles）
+  // 每个 profile 是完全隔离的 Hermes 环境：独立 config.yaml、.env、SOUL.md、记忆、会话、技能、网关
+  // 通过 `hermes profile create/use/delete` CLI 管理，profile 目录 = DATA_DIR/profiles/<name>/
+  const PROFILES_DIR = `${DATA_DIR}/profiles`;
+
+  // ── 辅助：读取某个 profile 目录的详细信息 ──
+  function _readProfileInfo(dir, id) {
+    let soul = ""; try { soul = readFileSync(`${dir}/SOUL.md`, "utf8"); } catch {}
+    let model = "";
+    let provider = "";
+    try {
+      const cfg = readFileSync(`${dir}/config.yaml`, "utf8");
+      model = (cfg.match(/^\s*default:\s*(.+)$/m) || [])[1] || "";
+      // 尝试提取 model.model 格式
+      if (!model) model = (cfg.match(/^\s*model:\s*(.+)$/m) || [])[1] || "";
+      provider = (cfg.match(/^\s*provider:\s*(.+)$/m) || [])[1] || "";
+    } catch {}
+    // 读取 .env 中的 API 密钥（仅检测是否配置，不暴露完整密钥）
+    let hasApiKey = false;
+    let envKeys = [];
+    try {
+      const envContent = readFileSync(`${dir}/.env`, "utf8");
+      envContent.split("\n").forEach(line => {
+        const s = line.trim();
+        if (!s || s.startsWith("#")) return;
+        const idx = s.indexOf("=");
+        if (idx < 0) return;
+        const key = s.slice(0, idx).trim();
+        if (key) envKeys.push(key);
+        if (/API_KEY|TOKEN|SECRET/i.test(key) && s.slice(idx + 1).trim()) hasApiKey = true;
+      });
+    } catch {}
+    // 检测技能目录
+    let skills = [];
+    try {
+      const skillsDir = `${dir}/skills`;
+      if (existsSync(skillsDir)) {
+        skills = readdirSync(skillsDir).filter(s => {
+          try { return statSync(`${skillsDir}/${s}`).isDirectory(); } catch { return false; }
+        });
+      }
+    } catch {}
+    // UI 元数据（emoji、显示名等，由 WEBUI 写入）
+    let meta = {}; try { meta = JSON.parse(readFileSync(`${dir}/metadata.json`, "utf8")); } catch {}
+    return {
+      id,
+      name: meta.name || id,
+      emoji: meta.emoji || "🤖",
+      prompt: soul.slice(0, 800),
+      model: (model || meta.model || "").trim(),
+      provider: (provider || "").trim(),
+      has_api_key: hasApiKey,
+      env_keys: envKeys,
+      skills,
+      is_default: false,
+    };
+  }
+
+  function _listProfiles() {
+    const profiles = [];
+    // 默认 profile（主目录 DATA_DIR 本身 = ~/.hermes）
+    let defaultSoul = ""; try { defaultSoul = readFileSync(`${DATA_DIR}/SOUL.md`, "utf8"); } catch {}
+    const mainCfg = _readHermesConfig();
+    const mainModel = (mainCfg.match(/^\s*default:\s*(.+)$/m) || [])[1] || "";
+    let defaultSkills = [];
+    try {
+      const sd = `${DATA_DIR}/skills`;
+      if (existsSync(sd)) defaultSkills = readdirSync(sd).filter(s => { try { return statSync(`${sd}/${s}`).isDirectory(); } catch { return false; } });
+    } catch {}
+    profiles.push({
+      id: "default",
+      name: "默认助手",
+      emoji: "🤖",
+      prompt: defaultSoul.slice(0, 800),
+      model: mainModel.trim(),
+      provider: "",
+      has_api_key: true,
+      env_keys: [],
+      skills: defaultSkills,
+      is_default: true,
+      is_active: _getActiveProfile() === "default",
+    });
+    // 扫描 profiles 子目录（每个都是 hermes profile create 创建的完整环境）
+    try {
+      if (!existsSync(PROFILES_DIR)) mkdirSync(PROFILES_DIR, { recursive: true });
+      const dirs = readdirSync(PROFILES_DIR).filter(d => {
+        try { return statSync(`${PROFILES_DIR}/${d}`).isDirectory(); } catch { return false; }
+      });
+      const activeProfile = _getActiveProfile();
+      dirs.forEach(d => {
+        const info = _readProfileInfo(`${PROFILES_DIR}/${d}`, d);
+        info.is_active = activeProfile === d;
+        profiles.push(info);
+      });
+    } catch {}
+    return profiles;
+  }
+
+  // ── 活跃 profile 检测：优先使用 hermes profile list 解析，兜底 .active_profile 文件 ──
+  function _getActiveProfile() {
+    // 方式1：解析 hermes profile list 输出（活跃 profile 带 ◆ 前缀）
+    // 实际格式: " ◆default         sensenova-6.7-flash-lite     running      —            —"
+    try {
+      const r = spawnSync(HERMES_BIN, ["profile", "list"], { stdout: "pipe", stderr: "pipe", timeout: 8000 });
+      const out = (r.stdout || "").toString();
+      if (r.status === 0 && out.trim()) {
+        const lines = out.split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          // 跳过表头和分隔线
+          if (!trimmed || trimmed.startsWith("Profile") || trimmed.startsWith("─") || trimmed.startsWith("-")) continue;
+          // ◆ 标记 = 当前活跃 profile（可能无空格直接连接名称）
+          if (trimmed.includes("◆")) {
+            const name = trimmed.replace(/^[\s◆]+/, "").trim().split(/\s+/)[0];
+            if (name) return name;
+          }
+          // 兼容其他可能的标记格式: "* coder" 或 "→ coder" 或 "(active)"
+          if (/^[\*→>]\s+/.test(trimmed) || /\(active\)|\(current\)/.test(trimmed)) {
+            const name = trimmed.replace(/^[\*→>]\s+/, "").replace(/\s*\(active\)|\s*\(current\)/, "").trim().split(/\s+/)[0];
+            if (name && name !== "Profile") return name;
+          }
+        }
+        // 有输出但没找到标记，默认 default
+        return "default";
+      }
+    } catch {}
+    // 方式2：兜底读取本地记录文件
+    try { return readFileSync(`${DATA_DIR}/.active_profile`, "utf8").trim(); } catch { return "default"; }
+  }
+
+  function _setActiveProfile(id) {
+    // 使用官方 CLI 切换（设置 sticky default，后续 hermes 命令都指向该 profile）
+    try {
+      const r = spawnSync(HERMES_BIN, ["profile", "use", id], { stdout: "pipe", stderr: "pipe", timeout: 10000 });
+      if (r.status === 0) {
+        log(`[profiles] hermes profile use ${id} 成功`);
+      } else {
+        const err = (r.stderr || "").toString().trim();
+        log(`[profiles] hermes profile use ${id} 失败: ${err}`);
+      }
+    } catch (e) {
+      log(`[profiles] hermes profile use 异常: ${e.message}`);
+    }
+    // 同时写入本地记录文件（供 CLI 不可用时兜底）
+    try { writeFileSync(`${DATA_DIR}/.active_profile`, id || "default"); } catch {}
+  }
+
+  function _createProfile(id, body) {
+    const dir = `${PROFILES_DIR}/${id}`;
+    if (existsSync(dir)) return { ok: false, error: "profile '" + id + "' 已存在" };
+    // 使用官方 CLI 创建（会生成完整环境：config.yaml、.env、SOUL.md、skills/、命令别名等）
+    const args = ["profile", "create", id];
+    if (body.clone) args.push("--clone");
+    if (body.clone_all) args.push("--clone-all");
+    if (body.clone_from) args.push("--clone-from", body.clone_from);
+    try {
+      const r = spawnSync(HERMES_BIN, args, { stdout: "pipe", stderr: "pipe", timeout: 30000 });
+      const out = (r.stdout || "").toString().trim();
+      const err = (r.stderr || "").toString().trim();
+      if (r.status !== 0) {
+        log(`[profiles] hermes profile create ${id} 失败: ${err || out}`);
+        // CLI 失败时兜底：手动创建基础目录结构
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(`${dir}/SOUL.md`, body.prompt || `# ${body.name || id}\n你是一个名为 ${body.name || id} 的 AI 助手。\n`);
+        writeFileSync(`${dir}/config.yaml`, body.model ? `model:\n  default: ${body.model}\n` : "");
+        writeFileSync(`${dir}/.env`, "");
+      } else {
+        log(`[profiles] hermes profile create ${id} 成功`);
+        // CLI 创建成功后，覆盖/追加用户自定义内容
+        if (body.prompt) writeFileSync(`${dir}/SOUL.md`, body.prompt);
+        if (body.model) {
+          // 追加模型配置到 config.yaml
+          let cfg = ""; try { cfg = readFileSync(`${dir}/config.yaml`, "utf8"); } catch {}
+          if (!cfg.includes("default:")) {
+            cfg += `\nmodel:\n  default: ${body.model}\n`;
+            writeFileSync(`${dir}/config.yaml`, cfg);
+          }
+        }
+      }
+    } catch (e) {
+      log(`[profiles] hermes profile create 异常: ${e.message}，使用兜底创建`);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(`${dir}/SOUL.md`, body.prompt || `# ${body.name || id}\n`);
+      writeFileSync(`${dir}/config.yaml`, body.model ? `model:\n  default: ${body.model}\n` : "");
+      writeFileSync(`${dir}/.env`, "");
+    }
+    // 写入 UI 元数据（emoji、显示名等，Hermes CLI 不管理这些）
+    const meta = { name: body.name || id, emoji: body.emoji || "🤖", created_at: Date.now() };
+    writeFileSync(`${dir}/metadata.json`, JSON.stringify(meta, null, 2));
+    return { ok: true, id };
+  }
+
+  function _updateProfile(id, body) {
+    if (id === "default") {
+      // 默认 profile：更新主目录下的 SOUL.md / config.yaml
+      if (body.prompt != null) writeFileSync(`${DATA_DIR}/SOUL.md`, body.prompt);
+      if (body.model) {
+        // 通过 hermes config set 更新模型（官方方式）
+        try { spawnSync(HERMES_BIN, ["config", "set", "model.model", body.model], { stdout: "pipe", stderr: "pipe", timeout: 8000 }); } catch {}
+      }
+      return { ok: true };
+    }
+    const dir = `${PROFILES_DIR}/${id}`;
+    if (!existsSync(dir)) return { ok: false, error: "profile not found" };
+    // 更新 SOUL.md（个性/指令）
+    if (body.prompt != null) writeFileSync(`${dir}/SOUL.md`, body.prompt);
+    // 更新模型配置
+    if (body.model) {
+      try {
+        // 优先使用 hermes -p <name> config set（官方方式）
+        const r = spawnSync(HERMES_BIN, ["-p", id, "config", "set", "model.model", body.model], { stdout: "pipe", stderr: "pipe", timeout: 8000 });
+        if (r.status !== 0) throw new Error("cli failed");
+      } catch {
+        // 兜底：直接写 config.yaml
+        let cfg = ""; try { cfg = readFileSync(`${dir}/config.yaml`, "utf8"); } catch {}
+        if (cfg.match(/^\s*default:\s*.+$/m)) {
+          cfg = cfg.replace(/^(\s*default:\s*).+$/m, `$1${body.model}`);
+        } else {
+          cfg += `\nmodel:\n  default: ${body.model}\n`;
+        }
+        writeFileSync(`${dir}/config.yaml`, cfg);
+      }
+    }
+    // 更新 .env（API 密钥等）
+    if (body.env && typeof body.env === "object") {
+      let envContent = ""; try { envContent = readFileSync(`${dir}/.env`, "utf8"); } catch {}
+      const envLines = envContent.split("\n");
+      const envMap = {};
+      envLines.forEach(line => {
+        const s = line.trim();
+        if (!s || s.startsWith("#")) return;
+        const idx = s.indexOf("=");
+        if (idx > 0) envMap[s.slice(0, idx).trim()] = s.slice(idx + 1).trim();
+      });
+      Object.keys(body.env).forEach(k => { if (body.env[k] != null) envMap[k] = body.env[k]; });
+      const newEnv = Object.keys(envMap).map(k => `${k}=${envMap[k]}`).join("\n") + "\n";
+      writeFileSync(`${dir}/.env`, newEnv);
+    }
+    // 更新 UI 元数据
+    let meta = {}; try { meta = JSON.parse(readFileSync(`${dir}/metadata.json`, "utf8")); } catch {}
+    if (body.name != null) meta.name = body.name;
+    if (body.emoji != null) meta.emoji = body.emoji;
+    meta.updated_at = Date.now();
+    writeFileSync(`${dir}/metadata.json`, JSON.stringify(meta, null, 2));
+    return { ok: true };
+  }
+
+  function _deleteProfile(id) {
+    if (id === "default") return { ok: false, error: "无法删除默认 profile（~/.hermes）" };
+    const dir = `${PROFILES_DIR}/${id}`;
+    if (!existsSync(dir)) return { ok: false, error: "profile not found" };
+    // 使用官方 CLI 删除（会停止网关、移除 systemd 服务、删除命令别名）
+    try {
+      const r = spawnSync(HERMES_BIN, ["profile", "delete", id, "--yes"], { stdout: "pipe", stderr: "pipe", timeout: 15000 });
+      if (r.status === 0) {
+        log(`[profiles] hermes profile delete ${id} 成功`);
+      } else {
+        const err = (r.stderr || "").toString().trim();
+        log(`[profiles] hermes profile delete ${id} CLI 失败(${err})，手动删除目录`);
+        rmSync(dir, { recursive: true, force: true });
+      }
+    } catch (e) {
+      log(`[profiles] hermes profile delete 异常: ${e.message}，手动删除`);
+      try { rmSync(dir, { recursive: true, force: true }); } catch (e2) { return { ok: false, error: e2.message }; }
+    }
+    if (_getActiveProfile() === id) _setActiveProfile("default");
+    return { ok: true };
+  }
+
+  // GET /api/profiles → 列出所有 profiles（与 hermes profile list 对齐）
+  if (path === "/api/profiles" && req.method === "GET") {
+    try {
+      return new Response(JSON.stringify({ ok: true, profiles: _listProfiles(), active: _getActiveProfile() }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // POST /api/profiles → 创建 profile（调用 hermes profile create）
+  if (path === "/api/profiles" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const id = (body.id || body.name || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_") || ("agent_" + Date.now());
+      const r = _createProfile(id, body);
+      return new Response(JSON.stringify(r), { status: r.ok ? 200 : 400, headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // PUT /api/profiles/:id → 更新 profile（SOUL.md / config / .env）
+  const profileUpdateMatch = path.match(/^\/api\/profiles\/([a-zA-Z0-9_-]+)$/);
+  if (profileUpdateMatch && req.method === "PUT") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const r = _updateProfile(profileUpdateMatch[1], body);
+      return new Response(JSON.stringify(r), { status: r.ok ? 200 : 404, headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // DELETE /api/profiles/:id → 删除 profile（调用 hermes profile delete）
+  if (profileUpdateMatch && req.method === "DELETE") {
+    try {
+      const r = _deleteProfile(profileUpdateMatch[1]);
+      return new Response(JSON.stringify(r), { status: r.ok ? 200 : 400, headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // POST /api/profiles/:id/activate → 切换活跃 profile（调用 hermes profile use）
+  const profileActivateMatch = path.match(/^\/api\/profiles\/([a-zA-Z0-9_-]+)\/activate$/);
+  if (profileActivateMatch && req.method === "POST") {
+    try {
+      const id = profileActivateMatch[1];
+      if (id !== "default" && !existsSync(`${PROFILES_DIR}/${id}`)) {
+        return new Response(JSON.stringify({ ok: false, error: "profile not found" }), { status: 404, headers: jsonHeaders() });
+      }
+      _setActiveProfile(id);
+      // 切换 profile 后触发网关重启以加载新 profile 的配置
+      _triggerGatewayRestart("profile-switch-" + id);
+      return new Response(JSON.stringify({ ok: true, active: id }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // GET /api/profiles/:id/env → 读取 profile 的 .env 键值（脱敏）
+  const profileEnvMatch = path.match(/^\/api\/profiles\/([a-zA-Z0-9_-]+)\/env$/);
+  if (profileEnvMatch && req.method === "GET") {
+    try {
+      const id = profileEnvMatch[1];
+      const envPath = id === "default" ? `${DATA_DIR}/.env` : `${PROFILES_DIR}/${id}/.env`;
+      const envObj = {};
+      try {
+        const content = readFileSync(envPath, "utf8");
+        content.split("\n").forEach(line => {
+          const s = line.trim();
+          if (!s || s.startsWith("#")) return;
+          const idx = s.indexOf("=");
+          if (idx < 0) return;
+          const key = s.slice(0, idx).trim();
+          const val = s.slice(idx + 1).trim();
+          // 脱敏：只显示前4位 + ***
+          envObj[key] = val.length > 8 ? val.slice(0, 4) + "****" : (val ? "****" : "");
+        });
+      } catch {}
+      return new Response(JSON.stringify({ ok: true, env: envObj }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
   // ─── 聊天：配置 API ──────────────────────────────────────────────────────
   // ───────────────────────────────────────────────────────────────
   // 扩展能力（LightAgent 集成）：toolsets / mcp_servers / skills / persona
@@ -3620,25 +4219,14 @@ async function handleFetch(req) {
   }
 
   // 替换/新增 config.yaml 顶层「列表」块（如 toolsets:）
+  // 通过 _setTopLevelBlock 写入：兼容 inline 与 block 形态，并清除重复顶层键
   function _setYamlListBlock(content, key, items){
     const block = `${key}:\n` + items.map(it => `  - ${_yamlScalarSafe(it)}`).join("\n");
-    const lines = content.split("\n");
-    const out = [];
-    let i = 0, done = false;
-    while (i < lines.length){
-      if (!done && lines[i] === key + ":"){
-        out.push(block);
-        done = true;
-        i = _skipBlock(lines, i + 1);
-        continue;
-      }
-      out.push(lines[i]); i++;
-    }
-    if (!done) out.push(block);
-    return out.join("\n");
+    return _setTopLevelBlock(content, key, block);
   }
 
   // 替换/新增 config.yaml 顶层「映射」块（如 mcp_servers:）
+  // 通过 _setTopLevelBlock 写入：兼容 inline（key: {}）与 block 形态，并清除重复顶层键
   function _setYamlMapBlock(content, key, obj){
     let block;
     const names = Object.keys(obj);
@@ -3658,20 +4246,7 @@ async function handleFetch(req) {
         });
       });
     }
-    const lines = content.split("\n");
-    const out = [];
-    let i = 0, done = false;
-    while (i < lines.length){
-      if (!done && lines[i] === key + ":"){
-        out.push(block);
-        done = true;
-        i = _skipBlock(lines, i + 1);
-        continue;
-      }
-      out.push(lines[i]); i++;
-    }
-    if (!done) out.push(block);
-    return out.join("\n");
+    return _setTopLevelBlock(content, key, block);
   }
 
   // 合并 skills.external_dirs（保留 skills 段其它字段）
@@ -3712,9 +4287,15 @@ async function handleFetch(req) {
     try { writeFileSync(`${VAR_DIR}/extensions.json`, JSON.stringify(obj, null, 2)); } catch (e) {}
   }
   // 从 config.yaml 提取某个顶层块的原始文本（用于 GET 推断）
+  // 兼容 block 形态（key:\n 缩进内容）与 inline 形态（key: {} / key: value）
   function _yamlBlockOf(yml, key){
     const m = yml.match(new RegExp("^" + key + ":\\n([\\s\\S]*?)(?=^[a-zA-Z_]+:|\\Z)", "m"));
-    return m ? m[1] : "";
+    if (m) return m[1];
+    const im = yml.match(new RegExp("^" + key + ":\\s*\\{[^\\n]*\\}\\s*$", "m"));
+    if (im) return "";
+    const iv = yml.match(new RegExp("^" + key + ":\\s*([^\\n]*)\\s*$", "m"));
+    if (iv) return iv[1] + "\n";
+    return "";
   }
 
   // 从 config.yaml 顶层「列表」块提取条目数组（如 toolsets:）
@@ -3734,19 +4315,13 @@ async function handleFetch(req) {
   }
 
   // 写 / 替换 config.yaml 顶层「扁平映射」块（如 memory: 下直接是标量）
+  // 通过 _setTopLevelBlock 写入：兼容 inline 与 block 形态，并清除重复顶层键
   function _setYamlFlatMap(content, key, obj){
     const items = Object.keys(obj).filter(k => obj[k] !== undefined && obj[k] !== null && obj[k] !== "");
     const block = items.length
       ? key + ":\n" + items.map(k => "  " + k + ": " + _yamlScalarSafe(obj[k])).join("\n")
       : key + ": {}";
-    const lines = content.split("\n");
-    const out = []; let i = 0, done = false;
-    while (i < lines.length){
-      if (!done && lines[i] === key + ":"){ out.push(block); done = true; i = _skipBlock(lines, i + 1); continue; }
-      out.push(lines[i]); i++;
-    }
-    if (!done) out.push(block);
-    return out.join("\n");
+    return _setTopLevelBlock(content, key, block);
   }
 
   // ── 健壮替换/删除 config.yaml 顶层块（消除重复顶层键，根因修复）──
@@ -3839,7 +4414,7 @@ async function handleFetch(req) {
     return (content ? content.replace(/\n?$/, "\n") : "") + line + "\n";
   }
   // ── 连接器凭证存储（DATA_DIR/connectors-state.json，权限 0o600）──
-  const CONNECTORS_STATE = `${DATA_DIR}/connectors-state.json`;
+  // CONNECTORS_STATE 常量已在模块级定义（模块级 MCP 自动注册需要直接访问）
   function _readConnectorsState(){
     try { if (existsSync(CONNECTORS_STATE)) return JSON.parse(readFileSync(CONNECTORS_STATE, "utf8") || "{}"); } catch (e) {}
     return {};
@@ -4468,7 +5043,7 @@ async function handleFetch(req) {
           }
         }
         if (existsSync(envProvPath)) {
-          const envContent = readFileSync(envProvPath, "utf8");
+          let envContent = readFileSync(envProvPath, "utf8");
           Object.keys(PROVIDER_API_KEYS).forEach(id => {
             const envKey = PROVIDER_API_KEYS[id];
             const m = envContent.match(new RegExp(`^${envKey}=(.*)$`, "m"));
@@ -4477,8 +5052,14 @@ async function handleFetch(req) {
           const customRe = /^CUSTOM_(?:PROVIDER_)?([A-Z0-9_]+)_API_KEY=(.+)$/gm;
           let cm;
           while ((cm = customRe.exec(envContent)) !== null) {
-            const customId = "custom-" + cm[1].toLowerCase().replace(/_/g, "-");
+            // 保留下划线（与 provider ID 格式一致：custom_xxx）
+            const customId = "custom_" + cm[1].toLowerCase();
             if (!envApiKeys[customId]) envApiKeys[customId] = cm[2];
+          }
+          // 迁移：修复双前缀 CUSTOM_CUSTOM_* → CUSTOM_*（历史 bug 导致）
+          if (/^CUSTOM_CUSTOM_/m.test(envContent)) {
+            envContent = envContent.replace(/^CUSTOM_CUSTOM_/gm, 'CUSTOM_');
+            try { writeFileSync(envProvPath, envContent); log('[env.providers] 已迁移双前缀 CUSTOM_CUSTOM_ → CUSTOM_'); } catch {}
           }
         }
       } catch (e) {}
@@ -4969,12 +5550,542 @@ async function handleFetch(req) {
     }
   }
 
+  // ─── MCP 服务器管理 API（对应 dashboard/mcp，读写 config.yaml mcp_servers 段）───
+  if (path === "/api/mcp-servers" && req.method === "GET") {
+    try {
+      const yml = _readHermesConfig();
+      const servers = _parseMcpServers(yml);
+      const list = Object.keys(servers).map(name => {
+        const s = servers[name];
+        const type = s.url ? "http" : "stdio";
+        return {
+          name, type,
+          command: s.command || "",
+          args: Array.isArray(s.args) ? s.args : [],
+          env: (s.env && typeof s.env === "object") ? s.env : {},
+          url: s.url || "",
+          headers: (s.headers && typeof s.headers === "object") ? s.headers : {},
+          enabled: s.enabled !== "false" && s.enabled !== false,
+          timeout: s.timeout || "",
+          connect_timeout: s.connect_timeout || "",
+          tools_include: Array.isArray(s.tools_include) ? s.tools_include : (s.tools && Array.isArray(s.tools.include) ? s.tools.include : []),
+          tools_exclude: Array.isArray(s.tools_exclude) ? s.tools_exclude : (s.tools && Array.isArray(s.tools.exclude) ? s.tools.exclude : []),
+        };
+      });
+      return new Response(JSON.stringify({ ok: true, servers: list }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message, servers: [] }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/mcp-servers → 添加 MCP 服务器
+  if (path === "/api/mcp-servers" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const name = String(body.name || "").trim().replace(/[^A-Za-z0-9_-]/g, "_");
+      if (!name) return new Response(JSON.stringify({ ok: false, error: "服务器名称不能为空" }), { status: 400, headers: jsonHeaders() });
+      const existing = _parseMcpServers(_readHermesConfig());
+      if (existing[name]) return new Response(JSON.stringify({ ok: false, error: "服务器 '" + name + "' 已存在" }), { status: 409, headers: jsonHeaders() });
+      const entry = {};
+      if (body.type === "http" || body.url) {
+        entry.url = String(body.url || "").trim();
+        if (body.headers && typeof body.headers === "object" && Object.keys(body.headers).length) entry.headers = body.headers;
+      } else {
+        entry.command = String(body.command || "").trim();
+        if (Array.isArray(body.args) && body.args.length) entry.args = body.args;
+        if (body.env && typeof body.env === "object" && Object.keys(body.env).length) entry.env = body.env;
+      }
+      if (body.enabled === false) entry.enabled = "false";
+      if (body.timeout) entry.timeout = String(body.timeout);
+      if (body.connect_timeout) entry.connect_timeout = String(body.connect_timeout);
+      const tools = {};
+      if (Array.isArray(body.tools_include) && body.tools_include.length) tools.include = body.tools_include;
+      if (Array.isArray(body.tools_exclude) && body.tools_exclude.length) tools.exclude = body.tools_exclude;
+      if (Object.keys(tools).length) entry.tools = tools;
+      _upsertMcpServer(name, entry);
+      _triggerGatewayRestart("mcp-add-" + name);
+      return new Response(JSON.stringify({ ok: true, name, restart: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // PUT /api/mcp-servers/:name → 更新 MCP 服务器
+  const mcpPutMatch = path.match(/^\/api\/mcp-servers\/([A-Za-z0-9_-]+)$/);
+  if (mcpPutMatch && req.method === "PUT") {
+    try {
+      const name = mcpPutMatch[1];
+      const body = await req.json().catch(() => ({}));
+      const entry = {};
+      if (body.type === "http" || body.url) {
+        entry.url = String(body.url || "").trim();
+        if (body.headers && typeof body.headers === "object" && Object.keys(body.headers).length) entry.headers = body.headers;
+      } else {
+        entry.command = String(body.command || "").trim();
+        if (Array.isArray(body.args) && body.args.length) entry.args = body.args;
+        if (body.env && typeof body.env === "object" && Object.keys(body.env).length) entry.env = body.env;
+      }
+      if (body.enabled === false) entry.enabled = "false";
+      if (body.timeout) entry.timeout = String(body.timeout);
+      if (body.connect_timeout) entry.connect_timeout = String(body.connect_timeout);
+      const tools = {};
+      if (Array.isArray(body.tools_include) && body.tools_include.length) tools.include = body.tools_include;
+      if (Array.isArray(body.tools_exclude) && body.tools_exclude.length) tools.exclude = body.tools_exclude;
+      if (Object.keys(tools).length) entry.tools = tools;
+      _upsertMcpServer(name, entry);
+      _triggerGatewayRestart("mcp-update-" + name);
+      return new Response(JSON.stringify({ ok: true, name, restart: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // DELETE /api/mcp-servers/:name → 删除 MCP 服务器
+  const mcpDelMatch = path.match(/^\/api\/mcp-servers\/([A-Za-z0-9_-]+)$/);
+  if (mcpDelMatch && req.method === "DELETE") {
+    try {
+      const name = mcpDelMatch[1];
+      _upsertMcpServer(name, null);
+      _triggerGatewayRestart("mcp-del-" + name);
+      return new Response(JSON.stringify({ ok: true, name, restart: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/mcp-servers/:name/toggle → 启用/禁用
+  const mcpToggleMatch = path.match(/^\/api\/mcp-servers\/([A-Za-z0-9_-]+)\/toggle$/);
+  if (mcpToggleMatch && req.method === "POST") {
+    try {
+      const name = mcpToggleMatch[1];
+      const yml = _readHermesConfig();
+      const servers = _parseMcpServers(yml);
+      if (!servers[name]) return new Response(JSON.stringify({ ok: false, error: "not found" }), { status: 404, headers: jsonHeaders() });
+      const cur = servers[name];
+      const isDisabled = cur.enabled === "false" || cur.enabled === false;
+      if (isDisabled) { delete cur.enabled; } else { cur.enabled = "false"; }
+      _upsertMcpServer(name, cur);
+      _triggerGatewayRestart("mcp-toggle-" + name);
+      return new Response(JSON.stringify({ ok: true, name, enabled: isDisabled, restart: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ─── 定时任务（Cron）管理 API（读取 DATA_DIR/cron/jobs.json + hermes cron CLI）───
+  const CRON_DIR = `${DATA_DIR}/cron`;
+  const CRON_JOBS_FILE = `${CRON_DIR}/jobs.json`;
+
+  function _readCronJobs() {
+    try {
+      if (!existsSync(CRON_JOBS_FILE)) return [];
+      const raw = readFileSync(CRON_JOBS_FILE, "utf8");
+      const data = JSON.parse(raw);
+      return Array.isArray(data) ? data : (data.jobs || Object.values(data));
+    } catch { return []; }
+  }
+
+  if (path === "/api/cron-jobs" && req.method === "GET") {
+    try {
+      const jobs = _readCronJobs();
+      return new Response(JSON.stringify({ ok: true, jobs }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message, jobs: [] }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/cron-jobs → 创建定时任务（使用 hermes cron create CLI）
+  if (path === "/api/cron-jobs" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const prompt = String(body.prompt || "").trim();
+      if (!prompt) return new Response(JSON.stringify({ ok: false, error: "提示词不能为空" }), { status: 400, headers: jsonHeaders() });
+      const schedule = String(body.schedule || "").trim() || "every 1h";
+      const args = ["cron", "create", schedule, prompt];
+      if (body.name) args.push("--name", String(body.name));
+      if (body.deliver_to) args.push("--deliver-to", String(body.deliver_to));
+      if (body.repeat) args.push("--repeat", String(body.repeat));
+      if (Array.isArray(body.skills)) body.skills.forEach(sk => { if (sk) args.push("--skill", sk); });
+      const r = spawnSync(HERMES_BIN, args, { stdout: "pipe", stderr: "pipe", timeout: 15000, env: { ...process.env, HERMES_HOME: DATA_DIR } });
+      const stdout = (r.stdout || "").toString().trim();
+      const stderr = (r.stderr || "").toString().trim();
+      if (r.status !== 0) {
+        return new Response(JSON.stringify({ ok: false, error: stderr || stdout || "创建失败" }), { status: 500, headers: jsonHeaders() });
+      }
+      return new Response(JSON.stringify({ ok: true, output: stdout }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/cron-jobs/:id/action → 生命周期操作（pause/resume/run/remove）
+  const cronActionMatch = path.match(/^\/api\/cron-jobs\/([^/]+)\/action$/);
+  if (cronActionMatch && req.method === "POST") {
+    try {
+      const jobId = decodeURIComponent(cronActionMatch[1]);
+      const body = await req.json().catch(() => ({}));
+      const action = String(body.action || "").trim();
+      const validActions = ["pause", "resume", "run", "remove"];
+      if (!validActions.includes(action)) return new Response(JSON.stringify({ ok: false, error: "无效操作: " + action }), { status: 400, headers: jsonHeaders() });
+      const r = spawnSync(HERMES_BIN, ["cron", action, jobId], { stdout: "pipe", stderr: "pipe", timeout: 15000, env: { ...process.env, HERMES_HOME: DATA_DIR } });
+      const stdout = (r.stdout || "").toString().trim();
+      const stderr = (r.stderr || "").toString().trim();
+      if (r.status !== 0) {
+        return new Response(JSON.stringify({ ok: false, error: stderr || stdout || "操作失败" }), { status: 500, headers: jsonHeaders() });
+      }
+      return new Response(JSON.stringify({ ok: true, action, output: stdout }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ─── 记忆 / 灵魂管理 API（读写 DATA_DIR 下的 SOUL.md、MEMORY.md、notes.md）───
+  if (path === "/api/memory" && req.method === "GET") {
+    try {
+      let soul = "", memory = "", notes = "";
+      try { soul = readFileSync(`${DATA_DIR}/SOUL.md`, "utf8"); } catch {}
+      try { memory = readFileSync(`${DATA_DIR}/MEMORY.md`, "utf8"); } catch {}
+      try { notes = readFileSync(`${DATA_DIR}/notes.md`, "utf8"); } catch {}
+      // 读取记忆配置（config.yaml 中的 memory 段）
+      const cfg = _readHermesConfig();
+      const memEnabled = !/memory:\s*\n\s*enabled:\s*false/.test(cfg);
+      return new Response(JSON.stringify({ ok: true, soul, memory, notes, memory_enabled: memEnabled }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/memory → 保存灵魂/记忆/笔记
+  if (path === "/api/memory" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      if (body.soul !== undefined) {
+        writeFileSync(`${DATA_DIR}/SOUL.md`, String(body.soul), { mode: 0o644 });
+      }
+      if (body.memory !== undefined) {
+        writeFileSync(`${DATA_DIR}/MEMORY.md`, String(body.memory), { mode: 0o644 });
+      }
+      if (body.notes !== undefined) {
+        writeFileSync(`${DATA_DIR}/notes.md`, String(body.notes), { mode: 0o644 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ─── Token 用量统计 API（从 Dashboard 拉取）───
+  if (path === "/api/usage" && req.method === "GET") {
+    try {
+      if (!isPortListening(DASHBOARD_PORT)) {
+        return new Response(JSON.stringify({ ok: true, usage: null, note: "Dashboard 未运行" }), { headers: jsonHeaders() });
+      }
+      const h = new Headers();
+      h.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
+      // 尝试从 dashboard 获取用量数据
+      let usage = null;
+      try {
+        const r = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/usage`, {
+          headers: h, signal: AbortSignal.timeout(8000),
+        });
+        if (r.ok) usage = await r.json();
+      } catch {}
+      // 备用：从 sessions 统计 token
+      if (!usage) {
+        try {
+          const r2 = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/sessions`, {
+            headers: h, signal: AbortSignal.timeout(8000),
+          });
+          if (r2.ok) {
+            const data = await r2.json();
+            const sessions = Array.isArray(data) ? data : (data.sessions || data.items || []);
+            let totalPrompt = 0, totalCompletion = 0, totalMsgs = 0;
+            const byModel = {};
+            sessions.forEach(s => {
+              const msgs = s.message_count || (s.messages ? s.messages.length : 0);
+              totalMsgs += msgs;
+              const model = s.model || "unknown";
+              if (!byModel[model]) byModel[model] = { sessions: 0, messages: 0 };
+              byModel[model].sessions++;
+              byModel[model].messages += msgs;
+            });
+            usage = { total_sessions: sessions.length, total_messages: totalMsgs, by_model: byModel };
+          }
+        } catch {}
+      }
+      return new Response(JSON.stringify({ ok: true, usage }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message, usage: null }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ─── 学习轨迹 API（技能图谱 + 使用统计，读取 skills 目录 + Dashboard state.db）───
+  if (path === "/api/learning-trajectory" && req.method === "GET") {
+    try {
+      const skills = [];
+      const relations = [];
+      // 1. 读取本地 skills 目录
+      const skillsDir = `${DATA_DIR}/skills`;
+      if (existsSync(skillsDir)) {
+        const dirs = readdirSync(skillsDir).filter(d => {
+          try { return statSync(`${skillsDir}/${d}`).isDirectory(); } catch { return false; }
+        });
+        dirs.forEach(dir => {
+          let meta = {};
+          try { meta = JSON.parse(readFileSync(`${skillsDir}/${dir}/metadata.json`, "utf8")); } catch {}
+          let category = meta.category || "other";
+          // 尝试从 SKILL.md 或 skill.yaml 提取分类
+          if (category === "other") {
+            try {
+              const skillMd = readFileSync(`${skillsDir}/${dir}/SKILL.md`, "utf8");
+              const catMatch = skillMd.match(/category:\s*(.+)/i);
+              if (catMatch) category = catMatch[1].trim();
+            } catch {}
+          }
+          skills.push({
+            id: dir,
+            name: meta.name || dir,
+            category,
+            description: meta.description || "",
+            usage_count: meta.usage_count || 0,
+            created_at: meta.created_at || null,
+            source: meta.source || "local"
+          });
+        });
+      }
+      // 2. 尝试从 Dashboard 获取技能使用统计
+      if (isPortListening(DASHBOARD_PORT)) {
+        try {
+          const h = new Headers();
+          h.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
+          const r = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/skills`, {
+            headers: h, signal: AbortSignal.timeout(6000),
+          });
+          if (r.ok) {
+            const data = await r.json();
+            const dashSkills = Array.isArray(data) ? data : (data.skills || []);
+            dashSkills.forEach(ds => {
+              const existing = skills.find(s => s.id === (ds.id || ds.name));
+              if (existing) {
+                existing.usage_count = ds.usage_count || ds.usageCount || existing.usage_count;
+                if (ds.category) existing.category = ds.category;
+              } else {
+                skills.push({
+                  id: ds.id || ds.name,
+                  name: ds.name || ds.id,
+                  category: ds.category || "other",
+                  description: ds.description || "",
+                  usage_count: ds.usage_count || ds.usageCount || 0,
+                  created_at: ds.created_at || null,
+                  source: "dashboard"
+                });
+              }
+            });
+          }
+        } catch {}
+      }
+      // 3. 构建关系（同分类技能之间建立关联）
+      const byCat = {};
+      skills.forEach(s => {
+        if (!byCat[s.category]) byCat[s.category] = [];
+        byCat[s.category].push(s.id);
+      });
+      Object.keys(byCat).forEach(cat => {
+        const ids = byCat[cat];
+        for (let i = 0; i < ids.length && i < 8; i++) {
+          for (let j = i + 1; j < ids.length && j < 8; j++) {
+            relations.push({ from: ids[i], to: ids[j], type: "same_category" });
+          }
+        }
+      });
+      return new Response(JSON.stringify({ ok: true, skills, relations }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message, skills: [], relations: [] }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ─── 文件管理 API（工作区文件浏览/读写/创建/删除）───
+  const WORKSPACE_ROOT = DATA_DIR; // 默认工作区根目录
+
+  // GET /api/files?path=xxx → 列出目录内容
+  if (path === "/api/files" && req.method === "GET") {
+    try {
+      const reqPath = url.searchParams.get("path") || "";
+      const dirPath = reqPath.startsWith("/") ? reqPath : `${WORKSPACE_ROOT}/${reqPath}`;
+      if (!existsSync(dirPath)) return new Response(JSON.stringify({ ok: false, error: "目录不存在", items: [] }), { headers: jsonHeaders() });
+      const entries = readdirSync(dirPath, { withFileTypes: true });
+      const items = entries.filter(e => !e.name.startsWith(".")).map(e => {
+        const fullPath = `${dirPath}/${e.name}`;
+        let size = 0, mtime = 0;
+        try { const st = statSync(fullPath); size = st.size; mtime = st.mtimeMs; } catch {}
+        return { name: e.name, path: fullPath, type: e.isDirectory() ? "dir" : "file", size, mtime };
+      }).sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "dir" ? -1 : 1));
+      return new Response(JSON.stringify({ ok: true, path: dirPath, items }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message, items: [] }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // GET /api/files/read?path=xxx → 读取文件内容
+  if (path === "/api/files/read" && req.method === "GET") {
+    try {
+      const filePath = url.searchParams.get("path") || "";
+      if (!filePath || !existsSync(filePath)) return new Response(JSON.stringify({ ok: false, error: "文件不存在" }), { headers: jsonHeaders() });
+      const st = statSync(filePath);
+      if (st.size > 512 * 1024) return new Response(JSON.stringify({ ok: false, error: "文件过大（>512KB）" }), { headers: jsonHeaders() });
+      const content = readFileSync(filePath, "utf8");
+      return new Response(JSON.stringify({ ok: true, path: filePath, content, size: st.size }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/files/write → 写入文件 { path, content }
+  if (path === "/api/files/write" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      if (!body.path) return new Response(JSON.stringify({ ok: false, error: "缺少 path" }), { headers: jsonHeaders() });
+      const dir = body.path.substring(0, body.path.lastIndexOf("/"));
+      if (dir && !existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(body.path, body.content || "", { mode: 0o644 });
+      return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/files/mkdir → 创建目录 { path }
+  if (path === "/api/files/mkdir" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      if (!body.path) return new Response(JSON.stringify({ ok: false, error: "缺少 path" }), { headers: jsonHeaders() });
+      mkdirSync(body.path, { recursive: true });
+      return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // DELETE /api/files?path=xxx → 删除文件/目录
+  if (path === "/api/files" && req.method === "DELETE") {
+    try {
+      const filePath = url.searchParams.get("path") || "";
+      if (!filePath || !existsSync(filePath)) return new Response(JSON.stringify({ ok: false, error: "不存在" }), { headers: jsonHeaders() });
+      rmSync(filePath, { recursive: true, force: true });
+      return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
   // ── 平台频道 / 通讯 ────────────────────────────────────────────────
   if (path === "/api/channels" && req.method === "GET") {
     try {
       return new Response(JSON.stringify({ ok: true, channels: _listChannels(), defs: CHANNEL_DEFS }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ── 通道会话同步：从 Dashboard 拉取各平台会话，按 channel 分组返回给前端 ──
+  if (path === "/api/channel-sessions" && req.method === "GET") {
+    try {
+      if (!isPortListening(DASHBOARD_PORT)) {
+        return new Response(JSON.stringify({ ok: true, groups: {} }), { headers: jsonHeaders() });
+      }
+      const h = new Headers();
+      h.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
+      const r = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/sessions`, {
+        headers: h, signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) return new Response(JSON.stringify({ ok: true, groups: {} }), { headers: jsonHeaders() });
+      const data = await r.json();
+      const sessions = Array.isArray(data) ? data : (data.sessions || data.items || []);
+      // 按 platform 分组
+      const groups = {};
+      sessions.forEach(s => {
+        const platform = s.platform || s.source || s.channel || "api_server";
+        if (!groups[platform]) groups[platform] = [];
+        groups[platform].push({
+          id: s.id || s.session_id || "",
+          title: s.title || s.name || "未命名会话",
+          platform,
+          updated_at: s.updated_at || s.last_active || s.created_at || 0,
+          message_count: s.message_count || (s.messages ? s.messages.length : 0),
+          model: s.model || "",
+        });
+      });
+      // 每组按时间倒序
+      Object.keys(groups).forEach(k => groups[k].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0)));
+      return new Response(JSON.stringify({ ok: true, groups }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: true, groups: {}, error: e.message }), { headers: jsonHeaders() });
+    }
+  }
+  // ── 通道会话消息：获取指定 session 的聊天消息（从 Dashboard API 拉取）──
+  const chSessMsgMatch = path.match(/^\/api\/channel-sessions\/([^/]+)\/messages$/);
+  if (chSessMsgMatch && req.method === "GET") {
+    try {
+      const sessionId = decodeURIComponent(chSessMsgMatch[1]);
+      if (!isPortListening(DASHBOARD_PORT)) {
+        return new Response(JSON.stringify({ ok: false, error: "Dashboard 未运行", messages: [] }), { headers: jsonHeaders() });
+      }
+      const h = new Headers();
+      h.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
+      // 尝试多种 Dashboard API 格式获取会话消息
+      let messages = [];
+      let sessionTitle = "";
+      // 方式1: /api/sessions/:id/messages
+      try {
+        const r1 = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/sessions/${encodeURIComponent(sessionId)}/messages`, {
+          headers: h, signal: AbortSignal.timeout(8000),
+        });
+        if (r1.ok) {
+          const d1 = await r1.json();
+          messages = Array.isArray(d1) ? d1 : (d1.messages || d1.items || []);
+        }
+      } catch {}
+      // 方式2: 如果方式1失败，尝试 /api/sessions/:id（可能包含 messages 字段）
+      if (!messages.length) {
+        try {
+          const r2 = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/sessions/${encodeURIComponent(sessionId)}`, {
+            headers: h, signal: AbortSignal.timeout(8000),
+          });
+          if (r2.ok) {
+            const d2 = await r2.json();
+            sessionTitle = d2.title || d2.name || "";
+            messages = d2.messages || d2.history || [];
+          }
+        } catch {}
+      }
+      // 方式3: 从全部 sessions 列表中查找（兜底）
+      if (!messages.length) {
+        try {
+          const r3 = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/sessions`, {
+            headers: h, signal: AbortSignal.timeout(8000),
+          });
+          if (r3.ok) {
+            const d3 = await r3.json();
+            const allSessions = Array.isArray(d3) ? d3 : (d3.sessions || d3.items || []);
+            const found = allSessions.find(s => (s.id || s.session_id) === sessionId);
+            if (found) {
+              sessionTitle = found.title || found.name || "";
+              messages = found.messages || found.history || [];
+            }
+          }
+        } catch {}
+      }
+      // 标准化消息格式
+      const normalized = messages.map(m => ({
+        role: m.role || (m.is_user ? "user" : "assistant"),
+        content: m.content || m.text || m.message || "",
+        timestamp: m.timestamp || m.created_at || m.ts || 0,
+        model: m.model || "",
+        tool_calls: m.tool_calls || null,
+      }));
+      return new Response(JSON.stringify({ ok: true, messages: normalized, title: sessionTitle, session_id: sessionId }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message, messages: [] }), { status: 500, headers: jsonHeaders() });
     }
   }
   // POST /api/channels/:id  → 保存凭证 + 行为配置
@@ -5942,6 +7053,18 @@ async function handleFetch(req) {
     return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
   }
 
+  // 获取指定 provider 的明文 API Key（仅本机 UI 使用，已经过 monitor token 鉴权）
+  if (path === "/api/provider-key" && req.method === "GET") {
+    const id = url.searchParams.get("id") || "";
+    if (!id) return new Response(JSON.stringify({ error: "missing id" }), { status: 400, headers: jsonHeaders() });
+    // 从已保存的 providers 中找到对应 provider
+    const cfg = getChatConfig();
+    const provider = (cfg.providers || []).find(p => p.id === id || p.name === id);
+    if (!provider) return new Response(JSON.stringify({ error: "provider not found" }), { status: 404, headers: jsonHeaders() });
+    const realKey = resolveRealApiKey(provider);
+    return new Response(JSON.stringify({ ok: true, api_key: realKey || "" }), { headers: jsonHeaders() });
+  }
+
   if (path === "/api/config/test" && req.method === "POST") {
     const body = await req.json().catch(() => ({}));
     let provider = body.provider || getActiveProvider();
@@ -6391,7 +7514,7 @@ function startServer() {
       if (Date.now() - ts > 60000) {
         // crash loop 检测：回滚所有 .hot-bak 文件
         log("[HotPatch] crash loop detected, rolling back...");
-        try { execSync(`find ${APP_DIR} -name "*.hot-bak" -exec sh -c 'mv "$1" "${1%.hot-bak}"' _ {} \;`, { timeout: 10000 }); } catch {}
+        try { execSync(`find ${APP_DIR} -name "*.hot-bak" -exec sh -c 'mv "$1" "\${1%.hot-bak}"' _ {} \;`, { timeout: 10000 }); } catch {}
         // 回滚 manifest
         const bakManifest = MANIFEST_FILE + ".hot-bak";
         if (existsSync(bakManifest)) { try { copyFileSync(bakManifest, MANIFEST_FILE); } catch {} }
@@ -6427,7 +7550,7 @@ function startServer() {
 
   wss = new WebSocketServer({ noServer: true });
 
-  server.on("upgrade", (req, socket, head) => {
+  const _handleUpgrade = (req, socket, head) => {
     const url = new URL(req.url, "http://localhost");
     let wsPath = url.pathname;
     if (BASE_PATH && BASE_PATH !== "/") {
@@ -6463,7 +7586,9 @@ function startServer() {
           socket.write("HTTP/1.1 503 Service Unavailable\r\n\r\n"); socket.destroy(); return;
         }
         const subPath = wsPath.slice(prefix.length);
-        const targetUrl = `ws://${DASHBOARD_BIND}:${DASHBOARD_PORT}${subPath}${url.search}`;
+        // Dashboard WS 认证要求 ?token=<session_token> 查询参数（浏览器 WS 无法设 header）
+        const _sep = url.search ? "&" : "?";
+        const targetUrl = `ws://${DASHBOARD_BIND}:${DASHBOARD_PORT}${subPath}${url.search}${_sep}token=${DASHBOARD_SESSION_TOKEN}`;
         log(`[WS-UPGRADE] ${wsPath} -> ${targetUrl}`);
         wss.handleUpgrade(req, socket, head, (ws) => {
           ws.data = { type: "dashboard-proxy", targetUrl };
@@ -6472,9 +7597,42 @@ function startServer() {
         return;
       }
     }
+    // 终端 WebSocket：/api/terminal/ws?token=xxx&cwd=xxx
+    if (wsPath === "/api/terminal/ws") {
+      const token = url.searchParams.get("token") || "";
+      if (MONITOR_TOKEN && token !== MONITOR_TOKEN) {
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n"); socket.destroy(); return;
+      }
+      const cwd = url.searchParams.get("cwd") || DATA_DIR;
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        log(`[TERMINAL] new session cwd=${cwd}`);
+        const shell = spawn("/bin/bash", ["-i"], {
+          cwd: existsSync(cwd) ? cwd : DATA_DIR,
+          env: { ...process.env, TERM: "xterm-256color", PS1: "\\u@\\h:\\w\\$ " },
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+        shell.stdout.on("data", (d) => { try { ws.send(JSON.stringify({ type: "output", data: d.toString() })); } catch {} });
+        shell.stderr.on("data", (d) => { try { ws.send(JSON.stringify({ type: "output", data: d.toString() })); } catch {} });
+        shell.on("close", (code) => { try { ws.send(JSON.stringify({ type: "exit", code })); ws.close(); } catch {} });
+        shell.on("error", (err) => { try { ws.send(JSON.stringify({ type: "output", data: `\r\n[ERROR] ${err.message}\r\n` })); } catch {} });
+        ws.on("message", (msg) => {
+          try {
+            const data = JSON.parse(msg.toString());
+            if (data.type === "input" && shell.stdin.writable) shell.stdin.write(data.data);
+            if (data.type === "resize") { /* bash -i 不支持 resize，忽略 */ }
+          } catch {
+            // 纯文本输入
+            if (shell.stdin.writable) shell.stdin.write(msg.toString());
+          }
+        });
+        ws.on("close", () => { try { shell.kill("SIGHUP"); } catch {} });
+      });
+      return;
+    }
     // 其他升级请求直接拒绝
     socket.destroy();
-  });
+  };
+  server.on("upgrade", _handleUpgrade);
 
   server.on("error", (err) => {
     log(`Server error: ${err?.message || err}`);
@@ -6503,6 +7661,7 @@ function startServer() {
       else { try { res.end(); } catch {} }
     }
   });
+  tcpServer.on("upgrade", _handleUpgrade);
   tcpServer.on("error", (err) => {
     if (err?.code === "EADDRINUSE") log(`[WARN] UI TCP port ${UI_PORT} already in use, standalone access disabled`);
     else log(`TCP server error: ${err?.message || err}`);
