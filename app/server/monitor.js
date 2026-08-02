@@ -7074,6 +7074,14 @@ async function handleFetch(req) {
       if (realKey) provider.api_key = realKey;
     }
     const result = await fetchGatewayModels(provider);
+    // mode=connectivity：纯连接测试（模型编辑弹窗「验证连接」按钮）。
+    // 只返回连通性 + 模型数量，不返回模型列表，避免前端误刷新/覆盖全部模型配置。
+    if (body.mode === "connectivity") {
+      if (result.error) {
+        return new Response(JSON.stringify({ ok: false, error: result.error, latency: result.latency || 0, latency_ms: result.latency || 0 }), { headers: jsonHeaders() });
+      }
+      return new Response(JSON.stringify({ ok: true, model_count: (result.models || []).length, latency: result.latency, latency_ms: result.latency }), { headers: jsonHeaders() });
+    }
     return new Response(JSON.stringify(result), { headers: jsonHeaders() });
   }
 
