@@ -1,8 +1,8 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.22.0)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.6)
 
 ---
 
-# v0.22.0 — 多 Agent 圆桌讨论 & 模型预配置 & 交互增强 & 更新链路修复
+# v0.21.6 — 多 Agent 圆桌讨论 & 模型预配置 & 交互增强 & 更新链路修复
 
 ### 新增功能
 - **多 Agent 圆桌讨论**：选择 2+ 个 Agent 在同一对话中轮流发言、互相讨论，支持 1-3 轮 + 自动综合总结。
@@ -10,10 +10,13 @@
 - **语音播放 / 消息引用 / Fork 话题**：AI 消息悬停操作栏，支持 TTS 朗读、基于引用追问、Fork 成新会话。
 - **模型预配置库（50+ 模型）**：获取模型后自动匹配上下文窗口/能力标签/最大输出；模型列表支持复选框启用/禁用 + 全选 + 能力徽章。
 - **定时任务模板**：10 个预设模板（新闻摘要/周报/NAS健康检查等），点击一键填充。
-- **完整更新端点** `POST /api/app/update/full`：从最新 Release 下载全部应用文件并本地替换 + 自动重启（此前「完整安装」仅触发 CI 构建，实际不安装）。
+- **完整安装改为直接下载 .fpk 安装包**：点击「完整安装」直接下载最新 Release 的 .fpk 安装包（后端认证中转，支持私有仓库），由用户在 fnOS 应用中心安装/覆盖；文件级替换升级走独立的「热更新」按钮（仅下载变更文件并自动替换+重启）。
 
 ### 问题修复
-- **「完整安装」点完提示更新完成但版本不变（三重根因）**：① `/api/app/update/dispatch` 只触发 GitHub Actions 构建 fpk，从不下载安装；② 前端轮询的 `/api/app/update/status` 端点后端不存在；③ `APP_VERSION` 是启动时读取的常量，manifest 更新后运行中进程仍报旧版本。现新增真正的完整更新端点 + status 端点，`APP_VERSION` 改为可热刷新。
+- **「完整安装」点完提示更新完成但版本不变（三重根因）**：① `/api/app/update/dispatch` 只触发 GitHub Actions 构建 fpk，从不下载安装；② 前端轮询的 `/api/app/update/status` 端点后端不存在；③ `APP_VERSION` 是启动时读取的常量，manifest 更新后运行中进程仍报旧版本。现改为「下载 fpk 手动安装」+「热更新」双路径，`APP_VERSION` 保持可热刷新（热更后概览页立即显示新版本）。
+- **更新后网关不重启**：启动清理的 pkill 误写成数组形式 `spawnSync(["pkill", ...])` 导致 ENOENT 静默失败，旧 gateway/dashboard 杀不掉；且旧进程存活时自动启动被跳过。现修复清理命令，并在热更新后先显式停止 gateway/dashboard，新 monitor 启动后必定全新拉起。
+- **双 monitor 并存**：自重启后 fnOS 框架可能另行拉起一个 monitor，双进程互抢 TCP 8650、反复杀对方刚拉起的网关。新增单实例守卫：启动较早（pid 较小）的进程保留，较晚的自行退出。
+- **版本号体系回退**：按小版本迭代原则，将误升的 v0.22.0 回退为 v0.21.6（Release/hot-patch/NAS 同步更新）。
 - **manifest 不可写导致版本不更新**：fnOS 安装目录的 manifest 属 root，应用用户无写权限，版本写入被静默吞掉。新增 `writeAppVersion()`：逐个尝试候选 manifest，全部失败则写 `${VAR_DIR}/app_version` 覆盖文件（readAppVersion 优先读它）。
 - **自重启端口竞争**：热更/完整更新后新进程在旧进程退出前启动，抢不到 TCP 8650 导致 standalone UI 不可用。改为 shell 延迟 1.5 秒再拉新进程，确保端口已释放。
 - **热更资产名不匹配**：Release 资产以裸文件名（monitor.js/index.html）上传，而热更端点只找 hotpatch_ 前缀名导致下载失败。现兼容两种命名。
