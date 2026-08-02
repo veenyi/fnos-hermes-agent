@@ -3302,8 +3302,10 @@ async function handleFetch(req) {
       const patchAsset = (relData.assets || []).find(a => (a.name || "") === "hot-patch.json");
       if (!patchAsset) return new Response(JSON.stringify({ ok: false, error: "该版本无热更新包，请使用完整安装" }), { status: 404, headers: jsonHeaders() });
 
-      // 3. 下载 hot-patch.json
-      const patchRes = await fetch(patchAsset.browser_download_url, { signal: AbortSignal.timeout(15000) });
+      // 3. 下载 hot-patch.json（私有仓库需认证）
+      const dlHeaders = { "Accept": "application/octet-stream", "User-Agent": "fnos-hermes-agent" };
+      if (pat) dlHeaders["Authorization"] = `Bearer ${pat}`;
+      const patchRes = await fetch(patchAsset.url || patchAsset.browser_download_url, { signal: AbortSignal.timeout(15000), headers: dlHeaders });
       if (!patchRes.ok) throw new Error("下载 hot-patch.json 失败: " + patchRes.status);
       const patchManifest = await patchRes.json();
 
@@ -3315,12 +3317,18 @@ async function handleFetch(req) {
       // 5. 逐个下载并替换文件
       const results = [];
       let needRestart = false;
+      // 构建 asset name → API URL 映射（用于私有仓库认证下载）
+      const assetUrlMap = {};
+      (relData.assets || []).forEach(a => { if (a.name) assetUrlMap[a.name] = a.url; });
       for (const file of (patchManifest.files || [])) {
         const targetPath = `${APP_DIR}/${file.path}`;
         const bakPath = targetPath + ".hot-bak";
         try {
-          // 下载文件内容
-          const fileRes = await fetch(file.url, { signal: AbortSignal.timeout(30000) });
+          // 优先用 API URL（私有仓库认证下载更可靠）
+          const assetName = 'hotpatch_' + file.path.replace(/\//g, '_');
+          const dlUrl = assetUrlMap[assetName] || file.url;
+          // 下载文件内容（私有仓库需认证）
+          const fileRes = await fetch(dlUrl, { signal: AbortSignal.timeout(30000), headers: dlHeaders });
           if (!fileRes.ok) { results.push({ path: file.path, ok: false, error: "HTTP " + fileRes.status }); continue; }
           const buf = Buffer.from(await fileRes.arrayBuffer());
           // 备份原文件
