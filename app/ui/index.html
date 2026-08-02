@@ -5919,10 +5919,21 @@ function switchTab(sid) {
   renderSessionTabs();
   renderRail(); updateHeader();
   restoreDraft(sid);
+  _syncModelBtn();
   if (body) {
     // 始终从后端重新拉取消息（避免缓存导致两个 tab 显示同一内容）
     body.innerHTML = '<div class="system-tip">加载中…</div>';
     loadSessionMessages(sid);
+  }
+}
+function _syncModelBtn(){
+  var bm=document.getElementById('btnModel'); if(!bm) return;
+  var sm=_getSessionModel();
+  if(sm){
+    var mName=(typeof sm==='object'&&sm.model)?sm.model:sm;
+    bm.setAttribute('data-tip','模型: '+mName); bm.classList.add('active');
+  } else {
+    bm.setAttribute('data-tip','选择模型'); bm.classList.remove('active');
   }
 }
 
@@ -6377,12 +6388,13 @@ function sendRaw(text){
       message: buildMessageContent(text, attachments),
       system: sys
     };
-    if(_selectedModel){
-      if(typeof _selectedModel === 'object' && _selectedModel.model){
-        payload.model = _selectedModel.model;
-        if(_selectedModel.provider) payload.provider = _selectedModel.provider;   // 后端支持时一并下发
+    var _sessModel = _getSessionModel(sid);
+    if(_sessModel){
+      if(typeof _sessModel === 'object' && _sessModel.model){
+        payload.model = _sessModel.model;
+        if(_sessModel.provider) payload.provider = _sessModel.provider;
       } else {
-        payload.model = _selectedModel;   // 兼容旧版字符串
+        payload.model = _sessModel;
       }
     }
     streamChat(payload, {
@@ -6651,10 +6663,11 @@ function buildMiniData(){
       var modelId = m.id || m.name || 'auto';
       var modelName = m.name || m.id || 'auto';
       var isActive = false;
-      if(_selectedModel && typeof _selectedModel === 'object' && _selectedModel.model){
-        isActive = (_selectedModel.provider === provName && _selectedModel.model === modelId);
+      var _curModel = _getSessionModel();
+      if(_curModel && typeof _curModel === 'object' && _curModel.model){
+        isActive = (_curModel.provider === provId && _curModel.model === modelId);
       }
-      enabledModels.push({ t: modelName, d: modelId, ico:'⚙️', active: isActive, provider: provName, model: modelId });
+      enabledModels.push({ t: modelName, d: modelId, ico:'⚙️', active: isActive, provider: provId, model: modelId });
     });
     if(enabledModels.length) modelGroups.push({ name: provName, base_url: p.base_url||'', items: enabledModels });
   });
@@ -6889,9 +6902,9 @@ function pickItem(key, el){
     if(prov && model){
       _selectedModel = { provider: prov, model: model };
     } else {
-      _selectedModel = name;   // 回退：无 provider 信息时仅存模型名
+      _selectedModel = name;
     }
-    persistSelectedModel();
+    _setSessionModel(currentSession, _selectedModel);
     toast('已选择模型：'+name);
     closeMini();
     return;
@@ -7143,8 +7156,13 @@ function invokeSelectedConnector(){
       if(currentSession) sendRaw('请通过已配置的 '+c.name+' 连接器处理以下请求：');
     });
 }
-var _selectedModel = (function(){ try{ var s=localStorage.getItem('hermes_selected_model'); return s?JSON.parse(s):''; }catch(e){ return ''; } })();
-function persistSelectedModel(){ try{ localStorage.setItem('hermes_selected_model', JSON.stringify(_selectedModel)); }catch(e){} }
+var _selectedModelMap = (function(){ try{ var s=localStorage.getItem('hermes_selected_model_map'); return s?JSON.parse(s):{}; }catch(e){ return {}; } })();
+function _getSessionModel(sid){ return _selectedModelMap[sid||currentSession] || ''; }
+function _setSessionModel(sid, val){ if(!sid) sid=currentSession; if(!sid) return; if(val){ _selectedModelMap[sid]=val; } else { delete _selectedModelMap[sid]; } try{ localStorage.setItem('hermes_selected_model_map', JSON.stringify(_selectedModelMap)); }catch(e){} }
+// 兼容旧版全局 key 迁移
+var _selectedModel = (function(){ try{ var s=localStorage.getItem('hermes_selected_model'); if(s){ var v=JSON.parse(s); localStorage.removeItem('hermes_selected_model'); return v; } return ''; }catch(e){ return ''; } })();
+if(_selectedModel && currentSession){ _setSessionModel(currentSession, _selectedModel); _selectedModel=''; }
+function persistSelectedModel(){ _setSessionModel(currentSession, _selectedModel); }
 var _activeSkills = [];   // 当前会话已启用的技能（名称列表），发送时注入 system 提示
 var _selectedExpert = null;     // 单专家注入对象 {id,name,prompt}（决策 3，随会话）
 var _selectedConnector = '';    // 当前选中的连接器 kind（字符串）
@@ -9533,9 +9551,10 @@ document.addEventListener('DOMContentLoaded', function(){
       renderChannels();
       renderWorkflowBar();
       renderTeamBar();
-      // 恢复上次选择的模型按钮状态
-      if(_selectedModel){
-        var mName = (typeof _selectedModel==='object'&&_selectedModel.model) ? _selectedModel.model : _selectedModel;
+      // 恢复上次选择的模型按钮状态（per-session）
+      var _initModel = _getSessionModel();
+      if(_initModel){
+        var mName = (typeof _initModel==='object'&&_initModel.model) ? _initModel.model : _initModel;
         var bm=document.getElementById('btnModel'); if(bm){ bm.setAttribute('data-tip','模型: '+mName); bm.classList.add('active'); }
       }
       // 必须在配置（含 agents 分组与 session→分组映射）恢复之后再加载会话并渲染侧栏，
