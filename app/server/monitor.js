@@ -1,8 +1,8 @@
 // Hermes Agent 监控服务 — 基于 Node.js 的 HTTP 服务（Unix Socket），WebSocket 由 ws 库提供
-import { spawn, spawnSync } from "child_process";
+import { spawn, spawnSync, execSync } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync, rmSync } from "fs";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync, rmSync, copyFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { networkInterfaces } from "os";
 import { resolve as resolvePath, dirname, join } from "path";
@@ -63,6 +63,17 @@ function readAppVersion() {
     } catch {}
   }
   return "unknown";
+}
+// 版本号比较：返回 -1/0/1
+function compareVersions(a, b) {
+  const pa = String(a).split(".").map(Number);
+  const pb = String(b).split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0, nb = pb[i] || 0;
+    if (na < nb) return -1;
+    if (na > nb) return 1;
+  }
+  return 0;
 }
 const APP_VERSION = readAppVersion();
 log(`[启动检测] 应用包版本(manifest): ${APP_VERSION}`);
@@ -812,7 +823,7 @@ function resolveChatProviders(cfg, modelOverride) {
   if (modelOverride && modelOverride.provider) {
     // 先在 config.json providers 中查找
     let sel = cfg.providers.find(p => p.name === modelOverride.provider || String(p.id) === String(modelOverride.provider));
-    // 回退：从 providers-state.yaml 查找（兼容未同步到 config.json 的情况）
+    // 回退1：从 providers-state.yaml 查找
     if (!sel) {
       try {
         const statePath = `${VAR_DIR}/providers-state.yaml`;
@@ -854,11 +865,71 @@ function resolveChatProviders(cfg, modelOverride) {
         }
       } catch (e) { /* non-fatal */ }
     }
-    if (sel) {
+    // 回退2：从 config.yaml 的 providers: 段查找 base_url（Hermes 面板配置的 provider 只存在这里）
+    if (!sel || !sel.base_url) {
+      try {
+        const yamlPath = `${DATA_DIR}/config.yaml`;
+        if (existsSync(yamlPath)) {
+          const yml = readFileSync(yamlPath, "utf8");
+          const provBlock = _yamlBlockOf(yml, "providers");
+          if (provBlock) {
+            // 构建反向映射：hermesId → 原始 id
+            const hermesToId = {};
+            Object.entries(PROVIDER_HERMES_IDS).forEach(([id, hid]) => { hermesToId[hid] = id; });
+            // 解析 providers 段
+            const lines = provBlock.split("\n");
+            let curId = null, curBase = "", curModel = "";
+            const yamlProvs = [];
+            lines.forEach(line => {
+              const km = line.match(/^  ([a-zA-Z0-9_-]+):\s*$/);
+              if (km) {
+                if (curId) yamlProvs.push({ hermesId: curId, base_url: curBase, model: curModel });
+                curId = km[1]; curBase = ""; curModel = "";
+                return;
+              }
+              const bm = line.match(/^    base_url:\s*(.+)\s*$/);
+              if (bm && curId) { curBase = bm[1].replace(/^["']|["']$/g, "").trim(); return; }
+              const dm = line.match(/^    default_model:\s*(.+)\s*$/);
+              if (dm && curId) { curModel = dm[1].replace(/^["']|["']$/g, "").trim(); return; }
+            });
+            if (curId) yamlProvs.push({ hermesId: curId, base_url: curBase, model: curModel });
+            // 匹配：前端发的 provider id 可能是原始 id 或 hermesId
+            const targetId = modelOverride.provider;
+            const targetHermesId = PROVIDER_HERMES_IDS[targetId] || targetId;
+            const match = yamlProvs.find(e => e.hermesId === targetId || e.hermesId === targetHermesId || hermesToId[e.hermesId] === targetId);
+            if (match && match.base_url) {
+              const origId = hermesToId[match.hermesId] || match.hermesId;
+              const preset = PROVIDER_PRESETS[origId];
+              if (!sel) {
+                sel = {
+                  id: origId,
+                  name: origId,
+                  base_url: match.base_url,
+                  model: match.model || "auto",
+                  type: "openai-compatible",
+                  is_custom: !preset,
+                };
+              } else if (!sel.base_url) {
+                sel.base_url = match.base_url;
+                if (!sel.model || sel.model === "auto") sel.model = match.model || "auto";
+              }
+            }
+          }
+        }
+      } catch (e) { /* non-fatal */ }
+    }
+    // 回退3：检查 PROVIDER_PRESETS 补全 base_url
+    if (sel && !sel.base_url) {
+      const preset = PROVIDER_PRESETS[sel.id];
+      if (preset) sel.base_url = preset.base_url;
+    }
+    if (sel && sel.base_url) {
       const effective = Object.assign({}, sel);
       if (modelOverride.model) effective.model = modelOverride.model;
+      log(`[ModelRoute] session override → provider=${effective.id} model=${effective.model} base=${effective.base_url}`);
       return [effective];
     }
+    log(`[ModelRoute] WARNING: could not resolve provider "${modelOverride.provider}" - falling back to default`);
   }
   const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
   const allProviders = [primary];
@@ -3202,11 +3273,94 @@ async function handleFetch(req) {
         published_at: data.published_at || "",
         body: data.body || "",
         repo: GITHUB_REPO,
+        // 热更新信息：检查 release assets 中是否有 hot-patch.json
+        hot_patch_available: Array.isArray(data.assets) && data.assets.some(a => (a.name || "") === "hot-patch.json"),
       }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ error: e.message || String(e) }), {
         status: 502, headers: jsonHeaders(),
       });
+    }
+  }
+
+  // ─── 热更新：下载并替换文件，无需全量 fpk 重装 ───────────────────────────
+  if (path === "/api/app/hot-patch" && req.method === "POST") {
+    try {
+      const pat = getGitHubPAT();
+      const ghHeaders = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
+      if (pat) ghHeaders["Authorization"] = `Bearer ${pat}`;
+
+      // 1. 获取最新 release
+      let r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=1`, {
+        signal: AbortSignal.timeout(15000), headers: ghHeaders,
+      });
+      let relData;
+      if (r.ok) { const list = await r.json(); relData = (Array.isArray(list) && list[0]) || null; }
+      if (!relData) return new Response(JSON.stringify({ ok: false, error: "无法获取 Release 信息" }), { status: 502, headers: jsonHeaders() });
+
+      // 2. 找 hot-patch.json asset
+      const patchAsset = (relData.assets || []).find(a => (a.name || "") === "hot-patch.json");
+      if (!patchAsset) return new Response(JSON.stringify({ ok: false, error: "该版本无热更新包，请使用完整安装" }), { status: 404, headers: jsonHeaders() });
+
+      // 3. 下载 hot-patch.json
+      const patchRes = await fetch(patchAsset.browser_download_url, { signal: AbortSignal.timeout(15000) });
+      if (!patchRes.ok) throw new Error("下载 hot-patch.json 失败: " + patchRes.status);
+      const patchManifest = await patchRes.json();
+
+      // 4. 校验 base_version
+      if (patchManifest.base_version && compareVersions(APP_VERSION, patchManifest.base_version) < 0) {
+        return new Response(JSON.stringify({ ok: false, error: `当前版本 ${APP_VERSION} 低于热更基线 ${patchManifest.base_version}，请完整安装` }), { status: 400, headers: jsonHeaders() });
+      }
+
+      // 5. 逐个下载并替换文件
+      const results = [];
+      let needRestart = false;
+      for (const file of (patchManifest.files || [])) {
+        const targetPath = `${APP_DIR}/${file.path}`;
+        const bakPath = targetPath + ".hot-bak";
+        try {
+          // 下载文件内容
+          const fileRes = await fetch(file.url, { signal: AbortSignal.timeout(30000) });
+          if (!fileRes.ok) { results.push({ path: file.path, ok: false, error: "HTTP " + fileRes.status }); continue; }
+          const buf = Buffer.from(await fileRes.arrayBuffer());
+          // 备份原文件
+          if (existsSync(targetPath)) { try { copyFileSync(targetPath, bakPath); } catch {} }
+          // 写入新文件
+          const dir = targetPath.substring(0, targetPath.lastIndexOf("/"));
+          if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+          writeFileSync(targetPath, buf, { mode: 0o644 });
+          results.push({ path: file.path, ok: true, size: buf.length });
+          if (file.path.indexOf("server/") >= 0 || file.path === "manifest") needRestart = true;
+        } catch (fe) {
+          results.push({ path: file.path, ok: false, error: fe.message });
+        }
+      }
+
+      // 6. 更新 manifest 版本号
+      if (patchManifest.version) {
+        try {
+          let mf = readFileSync(MANIFEST_FILE, "utf8");
+          mf = mf.replace(/^version\s*=\s*.+$/m, "version               = " + patchManifest.version);
+          writeFileSync(MANIFEST_FILE, mf);
+        } catch {}
+      }
+
+      const allOk = results.every(r => r.ok);
+      // 7. 若含后端文件变更，标记重启
+      if (allOk && needRestart) {
+        try { writeFileSync(`${VAR_DIR}/.hot-restart`, String(Date.now())); } catch {}
+        setTimeout(() => { log("[HotPatch] restarting after hot-patch..."); process.exit(0); }, 2000);
+      }
+
+      return new Response(JSON.stringify({
+        ok: allOk,
+        version: patchManifest.version || "",
+        need_restart: needRestart,
+        results,
+        hint: allOk ? (needRestart ? "后端文件已更新，服务将在 2 秒后自动重启" : "UI 文件已更新，刷新浏览器即可生效") : "部分文件更新失败，请检查日志",
+      }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message || String(e) }), { status: 500, headers: jsonHeaders() });
     }
   }
 
@@ -6221,6 +6375,26 @@ async function writeWebResponse(res, response) {
 }
 
 function startServer() {
+  // ─── 热更新回滚检测：若 .hot-restart 标记超过 60 秒仍存在，说明上次热更后启动失败（crash loop），回滚 ───
+  try {
+    const hotFlag = `${VAR_DIR}/.hot-restart`;
+    if (existsSync(hotFlag)) {
+      const ts = parseInt(readFileSync(hotFlag, "utf8"), 10) || 0;
+      if (Date.now() - ts > 60000) {
+        // crash loop 检测：回滚所有 .hot-bak 文件
+        log("[HotPatch] crash loop detected, rolling back...");
+        try { execSync(`find ${APP_DIR} -name "*.hot-bak" -exec sh -c 'mv "$1" "${1%.hot-bak}"' _ {} \;`, { timeout: 10000 }); } catch {}
+        // 回滚 manifest
+        const bakManifest = MANIFEST_FILE + ".hot-bak";
+        if (existsSync(bakManifest)) { try { copyFileSync(bakManifest, MANIFEST_FILE); } catch {} }
+      }
+      // 无论是否回滚，清理标记和备份文件
+      try { unlinkSync(hotFlag); } catch {}
+      // 启动成功，清理 .hot-bak 文件
+      try { execSync(`find ${APP_DIR} -name "*.hot-bak" -delete`, { timeout: 5000 }); } catch {}
+    }
+  } catch (e) { log("[HotPatch] startup check error: " + e.message); }
+
   // 启动前清理可能残留的旧 socket，避免 EADDRINUSE
   try { unlinkSync(SOCKET_PATH); } catch {}
 
