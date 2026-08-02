@@ -1253,7 +1253,8 @@
     <div class="update-title">Hermes Agent 应用</div>
     <div class="update-ver">当前 <strong id="appCurrent">--</strong> · 最新 <strong id="appLatest">--</strong></div>
     <button class="ov-actbtn" onclick="checkAppUpdate()">检查更新</button>
-    <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">更新到最新</button>
+    <button class="ov-actbtn start" id="appHotPatchBtn" style="display:none" onclick="doHotPatch()">⚡ 快速更新</button>
+    <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">完整安装</button>
   </div>
 </div>
 <div class="update-gh"><a class="gh-button" href="https://github.com/veenyi/fnos-hermes-agent" target="_blank">GitHub 仓库 →</a></div>
@@ -7055,7 +7056,24 @@ function pickWorkflowFromMini(key){
   if(!_cfg.extensions.toolsets) _cfg.extensions.toolsets={};
   _cfg.extensions.toolsets.delegation=true;
   saveConfig(); if(typeof renderWorkflow==='function') renderWorkflow(); if(typeof renderTeam==='function') renderTeam();
-  currentAgent='default';
+  // 工作流会话分组：建立专属分组，会话归入其中（与专家团分组同理）
+  var wfAgentId = 'wf_' + p.key;
+  ensureAgent(wfAgentId, { name: p.name, icon: '🛠️' });
+  var wfExisting = _sessions.find(function(s){ return (_sessionAgent[s.id]||'default')===wfAgentId; });
+  if(wfExisting){
+    switchSession(wfAgentId, wfExisting.id);
+  } else {
+    fetch(apiUrl('/api/sessions'), { method:'POST', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+      .then(function(s){
+        _sessions.unshift(s);
+        currentSession=s.id; currentAgent=wfAgentId;
+        setSessionAgent(s.id, wfAgentId);
+        localStorage.setItem('hermes_rail_open_'+wfAgentId, 'true');
+        _openTabs.push(s.id); persistTabs();
+        renderSessionTabs(); renderRail(); updateHeader();
+      })
+      .catch(function(){ toast('创建会话失败'); });
+  }
   var t=document.getElementById('chatTitle'); if(t) t.textContent=p.name;
   renderWorkflowBar();
   closeMini();
@@ -9438,10 +9456,35 @@ function confirmHermesUpdate(){
 }
 function checkAppUpdate(){
   apiGet('/api/app/update/check').then(function(data){
-    if(!data || data.error){ var b=document.getElementById('appUpdateBtn'); if(b) b.style.display='none'; return; }
+    if(!data || data.error){ var b=document.getElementById('appUpdateBtn'); if(b) b.style.display='none'; var hb=document.getElementById('appHotPatchBtn'); if(hb) hb.style.display='none'; return; }
     var lat=document.getElementById('appLatest');
-    if(lat){ if(data.updateAvailable){ lat.textContent='v'+data.latest; var btn=document.getElementById('appUpdateBtn'); if(btn) btn.style.display='inline-flex'; } else { lat.textContent='已是最新'; var btn=document.getElementById('appUpdateBtn'); if(btn) btn.style.display='none'; } }
+    if(lat){
+      if(data.updateAvailable){
+        lat.textContent='v'+data.latest;
+        var btn=document.getElementById('appUpdateBtn'); if(btn) btn.style.display='inline-flex';
+        var hbtn=document.getElementById('appHotPatchBtn'); if(hbtn) hbtn.style.display=data.hot_patch_available?'inline-flex':'none';
+      } else {
+        lat.textContent='已是最新';
+        var btn=document.getElementById('appUpdateBtn'); if(btn) btn.style.display='none';
+        var hbtn=document.getElementById('appHotPatchBtn'); if(hbtn) hbtn.style.display='none';
+      }
+    }
   }).catch(function(){ toast('检查应用更新失败'); });
+}
+function doHotPatch(){
+  if(!confirm('快速更新仅替换变更文件（约几百KB），无需重装。确认执行？')) return;
+  toast('正在下载热更新包…');
+  apiPost('/api/app/hot-patch', {}).then(function(data){
+    if(!data || !data.ok){ toast('热更新失败：'+(data&&data.error||'未知错误')); return; }
+    toast(data.hint || '热更新完成');
+    if(data.need_restart){
+      setTimeout(function(){ location.reload(); }, 3000);
+    } else {
+      setTimeout(function(){ location.reload(); }, 1000);
+    }
+    var btn=document.getElementById('appHotPatchBtn'); if(btn) btn.style.display='none';
+    var btn2=document.getElementById('appUpdateBtn'); if(btn2) btn2.style.display='none';
+  }).catch(function(e){ toast('热更新请求失败：'+e.message); });
 }
 function confirmAppUpdate(){
   if(!confirm('确认更新 Hermes Agent 应用？')) return;
