@@ -1,8 +1,9 @@
 {
-  "version": "0.21.9",
-  "base_version": "0.21.8",
-  "description": "v0.21.9 热更新包：学习轨迹 3D 可拖拽图谱+分类筛选，会话窗口 Studio 布局（工作区不遮挡按钮+多会话按钮+白底统一），修复 46 个工作流模板「未找到」，Agent/通讯模型改下拉选择",
+  "version": "0.21.10",
+  "base_version": "0.21.9",
+  "description": "v0.21.10 热更新包：修复 WebSocket 通话断连（自动重连+流结果缓存+SSE 降级复用），保证回答完整性",
   "files": [
+    { "path": "server/monitor.js" },
     { "path": "ui/index.html" }
   ]
 }
