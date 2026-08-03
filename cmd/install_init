@@ -45,6 +45,10 @@ rm -f "${TRIM_APPDEST}/hermes-agent.sock" 2>/dev/null || true
 rm -f "/var/apps/hermes-agent/target/hermes-agent.sock" 2>/dev/null || true
 log_msg "socket 清理完成"
 
+# 清理残留的版本覆盖文件（@appdata 不随卸载清除，旧 override 会导致 UI 显示旧版本号）
+rm -f "${TRIM_PKGVAR}/app_version" 2>/dev/null || true
+log_msg "app_version 覆盖文件清理完成"
+
 # 额外等待 2 秒，确保文件系统释放所有句柄
 sleep 2
 
