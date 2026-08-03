@@ -1,4 +1,12 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.7)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.8)
+
+---
+
+# v0.21.8 — 修复进入更新页后侧边栏「更新」图标丢失
+
+### 问题修复
+- **更新页丢图标根因定位（非 SVG/缓存问题）**：`checkHermesUpdate()`/`checkAppUpdate()` 用全局 `event.target` 获取按钮；点击侧边栏「更新」导航后 `switchPage('updates')` 自动调用二者，此时全局 `event` 仍是导航按钮的点击事件，`btn.textContent='检查中…'/'检查更新'` 直接把导航按钮里的 SVG 图标抹掉。现改为显式传 `event` 参数 + `currentTarget` 且仅接受 BUTTON 元素，自动调用时不再触碰任何 DOM。
+- **同类隐患清理**：`validateProvider()` 同样改用显式 event + `_resolveCheckBtn()` 安全解析。
 
 ---
 
