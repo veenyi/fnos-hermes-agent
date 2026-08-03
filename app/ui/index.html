@@ -725,6 +725,24 @@
     .learn-detail{width:300px;flex-shrink:0}
     .learn-detail .mem-card{position:sticky;top:0}
     @media (max-width:900px){ .learn-layout{flex-direction:column} .learn-detail{width:100%} }
+    /* 用量页 */
+    .usage-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+    .usage-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px}
+    .usage-card-label{font-size:12px;color:var(--text2);margin-bottom:6px}
+    .usage-card-value{font-size:24px;font-weight:700;color:var(--text)}
+    .usage-card-sub{font-size:11px;color:var(--text3);margin-top:4px}
+    .usage-section{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+    .usage-section h3{font-size:14px;font-weight:600;margin:0 0 12px;color:var(--text)}
+    .usage-model-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+    .usage-model-row:last-child{border-bottom:none}
+    .usage-model-name{font-size:13px;font-weight:500;min-width:140px;color:var(--text)}
+    .usage-model-bar{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+    .usage-model-bar-fill{height:100%;border-radius:4px;background:var(--accent)}
+    .usage-model-stats{font-size:12px;color:var(--text2);min-width:120px;text-align:right}
+    .usage-table{width:100%;border-collapse:collapse;font-size:13px}
+    .usage-table th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--text2);font-weight:600;font-size:12px}
+    .usage-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text)}
+    .usage-table tr:hover td{background:var(--bg2)}
     .workspace-panel{position:absolute;top:50px;right:0;width:340px;height:calc(100% - 50px);background:var(--bg2);border-left:1px solid var(--border);display:none;flex-direction:column;z-index:20}
     .workspace-panel.open{display:flex}
     .session-tabs.visible ~ .workspace-panel{top:100px;height:calc(100% - 100px)}
@@ -940,6 +958,7 @@
     <button class="nav-btn" title="定时" onclick="switchPage('cron')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>定时</button>
     <button class="nav-btn" title="记忆" onclick="switchPage('memory')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4 7l-1 4H10l-1-4C7 14.5 5 12 5 9a7 7 0 0 1 7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg>记忆</button>
         <button class="nav-btn" title="轨迹" onclick="switchPage('learning')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><line x1="7" y1="7" x2="10" y2="10"/><line x1="17" y1="7" x2="14" y2="10"/><line x1="7" y1="17" x2="10" y2="14"/><line x1="17" y1="17" x2="14" y2="14"/></svg>轨迹</button>
+    <button class="nav-btn" title="用量" onclick="switchPage('usage')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>用量</button>
     <button class="nav-btn" title="更新" onclick="switchPage('updates')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>更新</button>
     <div class="spacer"></div>
     <button class="nav-btn" title="设置" onclick="switchPage('settings')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>设置</button>
@@ -1173,19 +1192,6 @@
           </div>
           <div class="ov-toggle"><div class="toggle" id="dbToggle" onclick="toggleService('dashboard')"></div></div>
         </div>
-      </div>
-    </div>
-    <div class="ov-card" id="cardUsage">
-      <div class="ov-card-head">
-        <div class="ov-icon">🪙</div>
-        <div class="ov-card-title">Token 用量</div>
-        <button class="ov-refresh" onclick="renderUsageCard()" title="刷新">↻</button>
-      </div>
-      <div class="ov-card-body" id="usageCardBody">
-        <div class="ov-metric"><span>总会话</span><strong id="usageSessions">--</strong></div>
-        <div class="ov-metric"><span>总消息</span><strong id="usageMessages">--</strong></div>
-        <div class="ov-metric"><span>模型数</span><strong id="usageModels">--</strong></div>
-        <div id="usageByModel" style="margin-top:8px;font-size:12px;color:var(--text2)"></div>
       </div>
     </div>
   </div>
@@ -1481,6 +1487,26 @@
               <div class="learn-graph-wrap" id="learnGraph"><div class="empty-state">加载中…</div></div>
               <div class="learn-detail" id="learnDetail" style="display:none"></div>
             </div>
+          </div>
+        </section>
+
+        <!-- 用量页 -->
+        <section class="page" id="page-usage">
+          <div class="page-header"><h1>用量统计</h1><button class="ov-actbtn" onclick="renderUsagePage()" style="margin-left:auto">↻ 刷新</button></div>
+          <div class="page-body">
+            <div class="usage-summary" id="usageSummaryCards"></div>
+            <div class="usage-section" id="usageByModelSection" style="display:none">
+              <h3>模型分布</h3>
+              <div id="usageByModelList"></div>
+            </div>
+            <div class="usage-section" id="usageDailySection" style="display:none">
+              <h3>每日用量明细</h3>
+              <table class="usage-table" id="usageDailyTable">
+                <thead><tr><th>日期</th><th>会话数</th><th>消息数</th><th>模型</th></tr></thead>
+                <tbody id="usageDailyBody"></tbody>
+              </table>
+            </div>
+            <div class="empty-state" id="usageEmpty" style="display:none">暂无用量数据</div>
           </div>
         </section>
 
@@ -8356,8 +8382,6 @@ function renderOverview(){
     syncSessionTabsVisibility();
     // 默认加载 Monitor 日志（仅首次）
     if(!_logInited){ _logInited=true; setTimeout(function(){ appendLog('monitor','Monitor 日志'); }, 100); }
-    // 加载 Token 用量卡片
-    renderUsageCard();
   }).catch(function(){ setStatusOffline(); });
 }
 // 轻量级状态轮询：只更新顶栏状态点与服务卡片，不重渲染日志/系统信息区块（避免打断日志查看）
@@ -10512,6 +10536,67 @@ function renderUsageCard(){
       }).join('');
     }
   }).catch(function(){});
+}
+
+/* ============================ 用量统计页 ============================ */
+function renderUsagePage(){
+  var cardsEl = document.getElementById('usageSummaryCards');
+  var modelSection = document.getElementById('usageByModelSection');
+  var modelList = document.getElementById('usageByModelList');
+  var dailySection = document.getElementById('usageDailySection');
+  var dailyBody = document.getElementById('usageDailyBody');
+  var emptyEl = document.getElementById('usageEmpty');
+  
+  cardsEl.innerHTML = '<div class="usage-card"><div class="usage-card-label">加载中...</div></div>';
+  modelSection.style.display = 'none';
+  dailySection.style.display = 'none';
+  emptyEl.style.display = 'none';
+  
+  apiGet('/api/usage').then(function(res){
+    if(!res || !res.ok || !res.usage){
+      cardsEl.innerHTML = '';
+      emptyEl.style.display = '';
+      return;
+    }
+    var u = res.usage;
+    var totalSessions = u.total_sessions || 0;
+    var totalMessages = u.total_messages || 0;
+    var models = u.by_model ? Object.keys(u.by_model) : [];
+    
+    // 汇总卡片
+    cardsEl.innerHTML = 
+      '<div class="usage-card"><div class="usage-card-label">总会话数</div><div class="usage-card-value">'+totalSessions+'</div></div>' +
+      '<div class="usage-card"><div class="usage-card-label">总消息数</div><div class="usage-card-value">'+totalMessages+'</div></div>' +
+      '<div class="usage-card"><div class="usage-card-label">使用模型数</div><div class="usage-card-value">'+models.length+'</div></div>' +
+      '<div class="usage-card"><div class="usage-card-label">Dashboard 状态</div><div class="usage-card-value" style="font-size:16px">'+(res.note||'已连接')+'</div></div>';
+    
+    // 模型分布
+    if(models.length){
+      var maxSessions = 0;
+      models.forEach(function(m){ if(u.by_model[m].sessions > maxSessions) maxSessions = u.by_model[m].sessions; });
+      modelList.innerHTML = models.map(function(m){
+        var info = u.by_model[m];
+        var pct = maxSessions > 0 ? Math.round(info.sessions / maxSessions * 100) : 0;
+        return '<div class="usage-model-row">' +
+          '<div class="usage-model-name">'+esc(m)+'</div>' +
+          '<div class="usage-model-bar"><div class="usage-model-bar-fill" style="width:'+pct+'%"></div></div>' +
+          '<div class="usage-model-stats">'+info.sessions+' 会话 · '+info.messages+' 消息</div>' +
+          '</div>';
+      }).join('');
+      modelSection.style.display = '';
+    }
+    
+    // 每日用量（从会话数据推算）
+    if(u.daily && u.daily.length){
+      dailyBody.innerHTML = u.daily.map(function(d){
+        return '<tr><td>'+esc(d.date)+'</td><td>'+d.sessions+'</td><td>'+d.messages+'</td><td>'+esc(d.models||'-')+'</td></tr>';
+      }).join('');
+      dailySection.style.display = '';
+    }
+  }).catch(function(){
+    cardsEl.innerHTML = '';
+    emptyEl.style.display = '';
+  });
 }
 
 /* ============================ 学习轨迹 ============================ */
