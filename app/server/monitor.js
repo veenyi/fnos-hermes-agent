@@ -2,7 +2,7 @@
 import { spawn, spawnSync, execSync, execFile } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync, rmSync, copyFileSync } from "fs";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, rmSync, copyFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { networkInterfaces } from "os";
 import { resolve as resolvePath, dirname, join } from "path";
@@ -918,10 +918,90 @@ function readGatewayModelConfig() {
       const dm = block.match(/^[ \t]+default:[ \t]*(\S+)/m);
       const provider = pm ? pm[1].replace(/^["']|["']$/g, "") : "";
       const model = dm ? dm[1].replace(/^["']|["']$/g, "") : "";
-      if (provider || model) return { provider, model };
+      if (provider || model) return { provider, model, path: p };
     } catch { /* 继续尝试下一个候选 */ }
   }
   return null;
+}
+
+// 模块级 YAML 顶层块提取（注意：handleFetch 内部另有一个同名嵌套的 _yamlBlockOf，
+// 模块级代码不可访问，此处单独实现）
+function _yamlTopBlock(yml, key) {
+  const m = yml.match(new RegExp("^" + key + ":[ \\t]*\\n([\\s\\S]*?)(?=^[a-zA-Z_][\\w-]*:|$(?![\\s\\S]))", "m"));
+  return m ? m[1] : "";
+}
+
+// 解析所选 provider 在网关 config.yaml providers: 段中的 slug：
+// 优先直接匹配（候选 slug 已定义），其次按 base_url 反查。
+// 返回 { slug } 或 null（未定义则无法经网关执行所选模型）。
+function _resolveGatewayProviderSlug(yml, candidates, baseUrl) {
+  try {
+    const provBlock = _yamlTopBlock(yml, "providers");
+    if (!provBlock) return null;
+    const defined = new Set();
+    const bases = {}; // slug → base_url
+    for (const line of provBlock.split("\n")) {
+      const km = line.match(/^  ([a-zA-Z0-9_-]+):\s*$/);
+      if (km) { defined.add(km[1]); continue; }
+      const bm = line.match(/^    base_url:\s*(.+)\s*$/);
+      if (bm) {
+        // 取最近一个定义的 slug
+        const last = [...defined].pop();
+        if (last) bases[last] = bm[1].replace(/^["']|["']$/g, "").trim().replace(/\/$/, "");
+      }
+    }
+    for (const c of (candidates || [])) {
+      if (c && defined.has(c)) return { slug: c };
+    }
+    if (baseUrl) {
+      const norm = String(baseUrl).replace(/\/$/, "");
+      for (const [slug, b] of Object.entries(bases)) {
+        if (b === norm) return { slug };
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
+// v0.21.23 修复会话级模型切换不生效：
+// Hermes 网关的 /v1/chat/completions 会忽略请求里的 model 字段，始终按 config.yaml
+// 的 model.default 执行（实测确认网关每次请求热加载 config.yaml，改完立即生效、无需重启）。
+// 因此会话窗口选择模型时，直接把网关 config.yaml 的 model.provider/model.default
+// 改成所选组合，让网关 agent 用所选模型执行（保留完整工具能力）。
+// 注意：必须保持文件原 owner（hermes-agent），否则网关读不到 config 会报
+// "HTTP 400: required model"（sed/mv 以 root 操作会破坏所有权，这里写完立即 chown 回去）。
+function applyGatewayModelOverride(hermesProvider, model, baseUrl) {
+  try {
+    const gcfg = readGatewayModelConfig();
+    if (!gcfg || !gcfg.path) return { ok: false, reason: "config not found" };
+    const yml = readFileSync(gcfg.path, "utf8");
+    // 解析目标 provider 在网关中的 slug（直匹配或 base_url 反查）
+    const resolved = _resolveGatewayProviderSlug(yml, [hermesProvider], baseUrl);
+    if (!resolved) {
+      log(`[ModelRoute] applyGatewayModelOverride: provider "${hermesProvider}" not defined in gateway config - skip`);
+      return { ok: false, reason: "provider not defined" };
+    }
+    const slug = resolved.slug;
+    const already = gcfg.provider === slug && gcfg.model === model;
+    if (already) return { ok: true, changed: false, cfg: gcfg };
+    // 保持原 owner/mode（gateway 以 hermes-agent 用户读取）
+    const st = statSync(gcfg.path);
+    const blockMatch = yml.match(/^model:[ \t]*\n((?:[ \t]+[^\n]*\n?)+)/m);
+    if (!blockMatch) return { ok: false, reason: "no model block" };
+    let block = blockMatch[1];
+    let hitP = false, hitD = false;
+    block = block.replace(/^([ \t]+provider:)[ \t]*\S+.*$/m, (mm, k) => { hitP = true; return `${k} ${slug}`; });
+    block = block.replace(/^([ \t]+default:)[ \t]*\S+.*$/m, (mm, k) => { hitD = true; return `${k} ${model}`; });
+    if (!hitP || !hitD) return { ok: false, reason: "model block incomplete" };
+    const next = yml.slice(0, blockMatch.index) + "model:\n" + block + yml.slice(blockMatch.index + blockMatch[0].length);
+    writeFileSync(gcfg.path, next);
+    try { chownSync(gcfg.path, st.uid, st.gid); chmodSync(gcfg.path, st.mode & 0o777); } catch {}
+    log(`[ModelRoute] gateway config.yaml updated: provider=${slug} default=${model} (hot-reload, no restart)`);
+    return { ok: true, changed: true, cfg: { provider: slug, model, path: gcfg.path } };
+  } catch (e) {
+    log(`[ModelRoute] applyGatewayModelOverride failed: ${e.message}`);
+    return { ok: false, reason: e.message };
+  }
 }
 
 // 定位网关路由索引文件（sessions.json，legacy mirror of gateway_routing 表）。
@@ -1049,7 +1129,7 @@ function resolveChatProviders(cfg, modelOverride) {
         const yamlPath = `${DATA_DIR}/config.yaml`;
         if (existsSync(yamlPath)) {
           const yml = readFileSync(yamlPath, "utf8");
-          const provBlock = _yamlBlockOf(yml, "providers");
+          const provBlock = _yamlTopBlock(yml, "providers");
           if (provBlock) {
             // 构建反向映射：hermesId → 原始 id
             const hermesToId = {};
@@ -1086,6 +1166,7 @@ function resolveChatProviders(cfg, modelOverride) {
                   model: match.model || "auto",
                   type: "openai-compatible",
                   is_custom: !preset,
+                  hermesSlug: match.hermesId,
                 };
               } else if (!sel.base_url) {
                 sel.base_url = match.base_url;
@@ -1104,17 +1185,26 @@ function resolveChatProviders(cfg, modelOverride) {
     if (sel && sel.base_url) {
       const effective = Object.assign({}, sel);
       if (modelOverride.model) effective.model = modelOverride.model;
-      // 关键修复：若所选 provider/model 与 Hermes 网关当前配置一致，则经网关路由，
-      // 获得完整 agent 能力（工具调用/命令执行）；直连 provider 只是裸补全，无法执行工具。
-      const gcfg = readGatewayModelConfig();
-      const provMatches = gcfg && (String(effective.id) === gcfg.provider || PROVIDER_HERMES_IDS[effective.id] === gcfg.provider);
-      // 放宽：只要所选 provider 与网关配置一致（模型由网关 agent 按 config.yaml 执行），
-      // 即经网关路由获得完整工具能力；否则直连只是裸补全（无工具，只能输出命令让用户手动执行）
-      if (provMatches) {
+      // 关键修复（v0.21.23）：网关 /v1/chat/completions 忽略请求 model 字段，只按
+      // config.yaml 的 model.default 执行。会话选了模型时直接改写网关 config.yaml
+      // （网关热加载、立即生效），使所选模型经网关执行且保留完整 agent 工具能力；
+      // 改写失败时回退直连 provider（尊重所选模型，但没有工具能力）。
+      const wantSlug = effective.hermesSlug || PROVIDER_HERMES_IDS[effective.id] || effective.id;
+      const preCfg = readGatewayModelConfig();
+      // model 为 auto/空时不指定具体模型：不改写网关配置，沿用网关当前默认（保持旧行为）
+      const hasConcreteModel = effective.model && effective.model !== "auto";
+      const modelConsistent = preCfg && preCfg.provider === wantSlug && (!hasConcreteModel || preCfg.model === effective.model);
+      const ovRes = hasConcreteModel
+        ? applyGatewayModelOverride(wantSlug, effective.model, effective.base_url)
+        : { ok: modelConsistent, changed: false, reason: hasConcreteModel ? "" : "no concrete model" };
+      const provMatches = ovRes.ok || (preCfg && (String(effective.id) === preCfg.provider || PROVIDER_HERMES_IDS[effective.id] === preCfg.provider));
+      // 仅当「网关已按所选模型执行」（改写成功或本就一致）时才经网关路由；
+      // provider 一致但模型不一致且改写失败 → 直连，避免网关仍用旧模型回复。
+      if (provMatches && (ovRes.ok || modelConsistent)) {
         effective.viaGateway = true;
-        log(`[ModelRoute] session override → provider=${effective.id} model=${effective.model} via GATEWAY (agent tools enabled)`);
+        log(`[ModelRoute] session override → provider=${effective.id} model=${effective.model} via GATEWAY (agent tools enabled${ovRes.changed ? ", gateway default switched" : ""})`);
       } else {
-        log(`[ModelRoute] session override → provider=${effective.id} model=${effective.model} base=${effective.base_url} (direct, no tools)`);
+        log(`[ModelRoute] session override → provider=${effective.id} model=${effective.model} base=${effective.base_url} (direct, no tools; gateway switch failed: ${ovRes.reason || "provider mismatch"})`);
       }
       return [effective];
     }
