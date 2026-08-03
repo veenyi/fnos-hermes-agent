@@ -1467,6 +1467,12 @@ async function* streamDeltas(upstream, decoder, reqSignal) {
 const PROVIDER_TIMEOUT_MS = 300000; // 长任务/多工具链需要更长时间，5 分钟
 const activeChatStreams = new Map();
 const wsMessageQueue = new Map(); // session_id → message，WS 连接前暂存
+// 流结果缓存：WS 断开后 SSE fallback 可复用已完成的流结果，避免重新请求 LLM
+// 格式: session_id → { status:'running'|'done'|'error', reply:'', tools:[], error:'', waiters:[] }
+const _streamResultCache = new Map();
+// 清理超时：5 分钟后清除缓存条目，防止内存泄漏
+const _CACHE_TTL = 5 * 60 * 1000;
+function _cacheCleanup(sid) { setTimeout(() => _streamResultCache.delete(sid), _CACHE_TTL); }
 
 function combineSignals(signals) {
   const valid = signals.filter(Boolean);
@@ -1564,6 +1570,58 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
       };
       const sendJSON = (obj) => send(JSON.stringify(obj));
       const decoder = new TextDecoder();
+
+      // 检查流结果缓存：如果同一会话的 WS 流正在运行或已完成，复用结果
+      const cached = _streamResultCache.get(sessionId);
+      if (cached) {
+        if (cached.status === 'done') {
+          log(`[SSE] cache hit (done) session=${sessionId}, reply len=${cached.reply.length}`);
+          if (cached.reply) {
+            const chunkSize = 200;
+            for (let i = 0; i < cached.reply.length; i += chunkSize) {
+              sendJSON({ delta: cached.reply.slice(i, i + chunkSize) });
+              await new Promise(r => setTimeout(r, 5));
+            }
+          }
+          if (cached.tools && cached.tools.length) {
+            cached.tools.forEach(t => sendJSON({ tool_progress: t }));
+          }
+          sendJSON({ done: true });
+          try { controller.close(); } catch {}
+          return;
+        }
+        if (cached.status === 'running') {
+          log(`[SSE] cache hit (running) session=${sessionId}, waiting...`);
+          const result = await new Promise(resolve => {
+            cached.waiters.push(resolve);
+            setTimeout(() => resolve(null), 30000);
+          });
+          if (result && result.status === 'done') {
+            log(`[SSE] cache wait done session=${sessionId}, reply len=${result.reply.length}`);
+            if (result.reply) {
+              const chunkSize = 200;
+              for (let i = 0; i < result.reply.length; i += chunkSize) {
+                sendJSON({ delta: result.reply.slice(i, i + chunkSize) });
+                await new Promise(r => setTimeout(r, 5));
+              }
+            }
+            if (result.tools && result.tools.length) {
+              result.tools.forEach(t => sendJSON({ tool_progress: t }));
+            }
+            sendJSON({ done: true });
+            try { controller.close(); } catch {}
+            return;
+          }
+          log(`[SSE] cache wait timeout session=${sessionId}, falling through`);
+        }
+        if (cached.status === 'error') {
+          log(`[SSE] cache hit (error) session=${sessionId}`);
+          sendJSON({ error: cached.error || 'Stream failed' });
+          sendJSON({ done: true });
+          try { controller.close(); } catch {}
+          return;
+        }
+      }
 
       const stopCtrl = new AbortController();
       activeChatStreams.set(sessionId, stopCtrl);
@@ -1702,6 +1760,12 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
           const partialContent = fullReply || `(请求失败: ${requestError})`;
           finalizeAssistantMessage(sessionId, partialContent);
           sendJSON({ error: `所有模型均失败: ${requestError}` });
+          // SSE 路径也写入缓存
+          const sseCache = _streamResultCache.get(sessionId) || { status: 'error', reply: '', tools: [], error: '', waiters: [] };
+          sseCache.status = 'error'; sseCache.error = requestError; sseCache.reply = fullReply;
+          _streamResultCache.set(sessionId, sseCache);
+          sseCache.waiters.forEach(w => w(sseCache)); sseCache.waiters = [];
+          _cacheCleanup(sessionId);
           send("[DONE]", "end");
           cleanup();
           controller.close();
@@ -1723,11 +1787,23 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
           }).catch(() => {});
         }
 
+        // SSE 路径写入缓存
+        const sseCache2 = _streamResultCache.get(sessionId) || { status: 'done', reply: '', tools: [], error: '', waiters: [] };
+        sseCache2.status = 'done'; sseCache2.reply = fullReply; sseCache2.tools = responseTools;
+        _streamResultCache.set(sessionId, sseCache2);
+        sseCache2.waiters.forEach(w => w(sseCache2)); sseCache2.waiters = [];
+        _cacheCleanup(sessionId);
+
         send("[DONE]", "end");
       } catch (e) {
         clearInterval(checkpointInterval);
         if (fullReply) finalizeAssistantMessage(sessionId, fullReply + "\n\n(流式处理异常中断: " + e.message + ")");
         sendJSON({ error: e.message });
+        const sseCache3 = _streamResultCache.get(sessionId) || { status: 'error', reply: '', tools: [], error: '', waiters: [] };
+        sseCache3.status = 'error'; sseCache3.error = e.message; sseCache3.reply = fullReply || '';
+        _streamResultCache.set(sessionId, sseCache3);
+        sseCache3.waiters.forEach(w => w(sseCache3)); sseCache3.waiters = [];
+        _cacheCleanup(sessionId);
         send("[DONE]", "end");
       }
       cleanup();
@@ -1748,6 +1824,10 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
   activeChatStreams.set(sessionId, stopCtrl);
   wsClients.set(sessionId, ws);
   sendJSON({ info: '正在思考…' });
+
+  // 注册流结果缓存：WS 断开后 SSE fallback 可复用
+  const cacheEntry = { status: 'running', reply: '', tools: [], error: '', waiters: [], ws: ws };
+  _streamResultCache.set(sessionId, cacheEntry);
 
   const pingTimer = setInterval(() => { try { ws.ping(); } catch {} }, 30000);
   const keepaliveTimer = setInterval(() => { try { sendJSON({ keepalive: true }); } catch {} }, 15000);
@@ -1814,13 +1894,13 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
         clearTimeout(timeoutTimer);
 
         const localParser = createSSEParser(
-          (delta) => { fullReply += delta; sendJSON({ delta }); },
+          (delta) => { fullReply += delta; sendJSON({ delta }); cacheEntry.reply = fullReply; },
           () => {},
-          (err) => { requestError = err; sendJSON({ error: err }); },
+          (err) => { requestError = err; sendJSON({ error: err }); cacheEntry.error = err; },
           (toolEvent) => {
             hadToolCalls = true;
             sendJSON({ tool_progress: toolEvent });
-            responseTools.push({
+            const toolRecord = {
               tool: toolEvent.tool,
               toolCallId: toolEvent.toolCallId,
               status: toolEvent.status || "done",
@@ -1828,7 +1908,9 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
               label: toolEvent.label || toolEvent.command || toolEvent.summary || "",
               toolZh: toolEvent.toolZh || toolEvent.tool || "工具",
               result: (toolEvent.result || "").slice(0, 4000),
-            });
+            };
+            responseTools.push(toolRecord);
+            cacheEntry.tools = responseTools.slice();
           },
           (usage) => {
             usageReported = true;
@@ -1878,8 +1960,10 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
       const partialContent = fullReply || `(请求失败: ${requestError})`;
       finalizeAssistantMessage(sessionId, partialContent);
       sendJSON({ error: `所有模型均失败: ${requestError}` });
+      cacheEntry.status = 'error'; cacheEntry.error = requestError; cacheEntry.reply = fullReply;
     } else {
       finalizeAssistantMessage(sessionId, fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）"), { tools: responseTools });
+      cacheEntry.status = 'done'; cacheEntry.reply = fullReply; cacheEntry.tools = responseTools;
     }
 
     if (!requestError && session.title === "New Chat" && session.messages.length >= 2) {
@@ -1889,11 +1973,19 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
       }).catch(() => {});
     }
     sendJSON({ done: true });
+    // 通知 SSE fallback 等待者
+    cacheEntry.waiters.forEach(w => w(cacheEntry));
+    cacheEntry.waiters = [];
+    _cacheCleanup(sessionId);
   } catch (e) {
     clearInterval(checkpointInterval);
     if (fullReply) finalizeAssistantMessage(sessionId, fullReply + "\n\n(流式处理异常中断: " + e.message + ")");
     sendJSON({ error: e.message || String(e) });
     sendJSON({ done: true });
+    cacheEntry.status = 'error'; cacheEntry.error = e.message || String(e); cacheEntry.reply = fullReply || '';
+    cacheEntry.waiters.forEach(w => w(cacheEntry));
+    cacheEntry.waiters = [];
+    _cacheCleanup(sessionId);
     // 异常时也要保存，防止用户消息和已收到的部分内容丢失
     if (session) {
       try { saveSession(session); } catch {}
@@ -2076,9 +2168,11 @@ function attachWsHandlers(ws) {
       return;
     }
     const { sessionId, stopCtrl } = ws.data;
-    log(`[WS] close session=${sessionId}`);
+    log(`[WS] close session=${sessionId} (stream continues, SSE fallback can reuse result)`);
     wsClients.delete(sessionId);
-    if (stopCtrl) stopCtrl.abort();
+    // 关键修复：不再 abort 流！让 LLM 请求自然完成，结果缓存到 _streamResultCache
+    // SSE fallback 请求 /api/chat/stream 时可复用已完成的流结果，保证回答完整性
+    // stopCtrl 仅在用户主动停止时通过 ws.on("message") 中的 {stop:true} 触发
   });
 }
 
