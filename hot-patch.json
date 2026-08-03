@@ -1,7 +1,7 @@
 {
-  "version": "0.21.12",
-  "base_version": "0.21.11",
-  "description": "v0.21.12 热更新：修复工作流/专家团模式未生效（模板变量替换 + 执行规则强化）",
+  "version": "0.21.13",
+  "base_version": "0.21.12",
+  "description": "v0.21.13 热更新：修复工作流会话未归入'我的团队'分组",
   "files": [
     { "path": "ui/index.html" }
   ]
