@@ -1,4 +1,12 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.11)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.12)
+
+---
+
+# v0.21.12 — 修复工作流/专家团模式未生效
+
+### 问题修复
+- **工作流选择后仍以单点模式工作**：`injectExpertSystem` 注入工作流步骤时，模板变量 `{{request}}`、`{{context}}` 未被替换为用户实际输入，AI 看到的是字面占位符而非真实任务内容，导致无法正确执行工作流。修复：注入时将 `{{request}}` 替换为用户消息、`{{context}}` 替换为空值；同时强化执行规则，明确要求 AI 必须通过 `delegate_task` 按 DAG 依赖顺序逐步执行每个步骤。
+- **专家团模式指令不够明确**：补充了更严格的执行规则，强调必须调用 `delegate_task` 而非自行作答。
 
 ---
 
