@@ -290,6 +290,7 @@
     .tool-btn:hover{background:var(--bg3);color:var(--text)}
     .tool-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
     .tool-btn svg{width:18px;height:18px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
+    .model-badge{position:absolute;bottom:-2px;left:50%;transform:translateX(-50%);font-size:8px;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--accent);color:#fff;padding:1px 3px;border-radius:3px;line-height:1.2;pointer-events:none}
     .toolbar-spacer{flex:1}
 
     /* 统一小浮层（V5 气泡样式） */
@@ -6201,10 +6202,17 @@ function switchTab(sid) {
 }
 function _syncModelBtn(){
   var bm=document.getElementById('btnModel'); if(!bm) return;
+  // 移除旧徽章
+  var oldBadge = bm.querySelector('.model-badge'); if(oldBadge) oldBadge.remove();
   var sm=_getSessionModel();
   if(sm){
     var mName=(typeof sm==='object'&&sm.model)?sm.model:sm;
     bm.setAttribute('data-tip','模型: '+mName); bm.classList.add('active');
+    // 添加小徽章显示模型名
+    var badge=document.createElement('span');
+    badge.className='model-badge';
+    badge.textContent=mName.length>8?mName.slice(0,8)+'…':mName;
+    bm.appendChild(badge);
   } else {
     bm.setAttribute('data-tip','选择模型'); bm.classList.remove('active');
   }
@@ -7809,8 +7817,12 @@ function buildMiniPopupBody(key,d){
     });
     body+='</div>';
   } else if(key==='model'){
-    // 模型选择器：按 Provider 分组渲染
+    // 模型选择器：按 Provider 分组渲染，支持会话级模型选择
     body='<div class="pick-list pick-groups">';
+    // 添加"跟随默认"选项（清除当前会话的模型选择）
+    var _curModel = _getSessionModel();
+    body+='<div class="pop-item '+(!_curModel?'active':'')+'" data-clear="1" onclick="clearSessionModel()" style="border-bottom:1px solid var(--border);margin-bottom:4px;padding-bottom:8px">'+
+      '<div class="ico">🔄</div><div class="txt"><div class="t">跟随默认配置</div><div class="d">清除当前会话的模型选择</div></div><div class="check"></div></div>';
     (d.groups||[]).forEach(function(g){
       body+='<div class="pick-group"><div class="pick-group-head">'+esc(g.name)+'</div>';
       (g.items||[]).forEach(function(it){
@@ -7821,6 +7833,8 @@ function buildMiniPopupBody(key,d){
       body+='</div>';
     });
     body+='</div>';
+    // 添加提示：模型选择是会话级的
+    body+='<div style="padding:8px 12px;font-size:11px;color:var(--text3);border-top:1px solid var(--border)">💡 模型选择仅对当前会话生效，切换会话后可选择不同模型</div>';
   } else if(key==='expert'){
     if(_expertPickerTab==='team'){
       var team=_cfg.extensions.team||[];
@@ -7934,7 +7948,16 @@ function pickItem(key, el){
     pickItemExpert(el.getAttribute('data-id'), el);
     return;
   } else if(key==='model'){
-    var b=document.getElementById('btnModel'); if(b){ b.setAttribute('data-tip','模型: '+name); b.classList.add('active'); }
+    var b=document.getElementById('btnModel');
+    if(b){
+      b.setAttribute('data-tip','模型: '+name); b.classList.add('active');
+      // 更新徽章
+      var oldBadge = b.querySelector('.model-badge'); if(oldBadge) oldBadge.remove();
+      var badge=document.createElement('span');
+      badge.className='model-badge';
+      badge.textContent=name.length>8?name.slice(0,8)+'…':name;
+      b.appendChild(badge);
+    }
     var prov = el.getAttribute('data-provider');
     var model = el.getAttribute('data-model');
     if(prov && model){
@@ -7943,7 +7966,7 @@ function pickItem(key, el){
       _selectedModel = name;
     }
     _setSessionModel(currentSession, _selectedModel);
-    toast('已选择模型：'+name);
+    toast('已选择模型：'+name+'（仅当前会话）');
     closeMini();
     return;
   } else if(key==='connector'){
@@ -8218,6 +8241,17 @@ function invokeSelectedConnector(){
 var _selectedModelMap = (function(){ try{ var s=localStorage.getItem('hermes_selected_model_map'); return s?JSON.parse(s):{}; }catch(e){ return {}; } })();
 function _getSessionModel(sid){ return _selectedModelMap[sid||currentSession] || ''; }
 function _setSessionModel(sid, val){ if(!sid) sid=currentSession; if(!sid) return; if(val){ _selectedModelMap[sid]=val; } else { delete _selectedModelMap[sid]; } try{ localStorage.setItem('hermes_selected_model_map', JSON.stringify(_selectedModelMap)); }catch(e){} }
+function clearSessionModel(){
+  _setSessionModel(currentSession, '');
+  _selectedModel = '';
+  var b=document.getElementById('btnModel');
+  if(b){
+    b.setAttribute('data-tip','选择模型'); b.classList.remove('active');
+    var oldBadge = b.querySelector('.model-badge'); if(oldBadge) oldBadge.remove();
+  }
+  toast('已清除模型选择，将使用默认配置');
+  closeMini();
+}
 // 兼容旧版全局 key 迁移
 var _selectedModel = (function(){ try{ var s=localStorage.getItem('hermes_selected_model'); if(s){ var v=JSON.parse(s); localStorage.removeItem('hermes_selected_model'); return v; } return ''; }catch(e){ return ''; } })();
 if(_selectedModel && currentSession){ _setSessionModel(currentSession, _selectedModel); _selectedModel=''; }
@@ -11490,7 +11524,14 @@ document.addEventListener('DOMContentLoaded', function(){
       var _initModel = _getSessionModel();
       if(_initModel){
         var mName = (typeof _initModel==='object'&&_initModel.model) ? _initModel.model : _initModel;
-        var bm=document.getElementById('btnModel'); if(bm){ bm.setAttribute('data-tip','模型: '+mName); bm.classList.add('active'); }
+        var bm=document.getElementById('btnModel');
+        if(bm){
+          bm.setAttribute('data-tip','模型: '+mName); bm.classList.add('active');
+          var badge=document.createElement('span');
+          badge.className='model-badge';
+          badge.textContent=mName.length>8?mName.slice(0,8)+'…':mName;
+          bm.appendChild(badge);
+        }
       }
       // 必须在配置（含 agents 分组与 session→分组映射）恢复之后再加载会话并渲染侧栏，
       // 否则 loadSessions 的 renderRail 会先用空映射把所有会话归入「默认主力助手」分组
