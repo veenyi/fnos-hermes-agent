@@ -1,7 +1,7 @@
 {
   "version": "0.21.23",
   "base_version": "0.21.22",
-  "description": "v0.21.23 热更新：① 终端改用真实 PTY（server/pty_bridge.py），修复 bash cannot set terminal process group / no job control，支持 Ctrl+C 与前后台任务 ② Profile 隔离文件上传、剪贴板图片/文件粘贴、工作区附件（uploads/<profile>/）③ 文件下载 /api/download 按解析路径兼容 local/Docker/SSH/Singularity ④ 预览 /api/preview + /api/preview/office：HTML/PDF/DOCX/PPTX/XLSX/CSV/图片/Markdown/源码 ⑤ 修复 pty_bridge 控制帧与用户输入同批到达时丢命令 ⑥ 修复 docx/xlsx/pptx 服务端转换（inlineStr 单元格、a:p 段落）",
+  "description": "v0.21.23 热更新：① 终端改用真实 PTY（server/pty_bridge.py），修复 bash cannot set terminal process group / no job control，支持 Ctrl+C 与前后台任务 ② Profile 隔离文件上传、剪贴板图片/文件粘贴、工作区附件（uploads/<profile>/）③ 文件下载 /api/download 按解析路径兼容 local/Docker/SSH/Singularity ④ 预览 /api/preview + /api/preview/office：HTML/PDF/DOCX/PPTX/XLSX/CSV/图片/Markdown/源码 ⑤ 修复 pty_bridge 控制帧与用户输入同批到达时丢命令 ⑥ 修复 docx/xlsx/pptx 服务端转换（inlineStr 单元格、a:p 段落）⑦ 修复会话窗口切换模型不生效：网关忽略请求 model 字段，改为直接热改写网关 config.yaml 的 model.default（保留 agent 工具能力），并修复模块级误用嵌套 _yamlBlockOf 导致 providers 解析失败",
   "files": [
     { "path": "server/monitor.js" },
     { "path": "server/pty_bridge.py" },
