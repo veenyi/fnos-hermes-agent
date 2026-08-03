@@ -84,9 +84,9 @@
     .workspace{flex:1;display:flex;min-height:0;position:relative}
 
     /* 左侧专家/会话树（仅聊天页显示） */
-    .chat-rail{width:260px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s, margin .2s}
+    .chat-rail{width:260px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s, margin .2s}
     .chat-rail.hidden{width:0;overflow:hidden;border-right:none}
-    .rail-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .rail-head{height:50px;padding:0 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
     .rail-head h2{margin:0;font-size:15px;font-weight:600;white-space:nowrap;color:var(--text)}
     .rail-head .right{display:flex;align-items:center;gap:6px}
     .rail-head .icon-btn{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid transparent;background:transparent;color:var(--text3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
@@ -94,7 +94,7 @@
     .rail-head .icon-btn svg{width:16px;height:16px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
 
     .rail-search{padding:10px 12px}
-    .rail-search input{width:100%;padding:7px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg2);font-size:13px;outline:none;color:var(--text)}
+    .rail-search input{width:100%;padding:7px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:13px;outline:none;color:var(--text)}
     .rail-scroll{flex:1;overflow-y:auto;padding:6px}
     .agent-group{margin-bottom:2px}
     .agent-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-md);cursor:pointer;transition:background .15s;user-select:none}
@@ -137,6 +137,7 @@
     .chat-main{flex:1;min-width:0;background:var(--bg2);position:relative}
     .chat-header{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;gap:12px;background:var(--bg2)}
     .chat-header .left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+    .chat-header .right{display:flex;align-items:center;gap:8px;flex-shrink:0}
     .chat-header .rail-toggle{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg2);display:none;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);flex-shrink:0}
     .chat-header .rail-toggle:hover{background:var(--bg3)}
     .chat-header .rail-toggle svg{width:16px;height:16px;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
@@ -708,14 +709,25 @@
     .mem-file{font-size:11px;color:var(--text2);font-family:monospace;background:var(--bg2);padding:2px 6px;border-radius:4px}
     .mem-card-head .ov-actbtn{margin-left:auto}
     .mem-editor{width:100%;min-height:200px;max-height:400px;padding:14px 16px;border:none;background:transparent;color:var(--text1);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;resize:vertical;outline:none}
-    .learn-stats{margin-bottom:14px}
+    .learn-stats{margin-bottom:12px}
     .learn-summary{font-size:14px;margin-bottom:8px}
     .learn-cats{display:flex;flex-wrap:wrap;gap:8px}
-    .learn-cat-badge{background:var(--bg2);border:1px solid var(--border);padding:3px 10px;border-radius:12px;font-size:12px;color:var(--text2)}
-    .learn-graph-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);padding:16px;min-height:300px;display:flex;align-items:center;justify-content:center}
-    .learn-detail{margin-top:14px}
-    .workspace-panel{position:absolute;top:0;right:0;width:340px;height:100%;background:var(--bg0);border-left:1px solid var(--border);display:none;flex-direction:column;z-index:20}
+    .learn-cat-badge{background:var(--bg2);border:1px solid var(--border);padding:3px 10px;border-radius:12px;font-size:12px;color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;user-select:none}
+    .learn-cat-badge:hover{border-color:var(--accent)}
+    .learn-cat-badge.on{border-color:var(--accent);background:var(--accent-bg);color:var(--accent);font-weight:600}
+    .learn-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .learn-layout{display:flex;gap:16px;align-items:stretch;min-height:0}
+    .learn-graph-wrap{flex:1;min-width:0;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);position:relative;min-height:480px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .learn-legend{position:absolute;left:12px;bottom:10px;display:flex;gap:12px;font-size:11px;color:var(--text3);background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;opacity:.92;pointer-events:none}
+    .learn-legend .lg-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+    .learn-node{cursor:grab}
+    .learn-node:active{cursor:grabbing}
+    .learn-detail{width:300px;flex-shrink:0}
+    .learn-detail .mem-card{position:sticky;top:0}
+    @media (max-width:900px){ .learn-layout{flex-direction:column} .learn-detail{width:100%} }
+    .workspace-panel{position:absolute;top:50px;right:0;width:340px;height:calc(100% - 50px);background:var(--bg2);border-left:1px solid var(--border);display:none;flex-direction:column;z-index:20}
     .workspace-panel.open{display:flex}
+    .session-tabs.visible ~ .workspace-panel{top:100px;height:calc(100% - 100px)}
     .chat-main{position:relative}
     .ws-tabs{display:flex;align-items:center;gap:2px;padding:8px 10px;border-bottom:1px solid var(--border)}
     .ws-tab{padding:5px 12px;border-radius:6px;font-size:13px;cursor:pointer;background:transparent;border:none;color:var(--text2)}
@@ -995,6 +1007,7 @@
             <div class="right">
               <button class="tool-btn" id="roundtableBtn" title="多 Agent 圆桌讨论" onclick="openRoundtable()" style="width:32px;height:32px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M5 21v-2a4 4 0 0 1 4-4h2"/><path d="M13 21v-2a4 4 0 0 1 4-4h2"/><path d="M12 17v4"/></svg></button>
               <button class="tool-btn" id="wsPanelToggle" title="工作区" onclick="toggleWorkspace()" style="width:32px;height:32px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg></button>
+              <button class="tool-btn" id="multiTabsBtn" title="多会话" onclick="toggleSessionTabsBar()" style="width:32px;height:32px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></button>
             </div>
           </header>
 
@@ -1462,10 +1475,12 @@
         <section class="page" id="page-learning">
           <div class="page-header"><h1>学习轨迹</h1><button class="ov-actbtn" onclick="renderLearning()" style="margin-left:auto">↻ 刷新</button></div>
           <div class="page-body">
-            <div class="wf-intro" style="margin-bottom:12px">技能知识图谱与使用统计。节点大小代表使用频率，连线代表技能关联关系。</div>
+            <div class="wf-intro" style="margin-bottom:12px">技能知识图谱与使用统计。节点大小代表使用频率，颜色代表分类（点击顶部分类可筛选），连线代表技能关联关系；节点可拖拽。</div>
             <div class="learn-stats" id="learnStats"></div>
-            <div class="learn-graph-wrap" id="learnGraph"><div class="empty-state">加载中…</div></div>
-            <div class="learn-detail" id="learnDetail" style="display:none"></div>
+            <div class="learn-layout">
+              <div class="learn-graph-wrap" id="learnGraph"><div class="empty-state">加载中…</div></div>
+              <div class="learn-detail" id="learnDetail" style="display:none"></div>
+            </div>
           </div>
         </section>
 
@@ -1946,7 +1961,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "data\\dashboard-design",
+    "key": "data/dashboard-design",
     "file": "data\\dashboard-design.yaml",
     "name": "数据仪表盘设计",
     "description": "定义指标 → 设计布局 → 出视觉方案",
@@ -1993,7 +2008,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "data\\data-pipeline-review",
+    "key": "data/data-pipeline-review",
     "file": "data\\data-pipeline-review.yaml",
     "name": "数据管道审查",
     "description": "数据工程师分析 → 数据库优化师检查 → 数据分析师验证输出质量",
@@ -2040,7 +2055,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "department-collab\\ceo-org-delegation",
+    "key": "department-collab/ceo-org-delegation",
     "file": "department-collab\\ceo-org-delegation.yaml",
     "name": "CEO 组织架构协作",
     "description": "CEO 分析需求 → 自动路由到对应部门（工程/市场/产品/HR）→ 部门内专业 Agent 并行执行 → CEO 汇总决策",
@@ -2118,7 +2133,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "department-collab\\code-review",
+    "key": "department-collab/code-review",
     "file": "department-collab\\code-review.yaml",
     "name": "代码评审流程",
     "description": "架构/安全/性能并行评审 → 汇总 → 不通过则打回重审（最多 2 轮）",
@@ -2182,7 +2197,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "department-collab\\content-publish",
+    "key": "department-collab/content-publish",
     "file": "department-collab\\content-publish.yaml",
     "name": "内容发布流程",
     "description": "选题策划 → 文案撰写 → 品牌审核（不通过打回修改，最多 3 轮）→ 法务合规 → 发布清单",
@@ -2257,7 +2272,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "department-collab\\hiring-pipeline",
+    "key": "department-collab/hiring-pipeline",
     "file": "department-collab\\hiring-pipeline.yaml",
     "name": "招聘评估流程",
     "description": "HR 筛选简历 → 按岗位类型分流技术/业务评估 → 薪酬方案 → 最终审批",
@@ -2324,7 +2339,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "department-collab\\incident-response",
+    "key": "department-collab/incident-response",
     "file": "department-collab\\incident-response.yaml",
     "name": "故障响应流程",
     "description": "故障分类 → 按类型分流给对应团队分析 → 复盘汇总",
@@ -2387,7 +2402,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "department-collab\\marketing-campaign",
+    "key": "department-collab/marketing-campaign",
     "file": "department-collab\\marketing-campaign.yaml",
     "name": "营销活动策划",
     "description": "市场调研 → 创意策划 → 预算审批 → 投放方案 → 效果分析",
@@ -2458,7 +2473,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "design\\requirement-to-plan",
+    "key": "design/requirement-to-plan",
     "file": "design\\requirement-to-plan.yaml",
     "name": "需求到计划",
     "description": "产品经理分析需求 → 架构师设计方案 → 项目经理拆任务",
@@ -2506,7 +2521,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "design\\ux-review",
+    "key": "design/ux-review",
     "file": "design\\ux-review.yaml",
     "name": "UX 体验审查",
     "description": "UX 研究员评估 + 无障碍审核 → UX 架构师汇总",
@@ -2553,7 +2568,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "dev\\api-doc-gen",
+    "key": "dev/api-doc-gen",
     "file": "dev\\api-doc-gen.yaml",
     "name": "API 文档生成",
     "description": "分析代码生成 API 文档 → 验证完整性 → 输出最终文档",
@@ -2601,7 +2616,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "dev\\pr-review",
+    "key": "dev/pr-review",
     "file": "dev\\pr-review.yaml",
     "name": "PR 代码审查",
     "description": "三维度并行审查：代码质量、安全性、性能 → 汇总结论",
@@ -2656,7 +2671,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "dev\\readme-i18n",
+    "key": "dev/readme-i18n",
     "file": "dev\\readme-i18n.yaml",
     "name": "README 国际化",
     "description": "翻译 README → 审查技术术语 → 润色输出最终版",
@@ -2704,7 +2719,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "dev\\release-checklist",
+    "key": "dev/release-checklist",
     "file": "dev\\release-checklist.yaml",
     "name": "发布检查清单",
     "description": "SRE + 性能 + 安全三方检查 → Go/No-Go 决策",
@@ -2759,7 +2774,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "dev\\security-audit",
+    "key": "dev/security-audit",
     "file": "dev\\security-audit.yaml",
     "name": "安全审计",
     "description": "安全工程师 + 威胁检测并行审计 → 汇总安全报告",
@@ -2806,7 +2821,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "dev\\tech-debt-audit",
+    "key": "dev/tech-debt-audit",
     "file": "dev\\tech-debt-audit.yaml",
     "name": "技术债务审计",
     "description": "架构评估 + 代码扫描 + 测试分析 → 优先级排序",
@@ -2861,7 +2876,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "dev\\tech-design-review",
+    "key": "dev/tech-design-review",
     "file": "dev\\tech-design-review.yaml",
     "name": "技术方案评审",
     "description": "架构师出方案 → 后端架构师 + 安全工程师并行评审 → 代码审查员整合意见，输出评审结论",
@@ -2982,7 +2997,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\business-plan",
+    "key": "en/business-plan",
     "file": "en\\business-plan.yaml",
     "name": "Business Plan",
     "description": "Market research → financial forecast + product roadmap → executive summary — generates a complete business plan",
@@ -3045,7 +3060,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\code-architecture-review",
+    "key": "en/code-architecture-review",
     "file": "en\\code-architecture-review.yaml",
     "name": "Code Architecture Review",
     "description": "Architecture design → backend deep-dive → code review for a feature or system.",
@@ -3088,7 +3103,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\competitor-analysis",
+    "key": "en/competitor-analysis",
     "file": "en\\competitor-analysis.yaml",
     "name": "Competitor Analysis Report",
     "description": "Trend research → data analysis + SEO scan → executive summary — a report ready to present",
@@ -3151,7 +3166,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\content-pipeline",
+    "key": "en/content-pipeline",
     "file": "en\\content-pipeline.yaml",
     "name": "Content Creation Pipeline",
     "description": "Topic to finished draft — research, write, brand review, final edit",
@@ -3213,7 +3228,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\investment-analysis",
+    "key": "en/investment-analysis",
     "file": "en\\investment-analysis.yaml",
     "name": "Investment Analysis",
     "description": "Research → fundamentals → financial modeling: a structured analysis of a target.",
@@ -3256,7 +3271,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\okr-decomposition",
+    "key": "en/okr-decomposition",
     "file": "en\\okr-decomposition.yaml",
     "name": "OKR Decomposition",
     "description": "Annual goal → quarterly KRs → a concrete Q1 action plan.",
@@ -3299,7 +3314,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\pr-review",
+    "key": "en/pr-review",
     "file": "en\\pr-review.yaml",
     "name": "PR Code Review",
     "description": "Three-dimensional parallel review: code quality, security, performance → unified verdict",
@@ -3354,7 +3369,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\product-review",
+    "key": "en/product-review",
     "file": "en\\product-review.yaml",
     "name": "Product Requirements Review",
     "description": "Multi-role PRD review — PM analyzes requirements, architect assesses tech, UX researcher assesses experience, then synthesis",
@@ -3407,7 +3422,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\solo-founder-plan",
+    "key": "en/solo-founder-plan",
     "file": "en\\solo-founder-plan.yaml",
     "name": "Solo Founder All-Hands",
     "description": "One sentence in, 8 AI 'departments' collaborate, full launch plan out in 2 minutes — your one-person company",
@@ -3510,7 +3525,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "en\\tech-blog",
+    "key": "en/tech-blog",
     "file": "en\\tech-blog.yaml",
     "name": "Tech Blog",
     "description": "Research → outline → draft → polish: a deep, credible technical blog post.",
@@ -3563,7 +3578,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "hr\\interview-questions",
+    "key": "hr/interview-questions",
     "file": "hr\\interview-questions.yaml",
     "name": "面试题设计",
     "description": "招聘专家定义考察维度 → 心理学家设计行为面试题 + 技术专家设计技术题 → 招聘专家整合评分表",
@@ -3690,7 +3705,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "legal\\contract-review",
+    "key": "legal/contract-review",
     "file": "legal\\contract-review.yaml",
     "name": "合同审查",
     "description": "合同审查专家逐条分析 → 法务合规员补充合规风险 → 整合输出审查意见和修改建议",
@@ -3807,7 +3822,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "marketing\\competitor-analysis",
+    "key": "marketing/competitor-analysis",
     "file": "marketing\\competitor-analysis.yaml",
     "name": "竞品分析报告",
     "description": "趋势研究 → 数据分析 + SEO 竞品扫描 → 高管摘要，输出一份可直接汇报的竞品报告",
@@ -3870,7 +3885,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "marketing\\seo-content-matrix",
+    "key": "marketing/seo-content-matrix",
     "file": "marketing\\seo-content-matrix.yaml",
     "name": "SEO 内容矩阵",
     "description": "SEO 关键词研究 → 内容策略 + 批量内容生成 → SEO 优化审核，一次性生成一组 SEO 友好的文章",
@@ -3932,7 +3947,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "marketing\\xiaohongshu-content",
+    "key": "marketing/xiaohongshu-content",
     "file": "marketing\\xiaohongshu-content.yaml",
     "name": "小红书种草笔记",
     "description": "小红书专家选题策划 → 内容创作 + 视觉方案 → 小红书运营优化，批量生成高质量种草内容",
@@ -4121,7 +4136,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "ops\\incident-postmortem",
+    "key": "ops/incident-postmortem",
     "file": "ops\\incident-postmortem.yaml",
     "name": "事故复盘",
     "description": "故障指挥官梳理时间线 → SRE 分析根因 → 项目经理输出改进计划",
@@ -4169,7 +4184,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "ops\\sre-health-check",
+    "key": "ops/sre-health-check",
     "file": "ops\\sre-health-check.yaml",
     "name": "SRE 健康检查",
     "description": "可靠性 + 性能 + 基础设施三方检查 → SRE 汇总",
@@ -4224,7 +4239,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "ops\\weekly-report",
+    "key": "ops/weekly-report",
     "file": "ops\\weekly-report.yaml",
     "name": "周报/月报生成",
     "description": "数据整理 → 亮点提炼 → 高管摘要，从原始信息快速生成结构化周报",
@@ -4602,7 +4617,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "strategy\\business-plan",
+    "key": "strategy/business-plan",
     "file": "strategy\\business-plan.yaml",
     "name": "商业计划书",
     "description": "趋势研究 → 财务预测 + 产品规划 → 高管摘要，生成一份完整的商业计划书",
@@ -5238,7 +5253,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\brainstorm-to-plan",
+    "key": "sp/brainstorm-to-plan",
     "file": "sp\\brainstorm-to-plan.yaml",
     "name": "头脑风暴 → 实施计划（Superpowers）",
     "description": "superpowers 方法论：先头脑风暴澄清需求产出设计规格，再拆成可执行的分步实施计划，想清楚再动手。",
@@ -5256,7 +5271,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\tdd-feature-dev",
+    "key": "sp/tdd-feature-dev",
     "file": "sp\\tdd-feature-dev.yaml",
     "name": "TDD 测试驱动开发闭环（Superpowers）",
     "description": "superpowers 方法论：先写失败测试，再写最小实现使其通过，最后重构。严格 TDD 红-绿-重构。",
@@ -5274,7 +5289,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\systematic-debugging",
+    "key": "sp/systematic-debugging",
     "file": "sp\\systematic-debugging.yaml",
     "name": "四阶段系统化调试（Superpowers）",
     "description": "superpowers 方法论：定位 → 分析 → 假设 → 修复，用证据说话的系统化调试，拒绝瞎猜。",
@@ -5292,7 +5307,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\code-review-loop",
+    "key": "sp/code-review-loop",
     "file": "sp\\code-review-loop.yaml",
     "name": "代码审查请求与接收闭环（Superpowers）",
     "description": "superpowers 方法论：派遣审查 → 严谨接收反馈 → 逐条修复 → 再验证，拒绝敷衍式改代码。",
@@ -5310,7 +5325,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\parallel-agent-dev",
+    "key": "sp/parallel-agent-dev",
     "file": "sp\\parallel-agent-dev.yaml",
     "name": "并行子智能体开发（Superpowers）",
     "description": "superpowers 方法论：把大任务拆给多个并行子智能体，各自产出后经两轮审查再汇总。",
@@ -5327,7 +5342,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\git-worktree-feature",
+    "key": "sp/git-worktree-feature",
     "file": "sp\\git-worktree-feature.yaml",
     "name": "Git Worktree 隔离式特性开发（Superpowers）",
     "description": "superpowers 方法论：用 git worktree 隔离开发特性，完成后按合并/PR/保留/丢弃四选一收尾。",
@@ -5345,7 +5360,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\verification-gate",
+    "key": "sp/verification-gate",
     "file": "sp\\verification-gate.yaml",
     "name": "完成前证据验证关（Superpowers）",
     "description": "superpowers 方法论：声称完成前必须跑验证、拿证据。证据先行，杜绝“我觉得好了”。",
@@ -5363,7 +5378,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\skill-authoring",
+    "key": "sp/skill-authoring",
     "file": "sp\\skill-authoring.yaml",
     "name": "编写一个 AI Skill（Superpowers）",
     "description": "superpowers 方法论：按 writing-skills 方法论设计、编写、验证一个新的 AI 编程 skill。",
@@ -5380,7 +5395,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\mcp-server-build",
+    "key": "sp/mcp-server-build",
     "file": "sp\\mcp-server-build.yaml",
     "name": "MCP 服务器构建（Superpowers 中文原创）",
     "description": "superpowers-zh 原创 skill：设计并构建一个生产级 MCP 工具服务器，扩展 AI 能力边界。",
@@ -5398,7 +5413,7 @@ window.AO_WORKFLOW_PRESETS = [
     ]
   },
   {
-    "key": "sp\\workflow-yaml-run",
+    "key": "sp/workflow-yaml-run",
     "file": "sp\\workflow-yaml-run.yaml",
     "name": "多角色 YAML 工作流编排（Superpowers 中文原创）",
     "description": "superpowers-zh 原创 skill：设计一个多角色 YAML 工作流并模拟执行，验证编排合理性。",
@@ -6235,13 +6250,22 @@ function syncTabs() {
   renderSessionTabs();
 }
 
-/* 同步标签栏可见性：仅在左侧会话树折叠时显示（移动端 drawer 模式除外，始终显示） */
+/* 同步标签栏可见性：多会话按钮强制开启 > 移动端始终显示 > 桌面端仅 rail 折叠时显示 */
+var _multiTabsForced = false;
+function toggleSessionTabsBar(){
+  _multiTabsForced = !_multiTabsForced;
+  var btn=document.getElementById('multiTabsBtn');
+  if(btn) btn.classList.toggle('active', _multiTabsForced);
+  syncSessionTabsVisibility();
+}
 function syncSessionTabsVisibility() {
   var tabs = document.querySelector('.page-container .session-tabs');
   if (!tabs) return;
   var rail = document.getElementById('chatRail');
   if (!rail) return;
-  if (window.innerWidth <= 768) {
+  if (_multiTabsForced) {
+    tabs.classList.add('visible');  // 多会话按钮强制开启
+  } else if (window.innerWidth <= 768) {
     tabs.classList.add('visible');  // 移动端：始终显示
   } else if (rail.classList.contains('hidden')) {
     tabs.classList.add('visible');  // 桌面端：仅 rail 折叠时显示
@@ -7558,6 +7582,27 @@ function onChatPaste(e){
 }
 
 /* ============================ Mini Popup ============================ */
+/* 构建模型下拉选项（按 Provider 分组、仅含启用模型）；当前值不在列表中时补一个自定义项 */
+function buildModelOptionsHtml(currentValue, emptyLabel){
+  var cur = String(currentValue||'');
+  var html = '<option value="">'+esc(emptyLabel||'（跟随默认配置）')+'</option>';
+  var found = !cur;
+  (_cfg.providers||[]).forEach(function(p){
+    var provName = p.name || p.id;
+    var models = (p.models && p.models.length) ? p.models : [{ id:p.model||'auto', name:p.model||'auto', enabled:true }];
+    var opts='';
+    models.forEach(function(m){
+      if(m.enabled === false) return;
+      var modelId = m.id || m.name || 'auto';
+      var modelName = m.name || m.id || 'auto';
+      if(modelId===cur) found=true;
+      opts += '<option value="'+esc(modelId)+'"'+(modelId===cur?' selected':'')+'>'+esc(modelName)+'</option>';
+    });
+    if(opts) html += '<optgroup label="'+esc(provName)+'">'+opts+'</optgroup>';
+  });
+  if(!found) html += '<optgroup label="当前配置"><option value="'+esc(cur)+'" selected>'+esc(cur)+'（不在模型列表中）</option></optgroup>';
+  return html;
+}
 function buildMiniData(){
   // 模型选择器：按 Provider 分组展示模型列表（Issue #5），避免全部挤在一起
   var modelGroups = [];
@@ -7712,15 +7757,15 @@ function buildMiniPopupBody(key,d){
       }
     } else if(_expertPickerTab==='workflow'){
       var presets=window.AO_WORKFLOW_PRESETS||[];
-      var curKey=(_cfg.extensions.workflow&&_cfg.extensions.workflow.key)||'';
+      var curKey=String((_cfg.extensions.workflow&&_cfg.extensions.workflow.key)||'').replace(/\\/g,'/');
       var curEnabled=!!(_cfg.extensions.workflow&&_cfg.extensions.workflow.enabled&&_cfg.extensions.workflow.steps&&_cfg.extensions.workflow.steps.length);
       if(!presets.length){
         body='<div class="pick-list"><div class="empty-state" style="padding:20px 0;text-align:center;color:var(--text3)">暂无工作流模板。<br>请在「扩展→工作流」页面添加。</div></div>';
       } else {
         body='<div class="pick-list">';
         presets.forEach(function(p){
-          var isActive=(curEnabled&&p.key===curKey);
-          body+='<div class="pop-item'+(isActive?' active':'')+'" data-key="'+esc(p.key)+'" onclick="pickWorkflowFromMini(\''+esc(p.key).replace(/'/g,"\\'")+'\')">' +
+          var isActive=(curEnabled&&String(p.key).replace(/\\/g,'/')===curKey);
+          body+='<div class="pop-item'+(isActive?' active':'')+'" data-key="'+esc(p.key)+'" onclick="pickWorkflowFromMini(this.getAttribute(\'data-key\'))">' +
             '<div class="ico">🎛️</div><div class="txt"><div class="t">'+esc(p.name)+'</div><div class="d">'+esc(p.description||'')+(isActive?' · 当前已启用':'')+'</div></div><div class="check"></div></div>';
         });
         body+='</div>';
@@ -7951,7 +7996,8 @@ function useExpertTeam(){
 }
 /* 工具栏工作流选择器：从 mini popup 应用并激活工作流，互斥清除专家/专家团 */
 function pickWorkflowFromMini(key){
-  var p=(window.AO_WORKFLOW_PRESETS||[]).find(function(x){ return x.key===key; });
+  var nk=String(key||'').replace(/\\/g,'/');
+  var p=(window.AO_WORKFLOW_PRESETS||[]).find(function(x){ return String(x.key).replace(/\\/g,'/')===nk; });
   if(!p){ toast('未找到工作流模板'); return; }
   _cfg.extensions.workflow = {
     key:p.key, name:p.name, description:p.description,
@@ -9785,20 +9831,21 @@ function renderWorkflowPresets(){
   if(catSel && catSel.tagName==='SELECT'){
     catSel.innerHTML = cats.map(function(c){ return '<option value="'+esc(c.id)+'"'+(c.id===_wfCat?' selected':'')+'>'+esc(c.label)+'</option>'; }).join('');
   }
-  var appliedKey = (_cfg.extensions.workflow && _cfg.extensions.workflow.key) || '';
+  var appliedKey = String((_cfg.extensions.workflow && _cfg.extensions.workflow.key) || '').replace(/\\/g,'/');
   grid.innerHTML = presets.filter(function(p){ return !_wfCat || p.category===_wfCat; }).map(function(p){
-    var applied = (p.key===appliedKey);
+    var applied = (String(p.key).replace(/\\/g,'/')===appliedKey);
     var catLabel = catLabels[p.category]||p.category||'通用';
     var nameZh = nameLabels[p.name] || p.name;
     return '<div class="ext-card'+(applied?' active':'')+'">'+
       '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(nameZh)+'</div><div class="status">'+esc(catLabel)+(applied?' · 已应用':'')+'</div></div></div>'+
       '<div class="conn-desc">'+esc(p.description||'')+'</div>'+
-      '<button class="action" onclick="applyWorkflow(\''+esc(p.key)+'\')">'+(applied?'重新应用':'应用')+'</button></div>';
+      '<button class="action" data-wfkey="'+esc(p.key)+'" onclick="applyWorkflow(this.getAttribute(\'data-wfkey\'))">'+(applied?'重新应用':'应用')+'</button></div>';
   }).join('') || '<div class="empty-state">暂无工作流模板。</div>';
 }
 function setWfCat(cat){ _wfCat=cat; renderWorkflowPresets(); }
 function applyWorkflow(key){
-  var p=(window.AO_WORKFLOW_PRESETS||[]).find(function(x){ return x.key===key; });
+  var nk=String(key||'').replace(/\\/g,'/');
+  var p=(window.AO_WORKFLOW_PRESETS||[]).find(function(x){ return String(x.key).replace(/\\/g,'/')===nk; });
   if(!p){ toast('未找到工作流模板','error'); return; }
   if(!p.steps || !p.steps.length){ toast('该工作流模板无步骤，不可用','error'); return; }
   // 将不存在的专家 ID 映射为 auto（自动分配）
@@ -9903,7 +9950,7 @@ function openPersonaModal(id){
       promptEl.parentElement.after(extraWrap);
     }
     var extraHtml = '<div class="field" style="margin-top:10px"><label>模型（留空=跟随默认配置）</label>'+
-      '<input type="text" id="personaModel" value="'+esc(p?(p.model||''):'')+'" placeholder="如 anthropic/claude-sonnet-4、sensenova-6.7-flash-lite" style="width:100%;padding:8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)"></div>';
+      '<select id="personaModel" style="width:100%;padding:8px;border-radius:6px;background:var(--bg1);color:var(--text);border:1px solid var(--border)">'+buildModelOptionsHtml(p?(p.model||''):'', '跟随默认配置')+'</select></div>';
     if(!id){
       // 新建时提供克隆选项
       extraHtml += '<div class="field" style="margin-top:10px"><label>创建方式</label>'+
@@ -10409,75 +10456,237 @@ function renderUsageCard(){
 }
 
 /* ============================ 学习轨迹 ============================ */
+var LEARN_COLORS = { skills:'#f59e0b', 'software-development':'#3b82f6', media:'#8b5cf6', creative:'#ec4899', devops:'#10b981', productivity:'#06b6d4', memory:'#6366f1', other:'#6b7280' };
+var LEARN_EXTRA_COLORS = ['#ef4444','#14b8a6','#f97316','#a3e635','#d946ef','#0ea5e9','#84cc16','#f43f5e'];
+function _ensureCatColor(cat){
+  if(!LEARN_COLORS[cat]){
+    var h=0; for(var i=0;i<cat.length;i++) h=(h*31+cat.charCodeAt(i))>>>0;
+    LEARN_COLORS[cat]=LEARN_EXTRA_COLORS[h%LEARN_EXTRA_COLORS.length];
+  }
+  return LEARN_COLORS[cat];
+}
+var LEARN_CAT_LABELS = { skills:'技能', 'software-development':'软件开发', media:'媒体', creative:'创意', devops:'DevOps', productivity:'效率', memory:'记忆', other:'其他' };
+var _learnCatFilter = null;
+var _learnRaf = 0;
+var _learnState = null; // { nodes, nodeMap, edges, els }
+function _learnColor(cat){ return LEARN_COLORS[cat] || LEARN_COLORS.other; }
+function _shadeHex(hex, amt){
+  var n = parseInt(hex.slice(1),16), r=n>>16, g=(n>>8)&255, b=n&255;
+  function f(v){ v = amt>0 ? v+(255-v)*amt : v*(1+amt); return Math.round(Math.max(0,Math.min(255,v))); }
+  return 'rgb('+f(r)+','+f(g)+','+f(b)+')';
+}
 function renderLearning(){
   var statsEl = document.getElementById('learnStats');
   var graphEl = document.getElementById('learnGraph');
   if(!graphEl) return;
+  _learnCatFilter = null;
+  if(_learnRaf){ cancelAnimationFrame(_learnRaf); _learnRaf=0; }
   graphEl.innerHTML = '<div class="empty-state">加载中…</div>';
   apiGet('/api/learning-trajectory').then(function(res){
     if(!res || !res.ok){ graphEl.innerHTML='<div class="empty-state">加载失败</div>'; return; }
     var skills = res.skills || [];
     var relations = res.relations || [];
+    skills.forEach(function(s){ _ensureCatColor(s.category||'other'); });
     var totalUsage = skills.reduce(function(a,s){ return a+(s.usage_count||0); },0);
-    // 统计栏
+    // 统计栏（分类徽章可点击筛选）
     if(statsEl){
       var cats = {};
       skills.forEach(function(s){ var c=s.category||'other'; if(!cats[c]) cats[c]={count:0,usage:0}; cats[c].count++; cats[c].usage+=(s.usage_count||0); });
-      var catHtml = Object.keys(cats).sort(function(a,b){ return cats[b].usage-cats[a].usage; }).map(function(c){
+      var catHtml = '<span class="learn-cat-badge on" data-cat="" onclick="setLearnFilter(\'\')"><span class="learn-cat-dot" style="background:var(--text3)"></span>全部 '+skills.length+'</span>';
+      catHtml += Object.keys(cats).sort(function(a,b){ return cats[b].usage-cats[a].usage; }).map(function(c){
         var pct = totalUsage ? Math.round(cats[c].usage/totalUsage*100) : 0;
-        return '<span class="learn-cat-badge">'+esc(c)+' '+cats[c].count+' / '+pct+'%</span>';
+        return '<span class="learn-cat-badge" data-cat="'+esc(c)+'" onclick="setLearnFilter(\''+esc(c).replace(/'/g,"\\'")+'\')"><span class="learn-cat-dot" style="background:'+_learnColor(c)+'"></span>'+esc(LEARN_CAT_LABELS[c]||c)+' '+cats[c].count+' / '+pct+'%</span>';
       }).join('');
       statsEl.innerHTML = '<div class="learn-summary"><strong>'+skills.length+'</strong> 技能 · <strong>'+relations.length+'</strong> 关系 · <strong>'+totalUsage+'</strong> 次使用</div><div class="learn-cats">'+catHtml+'</div>';
     }
-    // 图谱渲染（SVG 力导向布局简化版）
     if(!skills.length){ graphEl.innerHTML='<div class="empty-state">尚无技能数据</div>'; return; }
     renderSkillGraph(graphEl, skills, relations);
   }).catch(function(e){ graphEl.innerHTML='<div class="empty-state">网络错误</div>'; });
 }
+function setLearnFilter(cat){
+  _learnCatFilter = (cat && cat!==_learnCatFilter) ? cat : null;
+  document.querySelectorAll('.learn-cat-badge').forEach(function(b){
+    b.classList.toggle('on', (b.getAttribute('data-cat')||'')===(_learnCatFilter||''));
+  });
+  applyLearnFilter();
+}
+function applyLearnFilter(){
+  var st=_learnState; if(!st) return;
+  var f=_learnCatFilter;
+  st.nodes.forEach(function(n){
+    var dim = f && n.category!==f;
+    n.el.style.opacity = dim ? '0.14' : '1';
+    n.el.style.pointerEvents = dim ? 'none' : '';
+  });
+  st.edges.forEach(function(e){
+    var dim = f && (e.a.category!==f && e.b.category!==f);
+    e.el.setAttribute('opacity', dim ? '0.05' : '0.5');
+  });
+}
 function renderSkillGraph(container, skills, relations){
-  var W=800, H=500, cx=W/2, cy=H/2;
+  var W=900, H=560, NS='http://www.w3.org/2000/svg';
   var maxUsage = Math.max.apply(null, skills.map(function(s){ return s.usage_count||1; }));
-  // 简化布局：中心节点 + 圆形分布
-  var nodes = skills.map(function(s,i){
-    var angle = (2*Math.PI*i)/skills.length - Math.PI/2;
-    var r = 140 + (i%3)*55;
-    var radius = 12 + Math.round((s.usage_count||1)/maxUsage*22);
-    return { id:s.id, name:s.name||s.id, category:s.category||'other', usage:s.usage_count||0, x:cx+r*Math.cos(angle), y:cy+r*Math.sin(angle), r:radius };
+  // 初始位置：按分类分簇 + 抖动，收敛更快
+  var catIndex = {};
+  skills.forEach(function(s){ var c=s.category||'other'; catIndex[c]=(catIndex[c]||[]); catIndex[c].push(s); });
+  var catKeys = Object.keys(catIndex);
+  var nodes = [];
+  catKeys.forEach(function(c, ci){
+    var ang = (2*Math.PI*ci)/Math.max(1,catKeys.length) - Math.PI/2;
+    var bcx = W/2 + Math.cos(ang)*Math.min(W,H)*0.28, bcy = H/2 + Math.sin(ang)*Math.min(W,H)*0.28;
+    catIndex[c].forEach(function(s, i){
+      var radius = 9 + Math.sqrt((s.usage_count||1)/maxUsage)*20;
+      nodes.push({ id:s.id, name:s.name||s.id, category:s.category||'other', usage:s.usage_count||0, skill:s,
+        x: bcx + (Math.random()-0.5)*90, y: bcy + (Math.random()-0.5)*90, vx:0, vy:0, fx:null, fy:null, r:radius });
+    });
   });
   var nodeMap = {}; nodes.forEach(function(n){ nodeMap[n.id]=n; });
-  var colors = { skills:'#f59e0b', 'software-development':'#3b82f6', media:'#8b5cf6', creative:'#ec4899', devops:'#10b981', productivity:'#06b6d4', memory:'#6366f1', other:'#6b7280' };
-  var svg = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;max-height:520px">';
-  // 连线
+  var edges = [];
   relations.forEach(function(rel){
     var a=nodeMap[rel.from], b=nodeMap[rel.to];
-    if(a&&b) svg += '<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="var(--border)" stroke-width="1" opacity="0.5"/>';
+    if(a && b && a!==b) edges.push({ a:a, b:b });
   });
-  // 节点
+
+  var svg = document.createElementNS(NS,'svg');
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+  svg.style.width='100%'; svg.style.height='100%'; svg.style.display='block';
+  // 渐变 defs（3D 球体感）
+  var defs = document.createElementNS(NS,'defs');
+  Object.keys(LEARN_COLORS).forEach(function(c){
+    var col = LEARN_COLORS[c];
+    var g = document.createElementNS(NS,'radialGradient');
+    g.setAttribute('id','lg-'+c); g.setAttribute('cx','35%'); g.setAttribute('cy','28%'); g.setAttribute('r','80%');
+    var s1=document.createElementNS(NS,'stop'); s1.setAttribute('offset','0%'); s1.setAttribute('stop-color',_shadeHex(col,0.55));
+    var s2=document.createElementNS(NS,'stop'); s2.setAttribute('offset','45%'); s2.setAttribute('stop-color',col);
+    var s3=document.createElementNS(NS,'stop'); s3.setAttribute('offset','100%'); s3.setAttribute('stop-color',_shadeHex(col,-0.35));
+    g.appendChild(s1); g.appendChild(s2); g.appendChild(s3); defs.appendChild(g);
+  });
+  svg.appendChild(defs);
+  var edgeLayer = document.createElementNS(NS,'g'); svg.appendChild(edgeLayer);
+  var nodeLayer = document.createElementNS(NS,'g'); svg.appendChild(nodeLayer);
+  edges.forEach(function(e){
+    var ln=document.createElementNS(NS,'line');
+    ln.setAttribute('stroke','var(--border2)'); ln.setAttribute('stroke-width','1'); ln.setAttribute('opacity','0.5');
+    edgeLayer.appendChild(ln); e.el=ln;
+  });
   nodes.forEach(function(n){
-    var color = colors[n.category]||colors.other;
-    svg += '<circle cx="'+n.x+'" cy="'+n.y+'" r="'+n.r+'" fill="'+color+'" opacity="0.85" class="learn-node" data-id="'+n.id+'"/>';
-    if(n.r>20) svg += '<text x="'+n.x+'" y="'+(n.y+n.r+14)+'" text-anchor="middle" font-size="11" fill="var(--text2)">'+esc(n.name.length>14?n.name.slice(0,14)+'…':n.name)+'</text>';
+    var g=document.createElementNS(NS,'g'); g.setAttribute('class','learn-node'); g.setAttribute('data-id',n.id);
+    var shadow=document.createElementNS(NS,'ellipse');
+    shadow.setAttribute('rx',n.r*0.9); shadow.setAttribute('ry',n.r*0.32); shadow.setAttribute('fill','rgba(0,0,0,.16)');
+    shadow.setAttribute('cx','0'); shadow.setAttribute('cy',String(n.r+5));
+    var c=document.createElementNS(NS,'circle');
+    c.setAttribute('r',n.r); c.setAttribute('fill','url(#lg-'+n.category+')');
+    c.setAttribute('stroke',_shadeHex(_learnColor(n.category),-0.25)); c.setAttribute('stroke-width','1');
+    g.appendChild(shadow); g.appendChild(c);
+    if(n.r>=16){
+      var t=document.createElementNS(NS,'text');
+      t.setAttribute('text-anchor','middle'); t.setAttribute('y',String(n.r+18));
+      t.setAttribute('font-size','11'); t.setAttribute('fill','var(--text2)');
+      t.textContent = n.name.length>12 ? n.name.slice(0,12)+'…' : n.name;
+      g.appendChild(t);
+    }
+    nodeLayer.appendChild(g); n.el=g;
   });
-  svg += '</svg>';
-  container.innerHTML = svg;
-  // 点击节点显示详情
-  container.querySelectorAll('.learn-node').forEach(function(el){
-    el.style.cursor='pointer';
-    el.addEventListener('click', function(){
-      var id=this.getAttribute('data-id');
-      var skill = skills.find(function(s){ return s.id===id; });
-      if(skill) showSkillDetail(skill);
+  container.innerHTML='';
+  container.appendChild(svg);
+  // 图例
+  var legend=document.createElement('div'); legend.className='learn-legend';
+  legend.innerHTML = catKeys.slice(0,6).map(function(c){ return '<span><span class="lg-dot" style="background:'+_learnColor(c)+'"></span>'+esc(LEARN_CAT_LABELS[c]||c)+'</span>'; }).join('');
+  container.appendChild(legend);
+
+  _learnState = { nodes:nodes, nodeMap:nodeMap, edges:edges };
+  applyLearnFilter();
+
+  // 力导向模拟
+  var alpha = 1;
+  function simTick(){
+    var i, j, a, b, dx, dy, d2, d, f;
+    // 库仑排斥
+    for(i=0;i<nodes.length;i++){
+      for(j=i+1;j<nodes.length;j++){
+        a=nodes[i]; b=nodes[j];
+        dx=b.x-a.x; dy=b.y-a.y; d2=dx*dx+dy*dy;
+        if(d2<1){ dx=(Math.random()-0.5); dy=(Math.random()-0.5); d2=1; }
+        d=Math.sqrt(d2);
+        f = 2200/d2 * alpha;
+        var fx=dx/d*f, fy=dy/d*f;
+        a.vx-=fx; a.vy-=fy; b.vx+=fx; b.vy+=fy;
+      }
+    }
+    // 连线弹簧
+    edges.forEach(function(e){
+      dx=e.b.x-e.a.x; dy=e.b.y-e.a.y; d=Math.sqrt(dx*dx+dy*dy)||1;
+      var rest = 70 + e.a.r + e.b.r;
+      f = (d-rest)*0.015*alpha;
+      e.a.vx += dx/d*f; e.a.vy += dy/d*f;
+      e.b.vx -= dx/d*f; e.b.vy -= dy/d*f;
+    });
+    // 向心 + 积分
+    nodes.forEach(function(n){
+      n.vx += (W/2-n.x)*0.0016*alpha;
+      n.vy += (H/2-n.y)*0.0016*alpha;
+      if(n.fx!=null){ n.x=n.fx; n.y=n.fy; n.vx=0; n.vy=0; return; }
+      n.vx*=0.82; n.vy*=0.82;
+      n.x+=n.vx; n.y+=n.vy;
+      var m=n.r+4;
+      if(n.x<m){n.x=m;n.vx=0;} if(n.x>W-m){n.x=W-m;n.vx=0;}
+      if(n.y<m){n.y=m;n.vy=0;} if(n.y>H-m){n.y=H-m;n.vy=0;}
+    });
+  }
+  function draw(){
+    nodes.forEach(function(n){ n.el.setAttribute('transform','translate('+n.x.toFixed(1)+','+n.y.toFixed(1)+')'); });
+    edges.forEach(function(e){
+      e.el.setAttribute('x1',e.a.x); e.el.setAttribute('y1',e.a.y);
+      e.el.setAttribute('x2',e.b.x); e.el.setAttribute('y2',e.b.y);
+    });
+  }
+  function loop(){
+    if(alpha>0.02){ simTick(); alpha*=0.985; draw(); _learnRaf=requestAnimationFrame(loop); }
+    else { _learnRaf=0; draw(); }
+  }
+  function reheat(v){ if(alpha<v) alpha=v; if(!_learnRaf) _learnRaf=requestAnimationFrame(loop); }
+  draw();
+  _learnRaf=requestAnimationFrame(loop);
+
+  // 拖拽 + 点击（pointer events，坐标换算到 viewBox）
+  function svgPoint(evt){
+    var pt=svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY;
+    var m=svg.getScreenCTM(); if(!m) return {x:0,y:0};
+    var p=pt.matrixTransform(m.inverse()); return {x:p.x, y:p.y};
+  }
+  nodes.forEach(function(n){
+    var dragging=false, moved=0, sx=0, sy=0;
+    n.el.addEventListener('pointerdown', function(evt){
+      evt.preventDefault();
+      dragging=true; moved=0; var p=svgPoint(evt); sx=p.x; sy=p.y;
+      n.fx=n.x; n.fy=n.y;
+      try{ n.el.setPointerCapture(evt.pointerId); }catch(e){}
+    });
+    n.el.addEventListener('pointermove', function(evt){
+      if(!dragging) return;
+      var p=svgPoint(evt);
+      moved += Math.abs(p.x-sx)+Math.abs(p.y-sy); sx=p.x; sy=p.y;
+      n.fx=p.x; n.fy=p.y; reheat(0.25);
+    });
+    n.el.addEventListener('pointerup', function(){
+      if(!dragging) return;
+      dragging=false;
+      if(moved<5){ n.fx=null; n.fy=null; showSkillDetail(n.skill); }
+      // 拖拽后钉住位置，保持用户布局
     });
   });
 }
 function showSkillDetail(skill){
   var el=document.getElementById('learnDetail'); if(!el) return;
-  el.style.display='block';
-  el.innerHTML = '<div class="mem-card" style="max-width:400px"><div class="mem-card-head"><span class="mem-icon">📌</span><span class="mem-title">'+esc(skill.name||skill.id)+'</span><button class="modal-close" onclick="document.getElementById(\'learnDetail\').style.display=\'none\'">\u00d7</button></div>' +
+  var cat=skill.category||'other';
+  el.style.display='';
+  el.innerHTML = '<div class="mem-card"><div class="mem-card-head"><span class="mem-icon">📌</span><span class="mem-title">'+esc(skill.name||skill.id)+'</span><button class="modal-close" onclick="document.getElementById(\'learnDetail\').style.display=\'none\'">\u00d7</button></div>' +
     '<div style="padding:12px;font-size:13px">' +
     '<div><strong>ID:</strong> '+esc(skill.id)+'</div>' +
-    '<div><strong>分类:</strong> '+esc(skill.category||'-')+'</div>' +
+    '<div><strong>分类:</strong> <span class="learn-cat-badge" style="cursor:default;padding:1px 8px"><span class="learn-cat-dot" style="background:'+_learnColor(cat)+'"></span>'+esc(LEARN_CAT_LABELS[cat]||cat)+'</span></div>' +
     '<div><strong>使用次数:</strong> '+(skill.usage_count||0)+'</div>' +
+    '<div><strong>来源:</strong> '+esc(skill.source||'-')+'</div>' +
     '<div><strong>创建时间:</strong> '+(skill.created_at?new Date(skill.created_at).toLocaleString():'-')+'</div>' +
     (skill.description?'<div style="margin-top:6px;color:var(--text2)">'+esc(skill.description)+'</div>':'') +
     '</div></div>';
@@ -10725,7 +10934,7 @@ function openChannelModal(id){
   html += '</select><div class="conn-hint" style="font-size:11px;margin-top:4px">该通道收到的消息将使用此角色的系统提示和配置</div></div>';
   // 模型选择
   var curModel = (c.config && c.config.model) || '';
-  html += '<div class="field"><label>模型选择（留空=跟随角色配置）</label><input type="text" id="ch_model" value="'+esc(curModel)+'" placeholder="如 sensenova-6.7-flash-lite、kimi-k2.7-code" style="width:100%;padding:8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)"></div>';
+  html += '<div class="field"><label>模型选择（留空=跟随角色配置）</label><select id="ch_model" style="width:100%;padding:8px;border-radius:6px;background:var(--bg1);color:var(--text);border:1px solid var(--border)">'+buildModelOptionsHtml(curModel, '跟随角色配置')+'</select></div>';
   // 技能多选
   var curSkills = (c.config && c.config.skills) || [];
   if(typeof curSkills === 'string') curSkills = curSkills ? curSkills.split(',') : [];
