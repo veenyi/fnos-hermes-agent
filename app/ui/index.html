@@ -7327,7 +7327,7 @@ function buildMessageContent(text, attachments){
   return { text: text||'', images: imgs, files: files };
 }
 
-/* 流式聊天：WebSocket 主通道（抗代理超时），SSE/XHR 降级 */
+/* 流式聊天：WebSocket 主通道（抗代理超时 + 自动重连），SSE/XHR 降级 */
 function wsChatUrl(sid){
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   return proto + '//' + location.host + apiUrl('/api/chat/ws') + '?session_id=' + encodeURIComponent(sid) + '&token=' + encodeURIComponent(monitorToken || '');
@@ -7337,7 +7337,10 @@ function streamChat(payload, cb){
   var done = false;
   var ws = null;
   var fallbackTimer = null;
-  var wsOpened = false;  // 跟踪 WS 是否曾经连接成功
+  var wsOpened = false;
+  var reconnectAttempts = 0;
+  var maxReconnects = 3;  // 最多自动重连 3 次
+  var reconnectDelay = 2000; // 首次重连延迟 2s
 
   function finish(){
     if(done) return; done = true;
@@ -7354,17 +7357,49 @@ function streamChat(payload, cb){
   }
   function doFallback(){
     if(done) return;
-    // 仅当 WS 从未连接成功时才降级 SSE（避免消息重复处理）
-    if(wsOpened){
-      // WS 曾连接成功后断开：不降级，通知用户重试
-      finish();
-      cb.onError('连接中断，请重新发送');
-      cb.onDone(false);
-      return;
-    }
-    console.warn('[Chat] WS unavailable, fallback to SSE');
+    console.warn('[Chat] WS fallback to SSE after ' + reconnectAttempts + ' reconnect attempts');
     streamChatSSE(payload, cb);
     finish();
+  }
+
+  function tryReconnect(){
+    if(done || reconnectAttempts >= maxReconnects){ doFallback(); return; }
+    reconnectAttempts++;
+    var delay = reconnectDelay * Math.pow(2, reconnectAttempts - 1); // 2s, 4s, 8s
+    console.log('[Chat] WS reconnect attempt ' + reconnectAttempts + '/' + maxReconnects + ' in ' + delay + 'ms');
+    cb.onInfo && cb.onInfo('连接中断，正在重连(' + reconnectAttempts + '/' + maxReconnects + ')…');
+    setTimeout(function(){
+      if(done) return;
+      try { ws = new WebSocket(wsChatUrl(payload.session_id)); } catch(e){ doFallback(); return; }
+      _msgState.ws = ws;
+      var reconnectTimer = setTimeout(function(){
+        if(ws && ws.readyState !== WebSocket.OPEN){ try{ ws.close(); }catch(e){} tryReconnect(); }
+      }, 10000);
+      ws.onopen = function(){
+        clearTimeout(reconnectTimer);
+        console.log('[Chat] WS reconnected successfully');
+        cb.onInfo && cb.onInfo('重连成功，继续接收回复…');
+        // 重连后服务器会从缓存返回完整结果
+      };
+      ws.onmessage = function(e){
+        try {
+          var p = JSON.parse(e.data);
+          if(p.done){ finish(); cb.onDone(false); try{ ws.close(); }catch(ex){} return; }
+          handleMsg(p);
+        } catch(ex){}
+      };
+      ws.onerror = function(){
+        if(done) return;
+        clearTimeout(reconnectTimer);
+        tryReconnect();
+      };
+      ws.onclose = function(ev){
+        if(done) return;
+        clearTimeout(reconnectTimer);
+        if(ev.code !== 1000){ tryReconnect(); }
+        else { finish(); cb.onDone(false); }
+      };
+    }, delay);
   }
 
   // 1) POST 消息入队
@@ -7382,10 +7417,10 @@ function streamChat(payload, cb){
     _msgState.ws = ws;
     _msgState.abortCtrl = { abort: function(){ try{ ws.close(1000, 'user stop'); }catch(e){} } };
 
-    // 15 秒内未 open 则降级
+    // 30 秒内未 open 则降级（从 15s 延长到 30s，给慢网络更多时间）
     fallbackTimer = setTimeout(function(){
       if(ws && ws.readyState !== WebSocket.OPEN){ try{ ws.close(); }catch(e){} doFallback(); }
-    }, 15000);
+    }, 30000);
 
     ws.onopen = function(){ wsOpened = true; clearTimeout(fallbackTimer); };
     ws.onmessage = function(e){
@@ -7398,14 +7433,18 @@ function streamChat(payload, cb){
     ws.onerror = function(){
       if(done) return;
       clearTimeout(fallbackTimer);
-      doFallback();
+      // 如果 WS 曾连接成功后断开，尝试重连而非直接降级
+      if(wsOpened){ tryReconnect(); }
+      else { doFallback(); }
     };
     ws.onclose = function(ev){
       if(done) return;
       clearTimeout(fallbackTimer);
       if(ev.code !== 1000){
         console.warn('[Chat] WS closed abnormally code=' + ev.code);
-        doFallback();
+        // 如果 WS 曾连接成功后断开，尝试重连
+        if(wsOpened){ tryReconnect(); }
+        else { doFallback(); }
       } else {
         finish(); cb.onDone(false);
       }
