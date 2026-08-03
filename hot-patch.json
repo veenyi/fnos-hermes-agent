@@ -1,7 +1,7 @@
 {
-  "version": "0.21.15",
-  "base_version": "0.21.14",
-  "description": "v0.21.15 热更新：Token 用量移至独立页面，左侧新增用量菜单",
+  "version": "0.21.16",
+  "base_version": "0.21.15",
+  "description": "v0.21.16 热更新：增强会话级模型选择（模型徽章、清除选项、提示文字）",
   "files": [
     { "path": "ui/index.html" }
   ]
