@@ -1,7 +1,7 @@
 {
-  "version": "0.21.8",
-  "base_version": "0.21.7",
-  "description": "v0.21.8 热更新包：修复进入更新页后侧边栏「更新」图标丢失（检查更新函数误读全局 event 抹掉导航按钮 SVG）",
+  "version": "0.21.9",
+  "base_version": "0.21.8",
+  "description": "v0.21.9 热更新包：学习轨迹 3D 可拖拽图谱+分类筛选，会话窗口 Studio 布局（工作区不遮挡按钮+多会话按钮+白底统一），修复 46 个工作流模板「未找到」，Agent/通讯模型改下拉选择",
   "files": [
     { "path": "ui/index.html" }
   ]
