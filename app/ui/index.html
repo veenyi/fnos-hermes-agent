@@ -1279,7 +1279,7 @@
         <div class="setting-row"><div><div class="label">支持推理</div><div class="desc">开启后该模型可作为推理模型使用</div></div><div class="toggle" id="modelEditReasoning" onclick="toggleModelInput(this)"></div></div>
     </div>
     <div class="modal-foot">
-      <button class="action" onclick="validateProvider()">验证连接</button>
+      <button class="action" onclick="validateProvider(event)">验证连接</button>
       <button class="action" onclick="closeModelEditModal()">取消</button>
       <button class="action primary" onclick="saveModelEdit()">保存修改</button>
     </div>
@@ -1477,13 +1477,13 @@
   <div class="update-card">
     <div class="update-title">Hermes 核心</div>
     <div class="update-ver">当前 <strong id="hermesCurrent">--</strong> · 最新 <strong id="hermesLatest">--</strong></div>
-    <button class="ov-actbtn" onclick="checkHermesUpdate()">检查更新</button>
+    <button class="ov-actbtn" onclick="checkHermesUpdate(event)">检查更新</button>
     <button class="ov-actbtn start" id="hermesUpdateBtn" style="display:none" onclick="confirmHermesUpdate()">更新到最新</button>
   </div>
   <div class="update-card">
     <div class="update-title">Hermes Agent 应用</div>
     <div class="update-ver">当前 <strong id="appCurrent">--</strong> · 最新 <strong id="appLatest">--</strong></div>
-    <button class="ov-actbtn" onclick="checkAppUpdate()">检查更新</button>
+    <button class="ov-actbtn" onclick="checkAppUpdate(event)">检查更新</button>
     <button class="ov-actbtn start" id="appHotPatchBtn" style="display:none" onclick="doHotPatch()">⚡ 热更新</button>
     <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">完整安装</button>
   </div>
@@ -9086,12 +9086,12 @@ function toggleKeyVisibility(){
   // 已有明文值：切换显示/隐藏
   inp.type = inp.type==='password' ? 'text' : 'password';
 }
-function validateProvider(){
+function validateProvider(evt){
   var provider = buildProviderObj();
   if(!provider.base_url){ toast('请先填写 Base URL 后再验证连接'); return; }
   // 纯连接测试：只验证当前配置（Base URL + Key）能否连通，
   // 绝不刷新/覆盖模型列表配置（获取模型请用「获取模型列表」按钮）。
-  var btn=event&&event.target; if(btn){btn.disabled=true;btn.textContent='验证中…';}
+  var btn=_resolveCheckBtn(evt); if(btn){btn.disabled=true;btn.textContent='验证中…';}
   toast('正在验证连接…');
   apiPost('/api/config/test', { provider: provider, mode: 'connectivity' }).then(function(r){
     if(r && r.ok){
@@ -10941,8 +10941,15 @@ function chApplyWecomQr(){
   }).catch(function(e){ alert('启用失败：'+(e.message||e)); });
 }
 /* ============================ 更新 ============================ */
-function checkHermesUpdate(){
-  var btn=event&&event.target; if(btn){btn.disabled=true;btn.textContent='检查中…';}
+// 注意：btn 只接受显式传入的 event；切勿读全局 event —— switchPage('updates') 自动调用本函数时
+// 全局 event 仍是侧边栏「更新」导航按钮的点击事件，event.target 会命中导航按钮，
+// textContent 会抹掉导航按钮里的 SVG 图标（更新页丢图标 bug 根因）。
+function _resolveCheckBtn(evt){
+  var t = evt && evt.currentTarget;
+  return (t && t.tagName === 'BUTTON') ? t : null;
+}
+function checkHermesUpdate(evt){
+  var btn=_resolveCheckBtn(evt); if(btn){btn.disabled=true;btn.textContent='检查中…';}
   apiGet('/api/hermes/update/check').then(function(data){
     if(!data || data.error){ var b=document.getElementById('hermesUpdateBtn'); if(b) b.style.display='none'; toast(data&&data.error?'检查失败：'+data.error:'检查 Hermes 更新失败'); return; }
     if(data.date) window.__hermesDate=data.date;
@@ -10966,8 +10973,8 @@ function confirmHermesUpdate(){
     })();
   }).catch(function(e){ toast('启动更新失败：'+e.message); });
 }
-function checkAppUpdate(){
-  var btn=event&&event.target; if(btn){btn.disabled=true;btn.textContent='检查中…';}
+function checkAppUpdate(evt){
+  var btn=_resolveCheckBtn(evt); if(btn){btn.disabled=true;btn.textContent='检查中…';}
   apiGet('/api/app/update/check').then(function(data){
     if(!data || data.error){ var b=document.getElementById('appUpdateBtn'); if(b) b.style.display='none'; var hb=document.getElementById('appHotPatchBtn'); if(hb) hb.style.display='none'; toast(data&&data.error?'检查失败：'+data.error:'检查应用更新失败'); return; }
     // 缓存更新信息供「完整安装」按钮使用（是否有 fpk 安装包/发布页链接）
