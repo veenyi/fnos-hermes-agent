@@ -97,7 +97,10 @@
     .rail-search input{width:100%;padding:7px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);font-size:13px;outline:none;color:var(--text)}
     .rail-scroll{flex:1;overflow-y:auto;padding:6px}
     .agent-group{margin-bottom:2px}
-    .agent-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-md);cursor:pointer;transition:background .15s;user-select:none}
+    .agent-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-md);cursor:pointer;transition:background .15s;user-select:none;position:relative}
+    .agent-row .agent-del{opacity:0;color:var(--text3);font-size:13px;margin-left:auto;flex:0 0 auto;padding:0 4px;border-radius:4px;line-height:1}
+    .agent-row:hover .agent-del{opacity:1}
+    .agent-row .agent-del:hover{color:var(--danger,#e5534b);background:rgba(229,83,75,.12)}
     .agent-row:hover{background:var(--bg3)}
     .agent-row.active{background:var(--accent-bg);color:var(--accent)}
     .agent-row .chevron{margin-right:2px;font-size:11px;color:var(--text3);transition:transform .2s;width:14px;height:14px;display:flex;align-items:center;justify-content:center}
@@ -220,6 +223,10 @@
     .chat-info .info-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite}
     @keyframes pulse{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
     /* 回复状态指示器 */
+    /* 思考过程块（推理模型 reasoning_content 流式显示） */
+    .reasoning-block{margin:0 0 8px;padding:8px 12px;background:var(--bg2);border-left:3px solid var(--text3);border-radius:8px;font-size:12px;color:var(--text2);max-height:180px;overflow-y:auto}
+    .reasoning-head{font-weight:600;margin-bottom:4px;color:var(--text3)}
+    .reasoning-text{white-space:pre-wrap;word-break:break-word;opacity:.85}
     .reply-status{display:flex;align-items:center;gap:8px;padding:6px 12px;margin-top:6px;border-radius:8px;font-size:12px;color:var(--text2);background:var(--bg2);border:1px solid var(--border);transition:all .3s}
     .reply-status.thinking{color:var(--warning);border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.06)}
     .reply-status.generating{color:var(--accent);border-color:rgba(99,102,241,.3);background:rgba(99,102,241,.06)}
@@ -765,12 +772,21 @@
     .ws-file-icon{font-size:16px;width:20px;text-align:center}
     .ws-file-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .ws-file-size{font-size:11px;color:var(--text2)}
-    .ws-file-del{opacity:0;color:var(--text2);cursor:pointer;font-size:14px}
+    .ws-file-act{opacity:0;color:var(--text2);cursor:pointer;font-size:13px;padding:0 2px}
+    .ws-file-item:hover .ws-file-act{opacity:1}
+    .ws-file-act:hover{color:var(--accent)}
     .ws-file-item:hover .ws-file-del{opacity:1}
     .ws-file-preview{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg0);display:flex;flex-direction:column;z-index:5}
     .ws-preview-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px}
     .ws-preview-head span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace}
     .ws-preview-editor{flex:1;border:none;background:transparent;color:var(--text1);font-family:'JetBrains Mono',monospace;font-size:12px;padding:12px;resize:none;outline:none;line-height:1.5}
+    .ws-preview-body{flex:1;overflow:auto;padding:12px;font-size:13px;line-height:1.6;background:var(--bg0)}
+    .ws-preview-body img{max-width:100%;border-radius:6px}
+    .ws-preview-body iframe{width:100%;height:100%;min-height:300px;border:none;border-radius:6px;background:#fff}
+    .ws-preview-body table{border-collapse:collapse;width:100%;font-size:12px}
+    .ws-preview-body th,.ws-preview-body td{border:1px solid var(--border2);padding:4px 8px;text-align:left}
+    .ws-preview-body th{background:var(--bg1);font-weight:600}
+    .ws-preview-body .md-text pre{overflow:auto}
     .ws-term-toolbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border)}
     .ws-term-status{font-size:12px;color:var(--text2)}
     .ws-term-output{flex:1;overflow-y:auto;padding:10px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all;background:#1a1a2e;color:#e0e0e0}
@@ -1093,20 +1109,28 @@
                 </div>
                 <div class="ws-file-list" id="fmList"><div class="empty-state">加载中…</div></div>
                 <div class="ws-file-preview" id="fmPreview" style="display:none">
-                  <div class="ws-preview-head"><span id="fmPreviewName"></span><button class="ov-actbtn" onclick="fmSaveFile()">保存</button><button class="modal-close" onclick="fmClosePreview()">×</button></div>
-                  <textarea class="ws-preview-editor" id="fmEditor" spellcheck="false"></textarea>
+                  <div class="ws-preview-head">
+                    <span id="fmPreviewName"></span>
+                    <button class="ov-actbtn" id="fmSaveBtn" onclick="fmSaveFile()" title="保存修改">保存</button>
+                    <button class="ov-actbtn" onclick="fmDownload('')" title="下载文件">⬇ 下载</button>
+                    <button class="ov-actbtn" onclick="fmAttach()" title="附加到对话">📎 附加</button>
+                    <button class="modal-close" onclick="fmClosePreview()">×</button>
+                  </div>
+                  <div class="ws-preview-body" id="fmPreviewBody" style="display:none"></div>
+                  <textarea class="ws-preview-editor" id="fmEditor" spellcheck="false" style="display:none"></textarea>
                 </div>
               </div>
               <div class="ws-pane" id="ws-terminal">
                 <div class="ws-term-toolbar">
                   <button class="ov-actbtn" onclick="termConnect()" id="termConnBtn">连接终端</button>
                   <button class="ov-actbtn" onclick="termDisconnect()">断开</button>
+                  <button class="ov-actbtn" onclick="termClear()" title="清空屏幕">清屏</button>
                   <span class="ws-term-status" id="termStatus">未连接</span>
                 </div>
                 <div class="ws-term-output" id="termOutput"></div>
                 <div class="ws-term-input-row">
                   <span class="ws-term-prompt">$</span>
-                  <input type="text" class="ws-term-input" id="termInput" placeholder="输入命令…" onkeydown="if(event.key==='Enter')termSend()" autocomplete="off" spellcheck="false">
+                  <input type="text" class="ws-term-input" id="termInput" placeholder="输入命令…（Enter 执行 / ↑↓ 历史）" onkeydown="termKeydown(event)" autocomplete="off" spellcheck="false">
                 </div>
               </div>
             </div>
@@ -6240,10 +6264,12 @@ function closeTab(sid) {
       renderRail(); updateHeader();
       restoreDraft(currentSession);
       loadSessionMessages(currentSession);
+      _syncModelBtn();
     } else {
       var body = document.getElementById('chatBody');
       if (body) body.innerHTML = '<div class="system-tip">没有打开的会话，点击右上角 + 新建</div>';
       updateHeader();
+      _syncModelBtn();
     }
   }
   renderSessionTabs(); renderRail();
@@ -6263,6 +6289,7 @@ function newTab() {
       _sessions.unshift(s);
       currentSession = s.id;
       setSessionAgent(s.id, aid);
+      _applyPendingModel(s.id);
       _openTabs.push(s.id); persistTabs();
       var ta = document.getElementById('chatInput'); if (ta) ta.value = '';
       renderSessionTabs(); renderRail(); updateHeader();
@@ -6318,6 +6345,7 @@ function loadSessions(){
       else if(currentSession && !_sessions.some(function(s){ return s.id===currentSession; })){ currentSession = _sessions.length?_sessions[0].id:''; }
       syncTabs();
       renderRail(); updateHeader();
+      _syncModelBtn();
       if(currentSession) loadSessionMessages(currentSession);
     })
     .catch(function(){ toast('加载会话失败，无法连接后端'); renderRail(); });
@@ -6368,7 +6396,9 @@ function renderRail(){
     }).map(function(s){ return s.id; });
     html += '<div class="agent-group"><div class="agent-row'+(open?' expanded':'')+(isActiveAgent?' active':'')+'" onclick="toggleAgent(\''+esc(agent.id)+'\')">'+
       '<span class="chevron">▶</span><span class="avatar">'+esc(agent.icon||'🤖')+'</span>'+
-      '<span class="info"><div class="name">'+esc(agent.name)+'</div><div class="desc">'+(isActiveAgent&&agent.id==='default'?'默认主力助手':'')+'</div></span></div>'+
+      '<span class="info"><div class="name">'+esc(agent.name)+'</div><div class="desc">'+(isActiveAgent&&agent.id==='default'?'默认主力助手':'')+'</div></span>'+
+      (agent.id!=='default' ? '<span class="agent-del" title="删除该分组" onclick="deleteAgentGroup(\''+esc(agent.id)+'\',event)">×</span>' : '')+
+      '</div>'+
       '<div class="session-list'+(open?' open':'')+'" id="sess-'+esc(agent.id)+'">';
     if(sessIds.length){
       html += sessIds.map(function(sid){
@@ -6482,6 +6512,29 @@ function switchSession(aid, sid, e){
   if(aid) setSessionAgent(sid, aid);
   openTab(sid);
   if(window.innerWidth<=768) closeRailDrawer();
+}
+/* 删除 Agent 分组（非 default）：分组下的会话移回「默认主力助手」，不删除会话本身 */
+function deleteAgentGroup(aid, e){
+  if(e) e.stopPropagation();
+  if(!aid || aid === 'default') return;
+  var a = getAgent(aid);
+  var sessIds = _sessions.filter(function(s){
+    var x = _sessionAgent[s.id] || 'default';
+    if(x !== 'default' && !getAgent(x)) x = 'default';
+    return x === aid;
+  }).map(function(s){ return s.id; });
+  var msg = '确定删除分组「' + (a ? a.name : aid) + '」？';
+  if(sessIds.length) msg += '\n该分组下的 ' + sessIds.length + ' 个会话将移动到「默认主力助手」。';
+  if(!confirm(msg)) return;
+  // 会话移回默认分组
+  sessIds.forEach(function(sid){ _sessionAgent[sid] = 'default'; });
+  persistSessionAgent();
+  _agents = _agents.filter(function(x){ return x.id !== aid; });
+  saveAgents();
+  try{ localStorage.removeItem('hermes_rail_open_' + aid); }catch(err){}
+  if(currentAgent === aid) currentAgent = 'default';
+  renderRail(); renderSessionTabs(); updateHeader();
+  toast('已删除分组');
 }
 function delSession(aid, sid, e){
   if(e) e.stopPropagation();
@@ -6652,13 +6705,17 @@ function fmRefresh(){
     var el=document.getElementById('fmList');
     if(!res.items.length){ el.innerHTML='<div class="empty-state">空目录</div>'; return; }
     el.innerHTML = res.items.map(function(item){
-      var icon = item.type==='dir' ? '📁' : (item.name.match(/\.(js|ts|py|sh|json|yaml|yml|md)$/i) ? '📄' : '📃');
+      var icon = item.type==='dir' ? '📁' : (item.name.match(/\.(js|ts|py|sh|json|yaml|yml|md|txt|csv|html|htm)$/i) ? '📄' : '📃');
       var size = item.type==='file' ? (item.size>1024 ? (item.size/1024).toFixed(1)+'KB' : item.size+'B') : '';
+      var act = item.type==='dir' ? '' :
+        '<span class="ws-file-act" title="下载" onclick="event.stopPropagation();fmDownload(\''+esc(item.path).replace(/'/g,"\\'")+'\')">⬇</span>'+
+        '<span class="ws-file-act" title="附加到对话" onclick="event.stopPropagation();fmAttachPath(\''+esc(item.path).replace(/'/g,"\\'")+'\')">📎</span>'+
+        '<span class="ws-file-del" title="删除" onclick="event.stopPropagation();fmDelete(\''+esc(item.path).replace(/'/g,"\\'")+'\')">\ud83d\uddd1</span>';
       return '<div class="ws-file-item" onclick="'+(item.type==='dir'?'fmOpenDir':'fmOpenFile')+'(\''+esc(item.path).replace(/'/g,"\\'")+'\')">' +
         '<span class="ws-file-icon">'+icon+'</span>' +
         '<span class="ws-file-name">'+esc(item.name)+'</span>' +
         '<span class="ws-file-size">'+size+'</span>' +
-        '<span class="ws-file-del" onclick="event.stopPropagation();fmDelete(\''+esc(item.path).replace(/'/g,"\\'")+'\')">\ud83d\uddd1</span>' +
+        act +
         '</div>';
     }).join('');
   }).catch(function(e){ document.getElementById('fmList').innerHTML='<div class="empty-state">网络错误</div>'; });
@@ -6670,14 +6727,106 @@ function fmUp(){
   _fmCwd=parent; fmRefresh();
 }
 function fmOpenFile(path){
-  apiGet('/api/files/read?path='+encodeURIComponent(path)).then(function(res){
+  _fmEditPath=path;
+  document.getElementById('fmPreviewName').textContent=path.split('/').pop();
+  document.getElementById('fmPreview').style.display='flex';
+  var ext=(path.split('.').pop()||'').toLowerCase();
+  var body=document.getElementById('fmPreviewBody');
+  var editor=document.getElementById('fmEditor');
+  var saveBtn=document.getElementById('fmSaveBtn');
+  var enc=encodeURIComponent(path);
+  // 图片：直接内联预览
+  if(['jpg','jpeg','png','gif','webp','svg','bmp','ico'].indexOf(ext)>=0){
+    editor.style.display='none'; body.style.display='block';
+    body.innerHTML='<img src="'+apiUrl('/api/preview?path=')+enc+'" alt="" style="max-width:100%;max-height:calc(100% - 8px);object-fit:contain;border-radius:6px">';
+    saveBtn.style.display='none';
+    return;
+  }
+  // PDF / HTML：浏览器原生内联预览
+  if(ext==='pdf'||ext==='html'||ext==='htm'){
+    editor.style.display='none'; body.style.display='block';
+    body.innerHTML='<iframe src="'+apiUrl('/api/preview?path=')+enc+'"></iframe>';
+    saveBtn.style.display='none';
+    return;
+  }
+  // Office：服务端转 HTML 预览（docx/xlsx/pptx）
+  if(ext==='docx'||ext==='xlsx'||ext==='pptx'){
+    editor.style.display='none'; body.style.display='block';
+    body.innerHTML='<iframe src="'+apiUrl('/api/preview/office?path=')+enc+'"></iframe>';
+    saveBtn.style.display='none';
+    return;
+  }
+  // 文本类：优先走 /api/preview（8MB 上限，含 md/csv 富渲染）
+  var isText = ['txt','md','markdown','csv','json','yaml','yml','xml','log','ini','conf',
+    'js','mjs','cjs','ts','tsx','jsx','py','sh','bash','c','h','cpp','cc','hpp','java','go','rs','rb','php','css','sql'].indexOf(ext)>=0;
+  if(isText){
+    apiGet('/api/preview?path='+enc).then(function(res){
+      if(!res || !res.ok){ toast(res?res.error:'读取失败','error'); return; }
+      if(ext==='md'||ext==='markdown'){
+        editor.style.display='none'; body.style.display='block';
+        body.innerHTML='<div class="md-text">'+renderMarkdown(res.content||'')+'</div>';
+        saveBtn.style.display='none';
+        return;
+      }
+      if(ext==='csv'){
+        editor.style.display='none'; body.style.display='block';
+        body.innerHTML=csvToTable(res.content||'');
+        saveBtn.style.display='none';
+        return;
+      }
+      editor.style.display='block'; body.style.display='none';
+      saveBtn.style.display='';
+      editor.value=res.content||'';
+    }).catch(function(){ toast('预览失败','error'); });
+    return;
+  }
+  // 未知类型：回退旧接口（textarea + 保存）
+  editor.style.display='block'; body.style.display='none'; saveBtn.style.display='';
+  apiGet('/api/files/read?path='+enc).then(function(res){
     if(!res || !res.ok){ toast(res?res.error:'读取失败','error'); return; }
-    _fmEditPath=path;
-    document.getElementById('fmPreviewName').textContent=path.split('/').pop();
-    document.getElementById('fmEditor').value=res.content;
-    document.getElementById('fmPreview').style.display='flex';
+    editor.value=res.content;
   });
 }
+function csvToTable(csv){
+  var rows=String(csv||'').split(/\r?\n/).filter(function(l,i,arr){ return !(i===arr.length-1 && !l.trim()); });
+  if(!rows.length) return '<div class="empty-state">空 CSV</div>';
+  var cells=rows.map(function(r){ return r.split(','); });
+  var w=Math.max.apply(null,cells.map(function(c){ return c.length; }));
+  var html='<div class="table-wrap"><table><thead><tr>';
+  for(var i=0;i<w;i++) html+='<th>'+esc(cells[0][i]||'')+'</th>';
+  html+='</tr></thead><tbody>';
+  for(var r=1;r<cells.length;r++){
+    html+='<tr>';
+    for(var j=0;j<w;j++) html+='<td>'+esc(cells[r][j]||'')+'</td>';
+    html+='</tr>';
+  }
+  return html+'</tbody></table></div>';
+}
+function fmDownload(path){
+  var p=path||_fmEditPath;
+  if(!p) return;
+  var name=p.split('/').pop()||'file';
+  var hdrs={}; if(monitorToken) hdrs['X-Monitor-Token']=monitorToken;
+  fetch(apiUrl('/api/download?path='+encodeURIComponent(p)),{headers:hdrs})
+    .then(function(r){ if(!r.ok) throw new Error(String(r.status)); return r.blob(); })
+    .then(function(blob){
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=name;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); try{ document.body.removeChild(a); }catch(e){} }, 2000);
+    })
+    .catch(function(){ toast('下载失败','error'); });
+}
+function fmAttachPath(path){
+  var name=path.split('/').pop()||'file';
+  // 以 /api/download?path= 形式引用，后端 normalizeMessage 时解析回真实路径，Agent 可直接读取分析
+  _pendingAttachments.push({ url:'/api/download?path='+encodeURIComponent(path)+'&name='+encodeURIComponent(name), type:'application/octet-stream', name:name });
+  toast('📎 已附加到对话：'+name);
+  renderAttachChips();
+  autoResize(document.getElementById('chatInput'));
+}
+function fmAttach(){ fmAttachPath(_fmEditPath); }
 function fmSaveFile(){
   if(!_fmEditPath) return;
   var content=document.getElementById('fmEditor').value;
@@ -6705,27 +6854,142 @@ function fmDelete(path){
     .then(function(r){return r.json();}).then(function(res){ if(res.ok){ toast('🗑 已删除'); fmRefresh(); } else toast(res.error||'删除失败','error'); });
 }
 
-/* ============================ 终端管理 ============================ */
+/* ============================ 终端管理（PTY：二进制帧 + ANSI 流式渲染） ============================ */
 var _termWs = null;
+var _termDecoder = new TextDecoder('utf-8');
+var _termRuns = [];           // [{t:文本, b:粗体, f:前景, bg:背景}] 已渲染片段
+var _termStyle = { b:0, f:'', bg:'' }; // 当前 SGR 状态（跨 chunk 保持）
+var _termEsc = '';            // 未完成的转义序列
+var _termCols = 0, _termRows = 0;
+var _termHist = []; var _termHistIdx = -1;
+var _ANSI_COLORS={0:'#000',1:'#cd0000',2:'#00cd00',3:'#cdcd00',4:'#0000ee',5:'#cd00cd',6:'#00cdcd',7:'#e5e5e5',8:'#7f7f7f',9:'#ff0000',10:'#00ff00',11:'#ffff00',12:'#5c5cff',13:'#ff00ff',14:'#00ffff',15:'#ffffff'};
+function ansi256Color(n){
+  n=parseInt(n,10)||0;
+  if(n<16) return _ANSI_COLORS[n]||'#fff';
+  if(n<232){
+    n-=16;
+    var r=Math.floor(n/36),g=Math.floor((n%36)/6),b=n%6;
+    function cv(v){ v=Math.round(v*255/5); var h=v.toString(16); return h.length<2?'0'+h:h; }
+    return '#'+cv(r)+cv(g)+cv(b);
+  }
+  var v=8+(n-232)*10; var h=v.toString(16); if(h.length<2)h='0'+h;
+  return '#'+h+h+h;
+}
+function applySGR(st, params){
+  if(!params || !params.length) params=['0'];
+  var i=0;
+  while(i<params.length){
+    var p=params[i];
+    if(!p){ i++; continue; }
+    var num=parseInt(p,10);
+    if(isNaN(num)){ i++; continue; }
+    if(num===0){ st.b=0; st.f=''; st.bg=''; }
+    else if(num===1){ st.b=1; }
+    else if(num===2){ st.b=0; }
+    else if(num===22){ st.b=0; }
+    else if(num>=30&&num<=37){ st.f=_ANSI_COLORS[num-30]; }
+    else if(num===39){ st.f=''; }
+    else if(num>=90&&num<=97){ st.f=_ANSI_COLORS[num-90]; }
+    else if(num>=40&&num<=47){ st.bg=_ANSI_COLORS[num-40]; }
+    else if(num===49){ st.bg=''; }
+    else if(num>=100&&num<=107){ st.bg=_ANSI_COLORS[num-100]; }
+    else if(num===38||num===48){
+      var mode=params[i+1], key=num===38?'f':'bg';
+      if(mode==='5'){ st[key]=ansi256Color(params[i+2]); i+=3; }
+      else if(mode==='2'){ st[key]='rgb('+params[i+2]+','+params[i+3]+','+params[i+4]+')'; i+=5; }
+      else { i++; }
+    }
+    i++;
+  }
+}
+function termAppend(raw){
+  var el=document.getElementById('termOutput');
+  if(!el) return;
+  var s=_termEsc+String(raw||''); _termEsc='';
+  var buf=''; var i=0, L=s.length;
+  function commit(){
+    if(!buf) return;
+    _termRuns.push({ t:buf, b:_termStyle.b, f:_termStyle.f, bg:_termStyle.bg });
+    if(_termRuns.length>20000) _termRuns.splice(0,_termRuns.length-20000); // 防内存膨胀
+    buf='';
+  }
+  while(i<L){
+    var c=s.charAt(i);
+    if(c==='\x1b'){
+      if(i+1>=L){ _termEsc=s.slice(i); break; }
+      var nxt=s.charAt(i+1);
+      if(nxt==='['){
+        var mm=s.slice(i+2).match(/^([0-9;?]*)([@-~])/);
+        if(mm){
+          if(mm[2]==='m'){ commit(); applySGR(_termStyle, mm[1]?mm[1].split(';'):[]); }
+          else if(mm[2]==='J'){ commit(); _termRuns.length=0; el.innerHTML=''; } // 清屏
+          else if(mm[2]==='K'){ commit(); } // 清行：忽略（轻量终端）
+          i+=2+mm[0].length;
+          continue;
+        }
+        _termEsc=s.slice(i); break; // 不完整 CSI，等下个 chunk
+      }
+      if(nxt===']'){
+        var oe=s.indexOf('\x07', i+2);
+        if(oe<0){ _termEsc=s.slice(i); break; } // OSC 未结束
+        i=oe+1; continue;
+      }
+      if(nxt==='('||nxt===')'||nxt==='>'||nxt==='='){
+        if(i+2>=L){ _termEsc=s.slice(i); break; }
+        i+=3; continue;
+      }
+      if(s.length-i<2){ _termEsc=s.slice(i); break; }
+      i+=2; continue;
+    }
+    if(c==='\r'||c==='\n'){
+      if(c==='\r' && s.charAt(i+1)==='\n') i++;
+      buf+='\n'; i++; continue;
+    }
+    var j=i;
+    while(j<L){ var ch=s.charAt(j); if(ch==='\x1b'||ch==='\r'||ch==='\n') break; j++; }
+    buf+=s.slice(i,j); i=j;
+  }
+  commit();
+  // 增量渲染：只补新片段
+  var html='';
+  var last=_termRuns.length;
+  if(_termAppendMark===undefined || _termAppendMark>last){ _termAppendMark=0; el.innerHTML=''; }
+  for(var k=_termAppendMark;k<last;k++){
+    var r=_termRuns[k];
+    var css='';
+    if(r.b) css+='font-weight:bold;';
+    if(r.f) css+='color:'+r.f+';';
+    if(r.bg) css+='background-color:'+r.bg+';';
+    html+=(css?'<span style="'+css+'">':'')+esc(r.t)+(css?'</span>':'');
+  }
+  _termAppendMark=last;
+  if(html) el.insertAdjacentHTML('beforeend', html);
+  // 未上滚时跟随底部
+  if(el.scrollTop+el.clientHeight>=el.scrollHeight-60) el.scrollTop=el.scrollHeight;
+}
+var _termAppendMark=0;
 function termConnect(){
   if(_termWs && _termWs.readyState<=1) return;
   var proto = location.protocol==='https:'?'wss:':'ws:';
   var url = proto+'//'+location.host+(window._basePath||'')+'/api/terminal/ws?token='+(monitorToken||'')+'&cwd='+encodeURIComponent(_fmCwd||'');
   document.getElementById('termStatus').textContent='连接中…';
   _termWs = new WebSocket(url);
-  _termWs.onopen=function(){ document.getElementById('termStatus').textContent='✅ 已连接'; };
+  _termWs.binaryType='arraybuffer';
+  _termWs.onopen=function(){
+    document.getElementById('termStatus').textContent='✅ 已连接';
+    termResize(true);
+  };
   _termWs.onmessage=function(e){
-    try{
-      var data=JSON.parse(e.data);
-      if(data.type==='output'){
-        var el=document.getElementById('termOutput');
-        el.textContent+=data.data;
-        el.scrollTop=el.scrollHeight;
-      } else if(data.type==='exit'){
-        document.getElementById('termStatus').textContent='已退出 (code:'+data.code+')';
-        _termWs=null;
-      }
-    }catch{}
+    if(typeof e.data==='string'){
+      try{
+        var data=JSON.parse(e.data);
+        if(data.type==='output'){ termAppend(data.data); }
+        else if(data.type==='exit'){ document.getElementById('termStatus').textContent='已退出 (code:'+data.code+')'; _termWs=null; }
+      }catch(err){ termAppend(e.data); }
+      return;
+    }
+    // PTY 原始二进制帧：流式 UTF-8 解码（跨 chunk 多字节字符不丢）
+    termAppend(_termDecoder.decode(new Uint8Array(e.data), {stream:true}));
   };
   _termWs.onclose=function(){ document.getElementById('termStatus').textContent='已断开'; _termWs=null; };
   _termWs.onerror=function(){ document.getElementById('termStatus').textContent='连接失败'; };
@@ -6734,15 +6998,49 @@ function termDisconnect(){
   if(_termWs){ _termWs.close(); _termWs=null; }
   document.getElementById('termStatus').textContent='未连接';
 }
+function termResize(force){
+  var el=document.getElementById('termOutput');
+  if(!el) return;
+  var cols=Math.max(20, Math.floor(el.clientWidth/7.5));
+  var rows=Math.max(5, Math.floor(el.clientHeight/16));
+  if(!force && cols===_termCols && rows===_termRows) return;
+  _termCols=cols; _termRows=rows;
+  if(_termWs && _termWs.readyState===1) _termWs.send(JSON.stringify({type:'resize', cols:cols, rows:rows}));
+}
+window.addEventListener('resize', function(){ termResize(false); });
+function termClear(){
+  _termRuns.length=0; _termAppendMark=0; _termStyle={b:0,f:'',bg:''};
+  var el=document.getElementById('termOutput'); if(el) el.innerHTML='';
+}
+function termKeydown(e){
+  var input=document.getElementById('termInput');
+  if(e.key==='Enter'){ termSend(); e.preventDefault(); return; }
+  if(e.key==='ArrowUp'){
+    e.preventDefault();
+    if(!_termHist.length) return;
+    if(_termHistIdx<0) _termHistIdx=_termHist.length-1;
+    else if(_termHistIdx>0) _termHistIdx--;
+    input.value=_termHist[_termHistIdx];
+    return;
+  }
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    if(_termHistIdx>=0){
+      _termHistIdx++;
+      if(_termHistIdx>=_termHist.length){ _termHistIdx=-1; input.value=''; }
+      else input.value=_termHist[_termHistIdx];
+    }
+    return;
+  }
+}
 function termSend(){
   var input=document.getElementById('termInput');
   var cmd=input.value;
   input.value='';
   if(!_termWs||_termWs.readyState!==1){ toast('终端未连接','error'); return; }
   _termWs.send(JSON.stringify({type:'input',data:cmd+'\n'}));
-  var el=document.getElementById('termOutput');
-  el.textContent+='\n$ '+cmd+'\n';
-  el.scrollTop=el.scrollHeight;
+  // PTY 下 bash 自行回显，无需本地回显（否则会重复显示）
+  if(cmd.trim()){ _termHist.push(cmd); if(_termHist.length>100) _termHist.shift(); _termHistIdx=-1; }
 }
 
 /* ============================ 消息操作：语音播放 / 引用 / Fork ============================ */
@@ -6807,6 +7105,7 @@ function forkMsg(btn){
       _sessions.unshift(s);
       currentSession = s.id;
       setSessionAgent(s.id, currentAgent || 'default');
+      _applyPendingModel(s.id);
       _openTabs.push(s.id); persistTabs();
       renderSessionTabs(); renderRail(); updateHeader();
       var body = document.getElementById('chatBody');
@@ -6867,6 +7166,7 @@ function startRoundtable(){
       _rtState = { active:true, agents:agents, rounds:rounds, currentRound:0, history:[], sessionId:s.id };
       _sessions.unshift(s); currentSession = s.id;
       setSessionAgent(s.id, 'team');
+      _applyPendingModel(s.id);
       _openTabs.push(s.id); persistTabs();
       renderSessionTabs(); renderRail();
       switchPage('chat');
@@ -7066,6 +7366,7 @@ function createNewSession(){
       _sessions.unshift(s);
       currentSession=s.id;
       setSessionAgent(s.id, agent||'default');
+      _applyPendingModel(s.id);
       _openTabs.push(s.id); persistTabs();
       var ta=document.getElementById('chatInput'); if(ta) ta.value='';
       renderSessionTabs(); renderRail(); updateHeader();
@@ -7243,7 +7544,7 @@ function sendRaw(text){
     if (_teamOn || _wfOn) { ensureAgent('team', { name: _ext.team_name || _ext.workflow.name || '我的团队', icon: _wfOn ? '⚙️' : '👥' }); currentAgent = 'team'; }
     fetch(apiUrl('/api/sessions'), { method:'POST', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
       .then(function(r){ return r.json(); })
-      .then(function(s){ _sessions.unshift(s); currentSession=s.id; setSessionAgent(s.id, _aid); _openTabs.push(s.id); persistTabs(); renderSessionTabs(); renderRail(); updateHeader(); doStream(); })
+      .then(function(s){ _sessions.unshift(s); currentSession=s.id; setSessionAgent(s.id, _aid); _applyPendingModel(s.id); _openTabs.push(s.id); persistTabs(); renderSessionTabs(); renderRail(); updateHeader(); doStream(); })
       .catch(function(){ toast('创建会话失败'); mdEl.textContent='⚠ 无法创建会话'; });
   } else {
     doStream();
@@ -7279,6 +7580,23 @@ function sendRaw(text){
           statusEl.innerHTML='<span class="rs-icon">✍️</span><span class="rs-text">正在回复<span class="rs-dots"></span></span><span class="rs-bar"><span class="rs-bar-inner"></span></span>';
         }
         mdEl.innerHTML = renderMarkdown(fullText, true); body.scrollTop=body.scrollHeight; _chatHTML[sid] = body.innerHTML;
+      },
+      onReasoning: function(r){
+        // 推理模型思考过程：状态从“正在思考”切换，并流式显示思考块（避免 content 为空时 UI 卡死）
+        if(statusEl && statusEl.classList.contains('thinking')){
+          statusEl.className='reply-status generating';
+          statusEl.innerHTML='<span class="rs-icon">💭</span><span class="rs-text">正在思考<span class="rs-dots"></span></span><span class="rs-bar"><span class="rs-bar-inner"></span></span>';
+        }
+        var rb = asst.querySelector('.reasoning-block');
+        if(!rb){
+          rb = document.createElement('div');
+          rb.className = 'reasoning-block';
+          rb.innerHTML = '<div class="reasoning-head">💭 思考过程</div><div class="reasoning-text"></div>';
+          mdEl.parentNode.insertBefore(rb, mdEl);
+        }
+        rb.querySelector('.reasoning-text').textContent += r;
+        rb.scrollTop = rb.scrollHeight;
+        body.scrollTop=body.scrollHeight; _chatHTML[sid] = body.innerHTML;
       },
       onTool: function(tp){
         // 技能调用渲染为 chip（Issue #9），不占完整工具卡片
@@ -7404,6 +7722,7 @@ function streamChat(payload, cb){
   function handleMsg(p){
     if(p.keepalive) return;
     if(p.delta) cb.onDelta(p.delta);
+    else if(p.reasoning && cb.onReasoning) cb.onReasoning(p.reasoning);
     else if(p.tool_progress) cb.onTool(p.tool_progress);
     else if(p.error) cb.onError(p.error);
     else if(p.info) cb.onInfo(p.info);
@@ -7518,6 +7837,7 @@ function streamChatSSE(payload, cb){
   function handleEvent(p){
     if(p.tool_progress) cb.onTool(p.tool_progress);
     else if(p.delta) cb.onDelta(p.delta);
+    else if(p.reasoning && cb.onReasoning) cb.onReasoning(p.reasoning);
     else if(p.error) cb.onError(p.error);
     else if(p.info) cb.onInfo(p.info);
     else if(p.usage) cb.onUsage && cb.onUsage(p.usage);
@@ -7575,6 +7895,7 @@ function streamChatXhr(payload, cb){
     function handleXhr(p){
       if(p.tool_progress) cb.onTool(p.tool_progress);
       else if(p.delta) cb.onDelta(p.delta);
+      else if(p.reasoning && cb.onReasoning) cb.onReasoning(p.reasoning);
       else if(p.error) cb.onError(p.error);
       else if(p.info) cb.onInfo(p.info);
     }
@@ -7596,7 +7917,26 @@ function chatStop(){
   if(_msgState.abortCtrl) _msgState.abortCtrl.abort();
 }
 
-/* 附件上传 */
+/* 附件上传（Profile 隔离：profile=当前 Agent，存 profiles/<agent>/uploads/） */
+function uploadAttachment(f, url){
+  var fd = new FormData();
+  fd.append('file', f);
+  fd.append('profile', window.currentAgent || 'default');
+  var hdrs = {}; if(monitorToken) hdrs['X-Monitor-Token']=monitorToken;
+  return fetch(apiUrl(url), { method:'POST', body:fd, headers:hdrs })
+    .then(function(r){ return r.json(); })
+    .then(function(out){
+      if(out && !out.error && out.url){
+        _pendingAttachments.push({ url:out.url, type:f.type, name:(f.name || 'file') });
+        renderAttachChips();
+        autoResize(document.getElementById('chatInput'));
+        return true;
+      }
+      toast('上传失败：'+(out && out.error || '未知错误'));
+      return false;
+    })
+    .catch(function(){ toast('上传失败，无法连接后端'); return false; });
+}
 function attachFile(){
   var inp = document.createElement('input'); inp.type='file'; inp.style.display='none';
   document.body.appendChild(inp);
@@ -7604,16 +7944,9 @@ function attachFile(){
     var f = inp.files[0];
     if(!f){ document.body.removeChild(inp); return; }
     var isImg = /^image\//.test(f.type);
-    var fd = new FormData(); fd.append('file', f);
-    var url = apiUrl(isImg ? '/api/chat/upload-image' : '/api/chat/upload-file');
-    var hdrs = {}; if(monitorToken) hdrs['X-Monitor-Token']=monitorToken;
-    fetch(url, { method:'POST', body:fd, headers:hdrs })
-      .then(function(r){ return r.json(); })
-      .then(function(out){
-        if(out && !out.error && out.url){ _pendingAttachments.push({ url:out.url, type:f.type, name:f.name }); toast('附件已添加：'+f.name); renderAttachChips(); autoResize(document.getElementById('chatInput')); }
-        else { toast('上传失败：'+(out&&out.error||'未知错误')); }
-      })
-      .catch(function(){ toast('上传失败，无法连接后端'); });
+    uploadAttachment(f, isImg ? '/api/chat/upload-image' : '/api/chat/upload-file').then(function(ok){
+      if(ok) toast('附件已添加：'+f.name);
+    });
     document.body.removeChild(inp);
   };
   inp.click();
@@ -7638,39 +7971,27 @@ function removeAttach(i){
   autoResize(document.getElementById('chatInput'));
 }
 
-/* 聊天输入框粘贴图片（Ctrl+V 直接贴图发送）
- * - 检测到图片则阻止默认粘贴（避免把文件名/字节塞进文本框），并复用附件上传通道
- * - 纯文本粘贴不拦截，保持原样
- * - 支持一次粘贴多张图片 */
+/* 聊天输入框粘贴图片/文件（Ctrl+V）
+ * - 图片 → upload-image（Profile 隔离）
+ * - 其他文件（如剪贴板文件复制）→ upload-file
+ * - 纯文本不拦截，保持原样 */
 function onChatPaste(e){
   var cd = (e && e.clipboardData) || window.clipboardData || null;
   if(!cd || !cd.items) return;            // 无剪贴板数据：交给浏览器默认行为
-  // 先同步收集所有图片文件，避免 items 在异步回调中失效
+  // 先同步收集所有文件，避免 items 在异步回调中失效
   var files = [];
   for(var i=0;i<cd.items.length;i++){
     var it = cd.items[i];
-    if(it.kind === 'file' && /^image\//.test(it.type || '')){
+    if(it.kind === 'file'){
       var f = it.getAsFile();
       if(f) files.push(f);
     }
   }
-  if(!files.length) return;              // 纯文本/非图片：不拦截，允许默认粘贴
-  e.preventDefault();                     // 检测到图片：阻止文本域写入原始数据
+  if(!files.length) return;              // 纯文本：不拦截，允许默认粘贴
+  e.preventDefault();                     // 检测到文件：阻止文本域写入原始数据
   files.forEach(function(f){
-    var fd = new FormData(); fd.append('file', f);
-    var hdrs = {}; if(monitorToken) hdrs['X-Monitor-Token'] = monitorToken;
-    fetch(apiUrl('/api/chat/upload-image'), { method:'POST', body:fd, headers:hdrs })
-      .then(function(r){ return r.json(); })
-      .then(function(out){
-        if(out && !out.error && out.url){
-          _pendingAttachments.push({ url:out.url, type:f.type, name:(f.name || 'pasted.png') });
-          renderAttachChips();
-          autoResize(document.getElementById('chatInput'));
-        } else {
-          toast('图片上传失败：'+(out && out.error || '未知错误'));
-        }
-      })
-      .catch(function(){ toast('图片上传失败'); });
+    var isImg = /^image\//.test(f.type || '');
+    uploadAttachment(f, isImg ? '/api/chat/upload-image' : '/api/chat/upload-file');
   });
 }
 
@@ -8239,9 +8560,21 @@ function invokeSelectedConnector(){
     });
 }
 var _selectedModelMap = (function(){ try{ var s=localStorage.getItem('hermes_selected_model_map'); return s?JSON.parse(s):{}; }catch(e){ return {}; } })();
+// 无当前会话时选择的模型暂存于此，会话创建后自动绑定（修复：新建会话前选模型被丢弃的问题）
+var _pendingModel = '';
 function _getSessionModel(sid){ return _selectedModelMap[sid||currentSession] || ''; }
-function _setSessionModel(sid, val){ if(!sid) sid=currentSession; if(!sid) return; if(val){ _selectedModelMap[sid]=val; } else { delete _selectedModelMap[sid]; } try{ localStorage.setItem('hermes_selected_model_map', JSON.stringify(_selectedModelMap)); }catch(e){} }
+function _setSessionModel(sid, val){ if(!sid) sid=currentSession; if(!sid){ if(val) _pendingModel = val; return; } if(val){ _selectedModelMap[sid]=val; } else { delete _selectedModelMap[sid]; } try{ localStorage.setItem('hermes_selected_model_map', JSON.stringify(_selectedModelMap)); }catch(e){} }
+// 会话创建成功后调用：把暂存的模型绑定到新会话（若该会话尚未绑定过模型）
+function _applyPendingModel(sid){
+  if(_pendingModel && sid && !_selectedModelMap[sid]){
+    _selectedModelMap[sid] = _pendingModel;
+    _pendingModel = '';
+    try{ localStorage.setItem('hermes_selected_model_map', JSON.stringify(_selectedModelMap)); }catch(e){}
+    _syncModelBtn();
+  }
+}
 function clearSessionModel(){
+  _pendingModel = '';
   _setSessionModel(currentSession, '');
   _selectedModel = '';
   var b=document.getElementById('btnModel');
@@ -8332,6 +8665,7 @@ function switchPage(name){
   if(name==='cron') renderCronJobs();
   if(name==='memory') renderMemoryPage();
   if(name==='learning') renderLearning();
+  if(name==='usage') renderUsagePage();
   if(name==='overview') renderOverview();
   if(name==='models') renderProviders();
   if(name==='extensions') renderExtensions();
