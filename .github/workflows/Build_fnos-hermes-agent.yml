@@ -113,19 +113,20 @@ jobs:
 
       # 8.5 追加小写 icon.png 到 fpk
       # （fnpack 白名单只打包大写 ICON.PNG，而 fnOS 部分界面按小写 icon.png 查找图标，
-      # 导致安装对话框/应用中心图标缺失；fpk 是压缩 tar，不能直接 -rf 追加，需解包重打）
+      # 导致安装对话框/应用中心图标缺失；fpk 是 gzip 压缩 tar，需解包后压缩重打，
+      # 保持 gzip 格式 + 文件 owner 为 root）
       - name: Append lowercase icon to fpk
         run: |
           cd "$GITHUB_WORKSPACE"
           FPK="dist/fnos-${{ env.APP_NAME }}_v${{ steps.target_version.outputs.target_version }}.fpk"
           [ -f icon.png ] || cp ICON.PNG icon.png
           WORKDIR=$(mktemp -d)
-          tar -xf "$FPK" -C "$WORKDIR" || exit 1
+          tar -xzf "$FPK" -C "$WORKDIR" || exit 1
           cp icon.png "$WORKDIR/icon.png"
-          tar -cf "$FPK" -C "$WORKDIR" $(ls -A "$WORKDIR") || exit 1
+          tar -czf "$FPK" --owner=0 --group=0 -C "$WORKDIR" $(ls -A "$WORKDIR") || exit 1
           rm -rf "$WORKDIR"
           echo "fpk 内图标条目："
-          tar -tf "$FPK" | grep -i icon
+          tar -tzf "$FPK" | grep -i icon
 
       # 9. 准备 Release 说明
       - name: Generate release notes
