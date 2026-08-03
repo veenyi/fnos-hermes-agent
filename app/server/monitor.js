@@ -1819,13 +1819,68 @@ const wsClients = new Map(); // session_id → ws
 async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) {
   const sendJSON = (obj) => { try { ws.send(JSON.stringify(obj)); } catch {} };
 
+  // 关键修复：检查是否已有同一会话的流在运行或已完成（WS 重连场景）
+  // 如果有，等待已有流完成并返回缓存结果，避免重复请求 LLM
+  const existingCache = _streamResultCache.get(sessionId);
+  if (existingCache) {
+    if (existingCache.status === 'done') {
+      log(`[WS] cache hit (done) session=${sessionId}, sending cached result`);
+      // 直接发送缓存的完整结果
+      if (existingCache.reply) {
+        const chunkSize = 200;
+        for (let i = 0; i < existingCache.reply.length; i += chunkSize) {
+          sendJSON({ delta: existingCache.reply.slice(i, i + chunkSize) });
+          await new Promise(r => setTimeout(r, 5));
+        }
+      }
+      if (existingCache.tools && existingCache.tools.length) {
+        existingCache.tools.forEach(t => sendJSON({ tool_progress: t }));
+      }
+      sendJSON({ done: true });
+      try { ws.close(1000); } catch {}
+      return;
+    }
+    if (existingCache.status === 'running') {
+      log(`[WS] cache hit (running) session=${sessionId}, waiting for existing stream...`);
+      sendJSON({ info: '正在等待之前的回复完成…' });
+      const result = await new Promise(resolve => {
+        existingCache.waiters.push(resolve);
+        setTimeout(() => resolve(null), 60000); // 60 秒超时
+      });
+      if (result && result.status === 'done') {
+        log(`[WS] cache wait done session=${sessionId}, reply len=${result.reply.length}`);
+        if (result.reply) {
+          const chunkSize = 200;
+          for (let i = 0; i < result.reply.length; i += chunkSize) {
+            sendJSON({ delta: result.reply.slice(i, i + chunkSize) });
+            await new Promise(r => setTimeout(r, 5));
+          }
+        }
+        if (result.tools && result.tools.length) {
+          result.tools.forEach(t => sendJSON({ tool_progress: t }));
+        }
+        sendJSON({ done: true });
+        try { ws.close(1000); } catch {}
+        return;
+      }
+      log(`[WS] cache wait timeout session=${sessionId}, starting new stream`);
+    }
+    if (existingCache.status === 'error') {
+      log(`[WS] cache hit (error) session=${sessionId}`);
+      sendJSON({ error: existingCache.error || 'Previous stream failed' });
+      sendJSON({ done: true });
+      try { ws.close(1000); } catch {}
+      return;
+    }
+  }
+
   const stopCtrl = new AbortController();
   ws.data.stopCtrl = stopCtrl;
   activeChatStreams.set(sessionId, stopCtrl);
   wsClients.set(sessionId, ws);
   sendJSON({ info: '正在思考…' });
 
-  // 注册流结果缓存：WS 断开后 SSE fallback 可复用
+  // 注册流结果缓存：WS 断开后 SSE fallback / WS 重连可复用
   const cacheEntry = { status: 'running', reply: '', tools: [], error: '', waiters: [], ws: ws };
   _streamResultCache.set(sessionId, cacheEntry);
 
