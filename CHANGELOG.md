@@ -16,7 +16,10 @@
 - **pptx 预览缺正文**：段落文本在 `a:p`（drawingml 命名空间）而非 `p:p`。修复：按 drawingml 命名空间遍历。
 - **会话窗口切换模型不生效**：Hermes 网关 `/v1/chat/completions` 会忽略请求里的 model 字段，始终按 config.yaml 的 `model.default` 执行，导致选了新模型仍用旧模型回复。修复：会话选模型时 monitor 直接热改写网关 config.yaml 的 `model.provider/default`（实测网关每次请求热加载、无需重启，保留完整 agent 工具能力），并保持文件原 owner；改写失败时回退直连 provider。同时修复模块级代码误用 handleFetch 内嵌套的 `_yamlBlockOf`（ReferenceError 被静默吞掉）与原正则 `\Z` 被 JS 当字面量 Z 导致 providers 块截断的问题。
 - **测试 zip 生成脚本**：local/central header 字段错位（name length/compressed size/CRC）导致 BadZipFile/CRC 校验失败。
-- **热更新/检查更新可能拉到旧 release**：`releases?per_page=1` 按 created_at 排序，重建过的旧 release 会排在前面。修复：改为拉取列表后按 `published_at` 选最新已发布 release。
+- **热更新检查更新可能拉到旧 release**：`releases?per_page=1` 按 created_at 排序，重建过的旧 release 会排在前面。修复：改为拉取列表后按 `published_at` 选最新已发布 release。
+- **安装包缺少图标**：fnOS `trim_app_center` 前端按小写 `icon.png` 查找图标，包内只有大写 `ICON.PNG`。修复：仓库增加小写 `icon.png` 副本一并打包。
+- **应用中心版本号显示重复（"0.21.23 0.21.23"）**：CI 构建时 sed 正则只替换到等号，旧版本号残留在行尾。修复：改为整行替换。
+- **安装新版本后 UI 仍显示旧版本号**：`@appdata` 数据目录不随卸载清除，残留的 `app_version` 覆盖文件（旧版本）被优先读取。修复：`install_init` 安装前清理残留覆盖文件，同时版本读取改为取所有候选中的最高版本。
 
 ---
 
