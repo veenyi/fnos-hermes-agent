@@ -1,4 +1,20 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.12)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.23)
+
+---
+
+# v0.21.23 — 终端 PTY 修复 + Profile 隔离上传/下载/预览（对齐 Studio）
+
+### 新功能
+- **终端真实 PTY**：新增 `server/pty_bridge.py`（pty.openpty + setsid + TIOCSCTTY），修复 `bash: cannot set terminal process group / no job control`，Ctrl+C、前后台任务（jobs/fg/bg）、vim 等全屏程序全部可用；支持 resize 控制帧（TIOCSWINSZ + SIGWINCH）。
+- **Profile 隔离文件上传**：上传文件按 `profiles/<profile>/uploads/images|files/` 隔离存储，剪贴板图片/文件粘贴、工作区附件均带 Profile；附件 URL 为 `/uploads/p/<profile>/...`。
+- **文件下载**：`GET /api/download?path=` 按解析后的真实路径下载用户上传文件与 Agent 生成文件，兼容 local/Docker/SSH/Singularity 等 terminal backend；附件命名 `filename*=UTF-8''`。
+- **文件预览**：`GET /api/preview?path=` 支持 HTML/PDF/图片流式预览与文本类（≤8MB）；`GET /api/preview/office` 用 `server/preview_conv.py` 将 DOCX/XLSX/PPTX 服务端转为 HTML（零第三方依赖）。
+
+### 问题修复
+- **pty_bridge 丢命令**：控制帧与用户输入同批到达时 `continue` 丢弃剩余输入，首批命令丢失。修复：解析完控制帧后将剩余内容转发给 PTY。
+- **xlsx 预览空单元格**：`inlineStr` 单元格的 `<t>` 在 `<is>` 内，`find` 查不到。修复：改用 `c.get("t")` 判断类型 + `iter` 取文本。
+- **pptx 预览缺正文**：段落文本在 `a:p`（drawingml 命名空间）而非 `p:p`。修复：按 drawingml 命名空间遍历。
+- **测试 zip 生成脚本**：local/central header 字段错位（name length/compressed size/CRC）导致 BadZipFile/CRC 校验失败。
 
 ---
 
