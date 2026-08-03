@@ -10594,9 +10594,9 @@ function renderSkillGraph(container, skills, relations){
     var ang = (2*Math.PI*ci)/Math.max(1,catKeys.length) - Math.PI/2;
     var bcx = W/2 + Math.cos(ang)*Math.min(W,H)*0.28, bcy = H/2 + Math.sin(ang)*Math.min(W,H)*0.28;
     catIndex[c].forEach(function(s, i){
-      var radius = 9 + Math.sqrt((s.usage_count||1)/maxUsage)*20;
+      var radius = 3 + Math.sqrt((s.usage_count||1)/maxUsage)*3;
       nodes.push({ id:s.id, name:s.name||s.id, category:s.category||'other', usage:s.usage_count||0, skill:s,
-        x: bcx + (Math.random()-0.5)*90, y: bcy + (Math.random()-0.5)*90, vx:0, vy:0, fx:null, fy:null, r:radius });
+        x: bcx + (Math.random()-0.5)*50, y: bcy + (Math.random()-0.5)*50, vx:0, vy:0, fx:null, fy:null, r:radius });
     });
   });
   var nodeMap = {}; nodes.forEach(function(n){ nodeMap[n.id]=n; });
@@ -10632,15 +10632,15 @@ function renderSkillGraph(container, skills, relations){
   nodes.forEach(function(n){
     var g=document.createElementNS(NS,'g'); g.setAttribute('class','learn-node'); g.setAttribute('data-id',n.id);
     var shadow=document.createElementNS(NS,'ellipse');
-    shadow.setAttribute('rx',n.r*0.9); shadow.setAttribute('ry',n.r*0.32); shadow.setAttribute('fill','rgba(0,0,0,.16)');
-    shadow.setAttribute('cx','0'); shadow.setAttribute('cy',String(n.r+5));
+    shadow.setAttribute('rx',n.r*0.8); shadow.setAttribute('ry',n.r*0.3); shadow.setAttribute('fill','rgba(0,0,0,.12)');
+    shadow.setAttribute('cx','0'); shadow.setAttribute('cy',String(n.r+3));
     var c=document.createElementNS(NS,'circle');
     c.setAttribute('r',n.r); c.setAttribute('fill','url(#lg-'+n.category+')');
-    c.setAttribute('stroke',_shadeHex(_learnColor(n.category),-0.25)); c.setAttribute('stroke-width','1');
+    c.setAttribute('stroke',_shadeHex(_learnColor(n.category),-0.25)); c.setAttribute('stroke-width','0.5');
     g.appendChild(shadow); g.appendChild(c);
-    if(n.r>=16){
+    if(n.r>=4){
       var t=document.createElementNS(NS,'text');
-      t.setAttribute('text-anchor','middle'); t.setAttribute('y',String(n.r+18));
+      t.setAttribute('text-anchor','middle'); t.setAttribute('y',String(n.r+10));
       t.setAttribute('font-size','11'); t.setAttribute('fill','var(--text2)');
       t.textContent = n.name.length>12 ? n.name.slice(0,12)+'…' : n.name;
       g.appendChild(t);
@@ -10668,7 +10668,7 @@ function renderSkillGraph(container, skills, relations){
         dx=b.x-a.x; dy=b.y-a.y; d2=dx*dx+dy*dy;
         if(d2<1){ dx=(Math.random()-0.5); dy=(Math.random()-0.5); d2=1; }
         d=Math.sqrt(d2);
-        f = 2200/d2 * alpha;
+        f = 600/d2 * alpha;
         var fx=dx/d*f, fy=dy/d*f;
         a.vx-=fx; a.vy-=fy; b.vx+=fx; b.vy+=fy;
       }
@@ -10676,7 +10676,7 @@ function renderSkillGraph(container, skills, relations){
     // 连线弹簧
     edges.forEach(function(e){
       dx=e.b.x-e.a.x; dy=e.b.y-e.a.y; d=Math.sqrt(dx*dx+dy*dy)||1;
-      var rest = 70 + e.a.r + e.b.r;
+      var rest = 30 + e.a.r + e.b.r;
       f = (d-rest)*0.015*alpha;
       e.a.vx += dx/d*f; e.a.vy += dy/d*f;
       e.b.vx -= dx/d*f; e.b.vy -= dy/d*f;
