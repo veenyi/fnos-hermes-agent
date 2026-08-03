@@ -1,9 +1,8 @@
 {
-  "version": "0.21.7",
-  "base_version": "0.21.6",
-  "description": "v0.21.7 热更新包：修复单实例守卫导致应用无法启动（改为接管式）、框架 stop/安装/升级脚本残留进程清理",
+  "version": "0.21.8",
+  "base_version": "0.21.7",
+  "description": "v0.21.8 热更新包：修复进入更新页后侧边栏「更新」图标丢失（检查更新函数误读全局 event 抹掉导航按钮 SVG）",
   "files": [
-    { "path": "server/monitor.js" },
     { "path": "ui/index.html" }
   ]
 }
