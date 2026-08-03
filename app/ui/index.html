@@ -6217,11 +6217,12 @@ function closeTab(sid) {
 
 /* 新建会话并打开为标签 */
 function newTab() {
-  // 团队模式启用时，新会话强制归入 team 分组（不受 currentAgent 瞬态影响）
+  // 团队模式或工作流启用时，新会话强制归入 team 分组
   var ext = _cfg.extensions || {};
   var teamActive = ext.team_enabled && ext.team && ext.team.length;
-  var aid = teamActive ? 'team' : (currentAgent || 'default');
-  if (teamActive) { ensureAgent('team', { name: ext.team_name || '我的团队', icon: '👥' }); currentAgent = 'team'; }
+  var wfActive = ext.workflow && ext.workflow.enabled && ext.workflow.steps && ext.workflow.steps.length;
+  var aid = (teamActive || wfActive) ? 'team' : (currentAgent || 'default');
+  if (teamActive || wfActive) { ensureAgent('team', { name: ext.team_name || ext.workflow.name || '我的团队', icon: wfActive ? '⚙️' : '👥' }); currentAgent = 'team'; }
   fetch(apiUrl('/api/sessions'), { method: 'POST', headers: monitorToken ? { 'X-Monitor-Token': monitorToken } : {} })
     .then(function (r) { return r.json(); })
     .then(function (s) {
@@ -7200,11 +7201,12 @@ function sendRaw(text){
   }
 
   if(!currentSession){
-    // 团队模式启用时，自动创建的会话也归入 team 分组
+    // 团队模式或工作流启用时，自动创建的会话归入 team 分组
     var _ext = _cfg.extensions || {};
     var _teamOn = _ext.team_enabled && _ext.team && _ext.team.length;
-    var _aid = _teamOn ? 'team' : (currentAgent || 'default');
-    if (_teamOn) { ensureAgent('team', { name: _ext.team_name || '我的团队', icon: '👥' }); currentAgent = 'team'; }
+    var _wfOn = _ext.workflow && _ext.workflow.enabled && _ext.workflow.steps && _ext.workflow.steps.length;
+    var _aid = (_teamOn || _wfOn) ? 'team' : (currentAgent || 'default');
+    if (_teamOn || _wfOn) { ensureAgent('team', { name: _ext.team_name || _ext.workflow.name || '我的团队', icon: _wfOn ? '⚙️' : '👥' }); currentAgent = 'team'; }
     fetch(apiUrl('/api/sessions'), { method:'POST', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
       .then(function(r){ return r.json(); })
       .then(function(s){ _sessions.unshift(s); currentSession=s.id; setSessionAgent(s.id, _aid); _openTabs.push(s.id); persistTabs(); renderSessionTabs(); renderRail(); updateHeader(); doStream(); })
