@@ -1,7 +1,7 @@
 {
-  "version": "0.21.10",
-  "base_version": "0.21.9",
-  "description": "v0.21.10 热更新包：修复 WebSocket 通话断连（自动重连+流结果缓存+SSE 降级复用），保证回答完整性",
+  "version": "0.21.11",
+  "base_version": "0.21.10",
+  "description": "v0.21.11 热更新：修复 WS 重连重复请求 + 安装包图标 + 版本号显示",
   "files": [
     { "path": "server/monitor.js" },
     { "path": "ui/index.html" }
