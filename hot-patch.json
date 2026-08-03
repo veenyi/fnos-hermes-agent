@@ -1,9 +1,8 @@
 {
-  "version": "0.21.11",
-  "base_version": "0.21.10",
-  "description": "v0.21.11 热更新：修复 WS 重连重复请求 + 安装包图标 + 版本号显示",
+  "version": "0.21.12",
+  "base_version": "0.21.11",
+  "description": "v0.21.12 热更新：修复工作流/专家团模式未生效（模板变量替换 + 执行规则强化）",
   "files": [
-    { "path": "server/monitor.js" },
     { "path": "ui/index.html" }
   ]
 }
