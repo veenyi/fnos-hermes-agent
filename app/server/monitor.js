@@ -3821,29 +3821,36 @@ async function handleFetch(req) {
     return "";
   }
 
+  // 获取「最新发布」的 release：按 published_at 排序而非 created_at。
+  // （releases?per_page=1 按 created_at 倒序，重建过的旧 release 会排在前面，导致热更拉到旧版本）
+  async function fetchLatestPublishedRelease(headers) {
+    const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=30`, {
+      signal: AbortSignal.timeout(15000), headers,
+    });
+    if (!r.ok) return { data: null, status: r.status };
+    const list = await r.json();
+    const published = (Array.isArray(list) ? list : []).filter(x => !x.draft && x.published_at);
+    if (!published.length) return { data: null, status: r.status };
+    published.sort((a, b) => String(b.published_at).localeCompare(String(a.published_at)));
+    return { data: published[0], status: r.status };
+  }
+
   if (path === "/api/app/update/check") {
     try {
       const pat = getGitHubPAT();
       const headers = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
       if (pat) headers["Authorization"] = `Bearer ${pat}`;
 
-      // 优先用 /releases?per_page=1：有 PAT 时能看到 draft，无 PAT 也能取到最新已发布版本
-      let r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=1`, {
-        signal: AbortSignal.timeout(15000),
-        headers,
-      });
-      let data;
+      // 优先按 published_at 取最新已发布 release（避免 created_at 排序导致拉到重建的旧 release）
+      let { data, status: firstStatus } = await fetchLatestPublishedRelease(headers);
       let rateLimited = false;
-      if (r.ok) {
-        const list = await r.json();
-        data = (Array.isArray(list) && list[0]) || null;
-      } else if (r.status === 401 || r.status === 403) {
+      if (!data && (firstStatus === 401 || firstStatus === 403)) {
         // 401/403 = PAT 无效或 GitHub API 限流（无 PAT 时 60次/小时）
         rateLimited = true;
       }
       // 兜底：未认证或没有 release 时尝试 /releases/latest
       if (!data && !rateLimited) {
-        r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+        const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
           signal: AbortSignal.timeout(15000),
           headers,
         });
@@ -3932,12 +3939,9 @@ async function handleFetch(req) {
       const ghHeaders = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
       if (pat) ghHeaders["Authorization"] = `Bearer ${pat}`;
 
-      // 1. 获取最新 release
-      let r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=1`, {
-        signal: AbortSignal.timeout(15000), headers: ghHeaders,
-      });
-      let relData;
-      if (r.ok) { const list = await r.json(); relData = (Array.isArray(list) && list[0]) || null; }
+      // 1. 获取最新已发布 release（按 published_at，避免拉到重建的旧 release）
+      const hpRes = await fetchLatestPublishedRelease(ghHeaders);
+      const relData = hpRes.data;
       if (!relData) return new Response(JSON.stringify({ ok: false, error: "无法获取 Release 信息" }), { status: 502, headers: jsonHeaders() });
 
       // 2. 找 hot-patch.json asset
