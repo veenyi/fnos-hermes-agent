@@ -65,11 +65,12 @@ jobs:
           fnpack || true
           echo "fnpack 已安装并可用"
 
-      # 6. 更新 manifest 版本号
+      # 6. 更新 manifest 版本号（整行替换：旧正则 s/^version.*=/.../ 只匹配到等号，
+      # 旧版本号会残留在行尾，导致应用中心显示 "0.21.23 0.21.23" 重复版本号）
       - name: Update manifest version
         run: |
           VERSION="${{ steps.target_version.outputs.target_version }}"
-          sed -i "s/^version.*=/version       = $VERSION/" ${{ env.MANIFEST_FILE }} || exit 1
+          sed -i -E "s/^version[[:space:]]*=.*/version               = $VERSION/" ${{ env.MANIFEST_FILE }} || exit 1
           echo "Updated manifest:"
           grep "^version" ${{ env.MANIFEST_FILE }}
 
