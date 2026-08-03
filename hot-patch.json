@@ -1,7 +1,7 @@
 {
-  "version": "0.21.14",
-  "base_version": "0.21.13",
-  "description": "v0.21.14 热更新：缩小学习记忆知识图谱节点（大球→小圆点）",
+  "version": "0.21.15",
+  "base_version": "0.21.14",
+  "description": "v0.21.15 热更新：Token 用量移至独立页面，左侧新增用量菜单",
   "files": [
     { "path": "ui/index.html" }
   ]
