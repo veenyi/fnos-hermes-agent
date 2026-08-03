@@ -7089,7 +7089,7 @@ function sendChat(){
 /* 统一 system 注入点：专家 / 专家团（决策 3）
  * 团队启用 → 优先拼接团队多智能体上下文；否则单专家 → 追加一条 system message（不替换 persona）。
  * 所有专家/专家团注入只走这一处。 */
-function injectExpertSystem(sys){
+function injectExpertSystem(sys, userMessage){
   if(!sys) sys='';
   var ext=_cfg.extensions||{};
   // ⓪ 工作流最高优先：启用且有步骤时，注入 DAG 编排上下文，让 AI 按工作流执行
@@ -7103,15 +7103,33 @@ function injectExpertSystem(sys){
       wl.push('输入变量：');
       wf.inputs.forEach(function(inp){ wl.push('  - '+inp.name+'：'+(inp.description||'')+(inp.required?'（必填）':'')); });
     }
+    // 构建变量替换表：{{request}} → 用户消息，{{context}} → 空
+    var varMap = { '{{request}}': (userMessage||''), '{{context}}': '' };
     wl.push('');
-    wl.push('执行步骤（按依赖顺序）：');
+    wl.push('执行步骤（按依赖顺序，每个步骤的完整任务指令如下）：');
     wf.steps.forEach(function(s,i){
       var dep=(s.depends_on&&s.depends_on.length)?'（依赖：'+s.depends_on.join(', ')+'）':'';
-      wl.push('  '+(i+1)+'. ['+s.id+'] 专家='+(s.expert||'自动分配')+'  输出变量='+(s.output||'无')+' '+dep);
-      if(s.task) wl.push('     任务：'+s.task.replace(/\n/g,'\n     '));
+      wl.push('');
+      wl.push('  ── 步骤 '+(i+1)+'：['+s.id+'] ──');
+      wl.push('  专家：'+(s.expert||'自动分配')+'  输出变量：'+(s.output||'无')+' '+dep);
+      if(s.task){
+        // 替换模板变量 {{request}} / {{context}} 为实际值，中间变量（如 {{ceo_decision}}）保留为占位符
+        var resolvedTask = s.task;
+        Object.keys(varMap).forEach(function(k){
+          resolvedTask = resolvedTask.split(k).join(varMap[k]);
+        });
+        wl.push('  任务指令：');
+        resolvedTask.split('\n').forEach(function(line){ wl.push('    '+line); });
+      }
     });
     wl.push('');
-    wl.push('请严格按照上述 DAG 工作流执行：将用户消息视为输入变量，按依赖顺序逐步派发子智能体完成各步骤，最终汇总所有步骤输出给出完整结果。使用任务委派（delegation）工具并行/顺序调度各专家。');
+    wl.push('═══════ 执行规则（必须严格遵守）═══════');
+    wl.push('1. 你是工作流编排者，必须使用 delegate_task（任务委派）工具按上述 DAG 依赖顺序逐步执行每个步骤。');
+    wl.push('2. 对于没有依赖的步骤（depends_on 为空），可以并行派发 delegate_task。');
+    wl.push('3. 对于有依赖的步骤，必须等依赖步骤的 delegate_task 全部返回后，将输出结果填入对应变量（如 {{ceo_decision}}），再派发下一步。');
+    wl.push('4. 每次 delegate_task 的 instruction 必须包含对应步骤的完整"任务指令"内容，并将其中仍存在的 {{变量名}} 替换为已获得的实际值。');
+    wl.push('5. 所有步骤完成后，汇总各步骤输出，给出完整的最终结果。');
+    wl.push('6. 严禁跳过 delegate_task 直接自己作答。必须真实调用 delegate_task 派发子智能体执行每个步骤。');
     return sys + '\n' + wl.join('\n');
   }
   // ① 专家团优先
@@ -7201,7 +7219,7 @@ function sendRaw(text){
     _tabStreaming[sid] = true; renderSessionTabs();
     var sys = _personaPrompt || '';
     if(_activeSkills.length){ sys += '\n\n【已启用技能】请在本轮对话中优先使用以下技能：'+_activeSkills.join('、')+'。'; }
-    sys = injectExpertSystem(sys);
+    sys = injectExpertSystem(sys, text);
     var payload = {
       session_id: sid,
       message: buildMessageContent(text, attachments),
