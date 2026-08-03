@@ -1,4 +1,14 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.10)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.11)
+
+---
+
+# v0.21.11 — 修复 WS 重连重复请求 + 安装包图标 + 版本号显示
+
+### 问题修复
+- **WS 重连时重复请求 LLM**：v0.21.10 的 WS 自动重连功能中，客户端重连后服务器会启动新的 `runChatWS`（不检查缓存），导致同一会话发起两次 LLM 请求。修复：`runChatWS` 入口检查 `_streamResultCache`，若同一会话的流正在运行则等待其完成并返回缓存结果，若已完成则直接发送缓存结果，避免重复请求。
+- **安装包图标丢失**：manifest 缺少 `icon` 字段，导致 fnOS 应用中心安装时不显示图标。修复：manifest 添加 `icon = ICON.PNG`。
+- **版本号显示两次**：应用中心显示 "0.21.10 0.21.10"，因 `app_version` 覆盖文件与 manifest 版本被重复读取。已清理覆盖文件。
+- **UI 显示旧版本号**：`/vol1/@appdata/hermes-agent/app_version` 覆盖文件未随 fpk 更新，导致 UI 仍显示 v0.21.9。热更新现已正确更新该文件。
 
 ---
 
