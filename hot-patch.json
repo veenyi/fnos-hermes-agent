@@ -1,7 +1,7 @@
 {
-  "version": "0.21.13",
-  "base_version": "0.21.12",
-  "description": "v0.21.13 热更新：修复工作流会话未归入'我的团队'分组",
+  "version": "0.21.14",
+  "base_version": "0.21.13",
+  "description": "v0.21.14 热更新：缩小学习记忆知识图谱节点（大球→小圆点）",
   "files": [
     { "path": "ui/index.html" }
   ]
