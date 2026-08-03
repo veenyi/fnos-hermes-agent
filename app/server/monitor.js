@@ -1,5 +1,5 @@
 // Hermes Agent 监控服务 — 基于 Node.js 的 HTTP 服务（Unix Socket），WebSocket 由 ws 库提供
-import { spawn, spawnSync, execSync } from "child_process";
+import { spawn, spawnSync, execSync, execFile } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, readdirSync, createReadStream, openSync, rmSync, copyFileSync } from "fs";
@@ -889,6 +889,111 @@ function getActiveProvider() {
   return cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
 }
 
+// 读取 Hermes 网关当前配置的 provider/model（网关始终用此配置跑 agent，
+// 会忽略请求里的 model 字段）。用于判断会话级选择的模型能否经网关获得工具调用能力。
+// 注意：monitor 的 DATA_DIR 与网关实际 HERMES_HOME 可能不同（如 @appdata vs @apphome），
+// 因此依次扫描候选路径，取第一个含 model 段的 config.yaml。
+function readGatewayModelConfig() {
+  const candidates = [];
+  try { if (existsSync(HERMES_CONFIG)) candidates.push(HERMES_CONFIG); } catch {}
+  try {
+    // 网关进程多以系统用户家目录为 HERMES_HOME（如 /vol1/@apphome/<user>/data）
+    const passwd = readFileSync("/etc/passwd", "utf8");
+    for (const line of passwd.split("\n")) {
+      const m = line.match(/^(hermes[^:]*|fn_hermes[^:]*):[^:]*:[^:]*:[^:]*:[^:]*:([^:]+):/);
+      if (m && m[2]) {
+        candidates.push(`${m[2]}/data/config.yaml`);
+        candidates.push(`${m[2]}/.hermes/config.yaml`);
+      }
+    }
+  } catch {}
+  for (const p of candidates) {
+    try {
+      if (!existsSync(p)) continue;
+      const yml = readFileSync(p, "utf8");
+      const blockMatch = yml.match(/^model:[ \t]*\n((?:[ \t]+[^\n]*\n?)+)/m);
+      if (!blockMatch) continue;
+      const block = blockMatch[1];
+      const pm = block.match(/^[ \t]+provider:[ \t]*(\S+)/m);
+      const dm = block.match(/^[ \t]+default:[ \t]*(\S+)/m);
+      const provider = pm ? pm[1].replace(/^["']|["']$/g, "") : "";
+      const model = dm ? dm[1].replace(/^["']|["']$/g, "") : "";
+      if (provider || model) return { provider, model };
+    } catch { /* 继续尝试下一个候选 */ }
+  }
+  return null;
+}
+
+// 定位网关路由索引文件（sessions.json，legacy mirror of gateway_routing 表）。
+// 网关实际 HERMES_HOME 可能与 monitor 的 DATA_DIR 不同（如 @appdata vs @apphome），
+// 因此依次扫描候选路径，返回第一个存在的位置。
+function _gatewayRoutingPath() {
+  const candidates = [];
+  try { candidates.push(`${DATA_DIR}/sessions/sessions.json`); } catch {}
+  try {
+    const passwd = readFileSync("/etc/passwd", "utf8");
+    for (const line of passwd.split("\n")) {
+      const m = line.match(/^(hermes[^:]*|fn_hermes[^:]*):[^:]*:[^:]*:[^:]*:[^:]*:([^:]+):/);
+      if (m && m[2]) {
+        candidates.push(`${m[2]}/data/sessions/sessions.json`);
+        candidates.push(`${m[2]}/.hermes/sessions/sessions.json`);
+      }
+    }
+  } catch {}
+  for (const p of candidates) {
+    try { if (existsSync(p)) return p; } catch {}
+  }
+  return null;
+}
+
+// 从网关路由索引提取指定平台的全部 chat_id（key 形如 agent:main:weixin:dm:<chat_id>）。
+// 用于把通道级模型/系统提示写入网关唯一认的 channel_overrides[chat_id]。
+function _gatewayChatIds(platformId) {
+  try {
+    const p = _gatewayRoutingPath();
+    if (!p) return [];
+    const raw = readFileSync(p, "utf8");
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return [];
+    const re = new RegExp("^agent:main:" + String(platformId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ":(dm|group|supergroup|thread):(.+)$");
+    const ids = [];
+    for (const k of Object.keys(data)) {
+      const m = k.match(re);
+      if (m && m[2]) ids.push(m[2]);
+    }
+    return [...new Set(ids)];
+  } catch (e) { return []; }
+}
+
+// 定时同步通道级模型覆盖：网关 0.19 的 PlatformConfig 只认 channel_overrides（按 chat_id），
+// 不认 platforms.<id>.model/profile 字段。因此凡配置了通道模型/系统提示的平台，
+// 都要把覆盖同步到该平台全部已知 chat_id（含保存后新增的会话）。
+function _syncChannelOverrides() {
+  try {
+    for (const chId of Object.keys(CHANNEL_DEFS)) {
+      const cfg = _readPlatformConfig(chId);
+      const model = cfg.model ? String(cfg.model).trim() : "";
+      const sysPrompt = (cfg.system_prompt != null) ? String(cfg.system_prompt).trim() : "";
+      if (!model && !sysPrompt) continue;
+      const chatIds = _gatewayChatIds(chId);
+      if (!chatIds.length) continue;
+      const ov = (cfg.channel_overrides && typeof cfg.channel_overrides === "object") ? cfg.channel_overrides : {};
+      let changed = false;
+      chatIds.forEach(cid => {
+        const cur = (ov[cid] && typeof ov[cid] === "object") ? ov[cid] : {};
+        if (model && cur.model !== model) { cur.model = model; changed = true; }
+        if (sysPrompt && cur.system_prompt !== sysPrompt) { cur.system_prompt = sysPrompt; changed = true; }
+        ov[cid] = cur;
+      });
+      if (changed) {
+        cfg.channel_overrides = ov;
+        cfg.updated_at = Date.now();
+        _writeHermesConfig(_setPlatformConfig(chId, cfg));
+        log(`[ChannelOverride] 已同步 ${chId} 通道模型覆盖到 ${chatIds.length} 个会话 (model=${model}${sysPrompt ? " +sys_prompt" : ""})`);
+      }
+    }
+  } catch (e) {}
+}
 // 根据前端会话级选择（modelOverride = { model, provider }）解析本次对话实际使用的 provider 列表。
 // 若用户在会话窗口选了具体模型/供应商，则优先用它（并覆盖该 provider 的默认 model），不走全局回退链；
 // 否则回退到全局 active_provider + fallback_providers。
@@ -999,17 +1104,36 @@ function resolveChatProviders(cfg, modelOverride) {
     if (sel && sel.base_url) {
       const effective = Object.assign({}, sel);
       if (modelOverride.model) effective.model = modelOverride.model;
-      log(`[ModelRoute] session override → provider=${effective.id} model=${effective.model} base=${effective.base_url}`);
+      // 关键修复：若所选 provider/model 与 Hermes 网关当前配置一致，则经网关路由，
+      // 获得完整 agent 能力（工具调用/命令执行）；直连 provider 只是裸补全，无法执行工具。
+      const gcfg = readGatewayModelConfig();
+      const provMatches = gcfg && (String(effective.id) === gcfg.provider || PROVIDER_HERMES_IDS[effective.id] === gcfg.provider);
+      // 放宽：只要所选 provider 与网关配置一致（模型由网关 agent 按 config.yaml 执行），
+      // 即经网关路由获得完整工具能力；否则直连只是裸补全（无工具，只能输出命令让用户手动执行）
+      if (provMatches) {
+        effective.viaGateway = true;
+        log(`[ModelRoute] session override → provider=${effective.id} model=${effective.model} via GATEWAY (agent tools enabled)`);
+      } else {
+        log(`[ModelRoute] session override → provider=${effective.id} model=${effective.model} base=${effective.base_url} (direct, no tools)`);
+      }
       return [effective];
     }
     log(`[ModelRoute] WARNING: could not resolve provider "${modelOverride.provider}" - falling back to default`);
   }
   const primary = cfg.providers.find(p => p.name === cfg.active_provider) || cfg.providers[0];
-  const allProviders = [primary];
+  const allProviders = [Object.assign({}, primary)];
+  // v0.21.2+ 修复：默认对话同样经网关 agent 路由（直连 provider 无工具，
+  // AI 只能输出命令让用户手动执行；经网关才有完整 agent 工具能力）
+  const _gcfg = readGatewayModelConfig();
+  const _provMatch = _gcfg && (String(allProviders[0].id) === _gcfg.provider || PROVIDER_HERMES_IDS[allProviders[0].id] === _gcfg.provider);
+  if (_provMatch) {
+    allProviders[0].viaGateway = true;
+    log(`[ModelRoute] default provider="${allProviders[0].name}" → via GATEWAY (agent tools enabled)`);
+  }
   if (cfg.fallback_providers && cfg.fallback_providers.length > 0) {
     for (const fbName of cfg.fallback_providers) {
       const fb = cfg.providers.find(p => p.name === fbName);
-      if (fb && primary && fb.name !== primary.name) allProviders.push(fb);
+      if (fb && primary && fb.name !== primary.name) allProviders.push(Object.assign({}, fb));
     }
   }
   return allProviders;
@@ -1043,7 +1167,7 @@ function deleteSession(id) {
   if (existsSync(f)) unlinkSync(f);
 }
 
-function createSSEParser(onDelta, onDone, onError, onToolEvent, onUsage) {
+function createSSEParser(onDelta, onDone, onError, onToolEvent, onUsage, onReasoning) {
   let buffer = "";
   let currentEvent = "";
   let toolData = {};
@@ -1125,6 +1249,10 @@ function createSSEParser(onDelta, onDone, onError, onToolEvent, onUsage) {
           if (json.error) { onError(typeof json.error === 'string' ? json.error : (json.error.message || JSON.stringify(json.error))); return; }
           const delta = json.choices?.[0]?.delta?.content || "";
           if (delta) onDelta(delta);
+          // 推理模型（deepseek-v4-flash 等）：思考内容在 reasoning_content 字段，
+          // 必须转发给前端，否则 UI 一直等不到 content 而卡死
+          const _rd = json.choices?.[0]?.delta?.reasoning_content || "";
+          if (_rd && onReasoning) onReasoning(_rd);
           if (json.usage && onUsage) onUsage(json.usage);
         } catch {
           // 忽略非 JSON 行
@@ -1160,6 +1288,8 @@ function createSSEParser(onDelta, onDone, onError, onToolEvent, onUsage) {
               if (json.error) { onError(typeof json.error === 'string' ? json.error : (json.error.message || JSON.stringify(json.error))); return; }
               const delta = json.choices?.[0]?.delta?.content || "";
               if (delta) onDelta(delta);
+              const _rd2 = json.choices?.[0]?.delta?.reasoning_content || "";
+              if (_rd2 && onReasoning) onReasoning(_rd2);
               if (json.usage && onUsage) onUsage(json.usage);
             } catch {}
           }
@@ -1220,6 +1350,10 @@ async function fetchGatewayModels(provider) {
 }
 
 function resolveProviderBase(provider) {
+  // 会话级模型选择与网关配置一致时，一律经网关（保留 agent 工具调用能力）
+  if (provider && provider.viaGateway) {
+    return GATEWAY_API.replace(/\/$/, "");
+  }
   // 会话级模型切换：若用户选了非 Gateway 的 provider，直接请求该 provider 的 API（绕过 Gateway）
   // 这样不同窗口选不同模型才能真正生效；Gateway 仅用于默认 provider（保留工具调用能力）
   if (provider && provider.base_url && provider.base_url !== "LOCAL" && provider.id !== "hermes") {
@@ -1313,6 +1447,25 @@ function resolveRealApiKey(provider) {
   } catch { return null; }
 }
 
+// 推理模型判断：思考内容（reasoning_content）会大量占用输出 token，
+// 若 max_tokens 被思考占满，content 永远为空 → UI 卡死（v0.21.2+ 会话选模型的根因）。
+function isReasoningModel(provider) {
+  if (!provider) return false;
+  const model = String(provider.model || "").toLowerCase();
+  if (Array.isArray(provider.models) && model && model !== "auto") {
+    const hit = provider.models.find(m => String(m.id || m.name || "").toLowerCase() === model);
+    if (hit && typeof hit.supports_reasoning === "boolean") return hit.supports_reasoning;
+  }
+  return /deepseek-v4|deepseek-r1|deepseek-reasoner|reasoner|o1|o3|kimi-k2|glm-4\.6|glm-5|qwen3|qwen-r1|think/i.test(model);
+}
+function resolveMaxTokens(provider) {
+  if (isReasoningModel(provider)) {
+    // 推理模型：思考 + 正文至少要 16K 输出，避免思考占满 4096 后被截断
+    return Math.max(Number(provider.max_tokens) || 0, 16384);
+  }
+  return provider.max_tokens ?? 4096;
+}
+
 async function chatRequest(provider, message, history, reqSignal) {
   const providerBase = resolveProviderBase(provider);
   const isGateway = providerBase === GATEWAY_API.replace(/\/$/, "");
@@ -1341,7 +1494,7 @@ async function chatRequest(provider, message, history, reqSignal) {
       model: provider.model || "auto",
       messages: history,
       temperature: provider.temperature ?? 0.7,
-      max_tokens: provider.max_tokens ?? 4096,
+      max_tokens: resolveMaxTokens(provider),
       stream: true,
       stream_options: { include_usage: true },
     }),
@@ -1360,17 +1513,89 @@ async function chatRequest(provider, message, history, reqSignal) {
 const MIME_BY_EXT = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
   webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp", ico: "image/x-icon",
+  // 文档/表格/演示
+  pdf: "application/pdf", doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // 文本/代码/Markdown
+  txt: "text/plain", md: "text/markdown", markdown: "text/markdown",
+  csv: "text/csv", json: "application/json", yaml: "text/yaml", yml: "text/yaml",
+  xml: "application/xml", log: "text/plain", ini: "text/plain", conf: "text/plain",
+  js: "text/javascript", mjs: "text/javascript", cjs: "text/javascript", ts: "text/plain",
+  tsx: "text/plain", jsx: "text/plain", py: "text/x-python", sh: "text/x-sh", bash: "text/x-sh",
+  c: "text/x-c", h: "text/x-c", cpp: "text/x-c", cc: "text/x-c", hpp: "text/x-c",
+  java: "text/x-java", go: "text/x-go", rs: "text/x-rust", rb: "text/x-ruby", php: "text/x-php",
+  html: "text/html", htm: "text/html", css: "text/css", sql: "text/x-sql",
+  zip: "application/zip", tar: "application/x-tar", gz: "application/gzip",
+  tgz: "application/gzip", rar: "application/vnd.rar", "7z": "application/x-7z-compressed",
+  mp3: "audio/mpeg", wav: "audio/wav", mp4: "video/mp4", mov: "video/quicktime",
+  webm: "video/webm",
 };
 function mimeFromPath(p) {
   const ext = (p.split(".").pop() || "").toLowerCase();
-  return MIME_BY_EXT[ext] || "image/png";
+  return MIME_BY_EXT[ext] || "application/octet-stream";
+}
+// 下载/预览时用于浏览器内联展示的类型白名单（其余强制附件下载）
+function isInlinePreviewType(p) {
+  const ext = (p.split(".").pop() || "").toLowerCase();
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "pdf", "html", "htm"].includes(ext)) return true;
+  const mime = MIME_BY_EXT[ext] || "";
+  return mime.startsWith("text/") || mime.startsWith("image/") || mime === "application/pdf";
 }
 function urlToUploadPath(url) {
   if (!url) return null;
+  // 工作区附加文件：前端以 /api/download?path=<绝对路径> 引用，这里解析回真实路径
+  if (url.startsWith("/api/download?path=")) {
+    let qs = url.slice("/api/download?path=".length);
+    try { qs = decodeURIComponent(qs); } catch {}
+    const p = qs.split("&")[0];
+    if (!p) return null;
+    const fp = resolveFilePath(p);
+    return fp || (p.startsWith("/") ? p : null);
+  }
+  // Profile 隔离上传：/uploads/p/<profile>/images|files/xxx
+  if (url.startsWith("/uploads/p/")) {
+    const rest = url.slice("/uploads/p/".length);
+    const slash = rest.indexOf("/");
+    if (slash > 0) {
+      const profile = rest.slice(0, slash);
+      const sub = rest.slice(slash + 1);
+      if (sub.startsWith("images/")) return `${DATA_DIR}/profiles/${profile}/uploads/images/${sub.slice("images/".length)}`;
+      if (sub.startsWith("files/")) return `${DATA_DIR}/profiles/${profile}/uploads/files/${sub.slice("files/".length)}`;
+    }
+  }
   if (url.startsWith("/uploads/images/")) return `${UPLOAD_IMG_DIR}/${url.slice("/uploads/images/".length)}`;
   if (url.startsWith("/uploads/files/")) return `${UPLOAD_FILE_DIR}/${url.slice("/uploads/files/".length)}`;
   if (url.startsWith("/uploads/")) return `${UPLOAD_DIR}/${url.slice("/uploads/".length)}`;
   return url;
+}
+// 下载/预览路径解析：支持绝对路径、~/ 相对 HOME、相对路径（以 DATA_DIR 为基准）、/uploads 别名
+function resolveFilePath(p, base = DATA_DIR) {
+  if (!p || typeof p !== "string") return null;
+  let s = p.trim();
+  if (!s) return null;
+  if (s.startsWith("/uploads/")) { const fp = urlToUploadPath(s); return existsSync(fp) ? fp : null; }
+  if (s.startsWith("~/")) s = `${base}/${s.slice(2)}`;
+  else if (s === "~") s = base;
+  else if (!s.startsWith("/")) s = `${base}/${s}`;
+  // 规范化，防止路径穿越
+  const norm = s.split("/").reduce((acc, seg) => {
+    if (seg === ".." || seg === ".") return acc;
+    acc.push(seg); return acc;
+  }, []).join("/");
+  if (!norm.startsWith("/")) return null;
+  try {
+    const st = statSync(norm);
+    if (!st.isFile()) return null;
+    return norm;
+  } catch { return null; }
+}
+function safeFilename(name) {
+  const n = String(name || "file").replace(/[\r\n\x00/\\]/g, "_").replace(/\.\.+/g, ".").slice(-180);
+  return n || "file";
 }
 async function normalizeMessage(message) {
   if (message == null) return "";
@@ -1726,6 +1951,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
                 } catch {}
                 sendJSON({ usage });
               },
+              (r) => { sendJSON({ reasoning: r }); },
             );
 
             const reader = upstream.body.getReader();
@@ -1864,6 +2090,13 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
         return;
       }
       log(`[WS] cache wait timeout session=${sessionId}, starting new stream`);
+      // 重连且无新消息时无法起新流，直接告知错误
+      if (message == null) {
+        sendJSON({ error: '等待上一轮回复超时，请重新发送消息' });
+        sendJSON({ done: true });
+        try { ws.close(1000); } catch {}
+        return;
+      }
     }
     if (existingCache.status === 'error') {
       log(`[WS] cache hit (error) session=${sessionId}`);
@@ -1872,6 +2105,15 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
       try { ws.close(1000); } catch {}
       return;
     }
+  }
+
+  // 重连场景但没有可用缓存（无新消息也无进行中/已完成的流）→ 告知并关闭
+  if (message == null) {
+    log(`[WS] reconnect without cache session=${sessionId}, closing`);
+    sendJSON({ error: '没有进行中的回复，请重新发送消息' });
+    sendJSON({ done: true });
+    try { ws.close(1000); } catch {}
+    return;
   }
 
   const stopCtrl = new AbortController();
@@ -1983,6 +2225,7 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
             } catch {}
             sendJSON({ usage });
           },
+          (r) => { sendJSON({ reasoning: r }); },
         );
 
         const reader = upstream.body.getReader();
@@ -4921,6 +5164,27 @@ async function handleFetch(req) {
         const v = body.config[p]; if (v != null) _setValByPath(cfg, p, v);
       });
     }
+    // 通道级模型/系统提示：网关只认 channel_overrides[chat_id]（platforms.<id>.model 会被忽略），
+    // 保存时同步到该平台全部已知 chat_id（新增会话由 _syncChannelOverrides 定时补齐）
+    const chModel = (body.config && body.config.model != null) ? String(body.config.model).trim() : "";
+    const chSysPrompt = (body.config && body.config.system_prompt != null) ? String(body.config.system_prompt).trim() : "";
+    if (chModel || chSysPrompt) {
+      const chatIds = _gatewayChatIds(id);
+      if (chatIds.length) {
+        const ov = (cfg.channel_overrides && typeof cfg.channel_overrides === "object") ? cfg.channel_overrides : {};
+        chatIds.forEach(cid => {
+          const cur = (ov[cid] && typeof ov[cid] === "object") ? ov[cid] : {};
+          if (chModel) cur.model = chModel; else delete cur.model;
+          if (chSysPrompt) cur.system_prompt = chSysPrompt; else delete cur.system_prompt;
+          if (Object.keys(cur).length) ov[cid] = cur; else delete ov[cid];
+        });
+        cfg.channel_overrides = ov;
+        log(`[ChannelOverride] 通道 ${id} 保存：模型覆盖已应用到 ${chatIds.length} 个会话`);
+      }
+    } else if (cfg.channel_overrides && typeof cfg.channel_overrides === "object" && !Object.keys(cfg.channel_overrides).length) {
+      // 用户清空模型/系统提示（跟随角色）→ 移除本功能写入的 channel_overrides
+      delete cfg.channel_overrides;
+    }
     cfg.updated_at = Date.now();
     _writeHermesConfig(_setPlatformConfig(id, cfg));
     return { ok: true };
@@ -7302,6 +7566,17 @@ async function handleFetch(req) {
     // system 字段携带 persona / 专家团提示，由 createChatStream 注入 system prompt，
     // 避免把人格提示拼进用户消息污染对话历史
     // model/provider 为会话级模型选择，由 resolveChatProviders 优先采用
+    // 关键修复：新消息到达时作废旧的已完成/失败缓存，防止重发时把上一轮的旧回复当成本轮结果返回
+    const _prevCache = _streamResultCache.get(session_id);
+    if (_prevCache) {
+      if (_prevCache.status === 'running') {
+        // 用户在流进行中又发了新消息 → 中断旧流，以新消息为准
+        const _prevCtrl = activeChatStreams.get(session_id);
+        if (_prevCtrl) { try { _prevCtrl.abort(); } catch {}
+          log(`[WS] new message arrived, aborting previous stream session=${session_id}`); }
+      }
+      _streamResultCache.delete(session_id);
+    }
     wsMessageQueue.set(session_id, { message, system: system || "", model: model || "", provider: provider || "" });
     // 30秒后自动清除（防止 WS 连接未建立导致泄漏）
     setTimeout(() => wsMessageQueue.delete(session_id), 30000);
@@ -7343,7 +7618,7 @@ async function handleFetch(req) {
     return new Response(JSON.stringify({ ok: false, error: "no active stream for this session" }), { headers: jsonHeaders() });
   }
 
-  // ─── 聊天：图片上传 API ─────────────────────────────────────────────────
+  // ─── 聊天：图片上传 API（Profile 隔离：profile 参数非空时存入 profiles/<p>/uploads）────
   if (path === "/api/chat/upload-image" && req.method === "POST") {
     // 安全：仅在 Gateway 存活时允许上传
     const gwPid = readPidSync(PID_GATEWAY);
@@ -7373,8 +7648,16 @@ async function handleFetch(req) {
       }
       const ext = SAFE_EXT[file.type] || "bin";
       const filename = randomBytes(16).toString("hex") + "." + ext;
-      writeFileSync(`${UPLOAD_IMG_DIR}/${filename}`, Buffer.from(buf));
-      return new Response(JSON.stringify({ url: `/uploads/images/${filename}`, path: `${UPLOAD_IMG_DIR}/${filename}` }), { headers: jsonHeaders() });
+      // Profile 隔离：profile 参数非空 → 存入该 profile 的 uploads 目录
+      const profile = String(form.get("profile") || "").replace(/[^\w.-]/g, "").slice(0, 64);
+      let imgDir = UPLOAD_IMG_DIR, urlBase = "/uploads/images/";
+      if (profile && profile !== "default") {
+        imgDir = `${DATA_DIR}/profiles/${profile}/uploads/images`;
+        urlBase = `/uploads/p/${profile}/images/`;
+      }
+      mkdirSync(imgDir, { recursive: true });
+      writeFileSync(`${imgDir}/${filename}`, Buffer.from(buf));
+      return new Response(JSON.stringify({ url: `${urlBase}${filename}`, path: `${imgDir}/${filename}`, profile: profile || "default" }), { headers: jsonHeaders() });
     } catch (err) {
       return new Response(JSON.stringify({ error: "Upload failed" }), { status: 500, headers: jsonHeaders() });
     }
@@ -7382,6 +7665,7 @@ async function handleFetch(req) {
 
   // ─── 聊天：通用文件上传 API（非图片附件，落盘到 Hermes home 下，让 Hermes
   //      自己用文件工具读取，而不是把全文本塞进 prompt 撑爆/卡死浏览器）──────────
+  //      Profile 隔离：profile 参数非空时存入 profiles/<p>/uploads，保持多 Agent 完全隔离
   if (path === "/api/chat/upload-file" && req.method === "POST") {
     const gwPid = readPidSync(PID_GATEWAY);
     if (!gwPid || !pidAliveSync(gwPid)) {
@@ -7403,22 +7687,133 @@ async function handleFetch(req) {
       }
       // 原始文件名做安全清洗，保留可读性（方便 Hermes/用户辨认），但去掉路径分隔符等危险字符
       const origName = (file.name || "file").toString();
-      const safeBase = origName.replace(/[/\\]/g, "_").replace(/\.\.+/g, ".").slice(-100) || "file";
+      const safeBase = safeFilename(origName);
       const filename = `${Date.now()}_${randomBytes(6).toString("hex")}_${safeBase}`;
-      const fullPath = `${UPLOAD_FILE_DIR}/${filename}`;
+      const profile = String(form.get("profile") || "").replace(/[^\w.-]/g, "").slice(0, 64);
+      let fileDir = UPLOAD_FILE_DIR, urlBase = "/uploads/files/";
+      if (profile && profile !== "default") {
+        fileDir = `${DATA_DIR}/profiles/${profile}/uploads/files`;
+        urlBase = `/uploads/p/${profile}/files/`;
+      }
+      mkdirSync(fileDir, { recursive: true });
+      const fullPath = `${fileDir}/${filename}`;
       writeFileSync(fullPath, Buffer.from(buf));
       return new Response(JSON.stringify({
-        url: `/uploads/files/${encodeURIComponent(filename)}`,
+        url: `${urlBase}${encodeURIComponent(filename)}`,
         path: fullPath,
         name: origName,
         size: buf.byteLength,
+        profile: profile || "default",
       }), { headers: jsonHeaders() });
     } catch (err) {
       return new Response(JSON.stringify({ error: "Upload failed" }), { status: 500, headers: jsonHeaders() });
     }
   }
 
-  // Dashboard 反代
+  // ─── 文件下载：按解析后的路径下载用户上传文件 / Agent 生成文件 ─────────────
+  // 路径解析兼容：绝对路径、~/ 相对 HOME、相对路径（DATA_DIR 基准）、/uploads 别名
+  // GET /api/download?path=xxx[&name=xxx] → 流式下载（Content-Disposition: attachment）
+  if (path === "/api/download" && req.method === "GET") {
+    try {
+      const p = url.searchParams.get("path") || "";
+      const fp = resolveFilePath(p);
+      if (!fp) {
+        return new Response(JSON.stringify({ error: `文件不存在或不可访问: ${p}` }), { status: 404, headers: jsonHeaders() });
+      }
+      const st = statSync(fp);
+      const name = safeFilename(url.searchParams.get("name") || decodeURIComponent(fp.split("/").pop() || "file"));
+      const mime = mimeFromPath(fp);
+      // 内联类型（图片/pdf/html/文本）用 inline，其余强制 attachment
+      const disposition = isInlinePreviewType(fp) ? "inline" : "attachment";
+      const stream = createReadStream(fp);
+      return new Response(stream, {
+        headers: {
+          "Content-Type": mime,
+          "Content-Length": String(st.size),
+          "Content-Disposition": `${disposition}; filename*=UTF-8''${encodeURIComponent(name)}`,
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": corsOrigin,
+        },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: `Download failed: ${err.message}` }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ─── 文件预览：返回可内联内容（图片/pdf/html 直接流，文本类 JSON 由前端渲染）────
+  // GET /api/preview?path=xxx → 图片/PDF/HTML 流式返回；文本类返回 {ok, content, mime, name}
+  if (path === "/api/preview" && req.method === "GET") {
+    try {
+      const p = url.searchParams.get("path") || "";
+      const fp = resolveFilePath(p);
+      if (!fp) {
+        return new Response(JSON.stringify({ error: `文件不存在或不可访问: ${p}` }), { status: 404, headers: jsonHeaders() });
+      }
+      const st = statSync(fp);
+      const ext = (fp.split(".").pop() || "").toLowerCase();
+      const name = decodeURIComponent(fp.split("/").pop() || "file");
+      // 图片 / PDF / HTML：直接流式返回（前端 iframe/img 引用）
+      if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "pdf", "html", "htm"].includes(ext)) {
+        const stream = createReadStream(fp);
+        return new Response(stream, {
+          headers: {
+            "Content-Type": mimeFromPath(fp),
+            "Content-Length": String(st.size),
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": corsOrigin,
+            "X-Preview-Name": encodeURIComponent(name),
+          },
+        });
+      }
+      // 文本类：>8MB 拒绝（前端只渲染小文本）
+      if (st.size > 8 * 1024 * 1024) {
+        return new Response(JSON.stringify({ ok: false, error: "文本文件过大（>8MB），请使用下载" }), { headers: jsonHeaders() });
+      }
+      const content = readFileSync(fp, "utf8");
+      return new Response(JSON.stringify({ ok: true, path: fp, name, mime: mimeFromPath(fp), content, size: st.size }), { headers: jsonHeaders() });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: `Preview failed: ${err.message}` }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ─── Office 预览：docx/xlsx/pptx → HTML（server/preview_conv.py，零依赖）────
+  // GET /api/preview/office?path=xxx → text/html
+  if (path === "/api/preview/office" && req.method === "GET") {
+    try {
+      const p = url.searchParams.get("path") || "";
+      const fp = resolveFilePath(p);
+      if (!fp) {
+        return new Response(JSON.stringify({ error: `文件不存在或不可访问: ${p}` }), { status: 404, headers: jsonHeaders() });
+      }
+      const ext = (fp.split(".").pop() || "").toLowerCase();
+      if (!["docx", "xlsx", "pptx"].includes(ext)) {
+        return new Response(JSON.stringify({ error: "仅支持 docx/xlsx/pptx" }), { status: 415, headers: jsonHeaders() });
+      }
+      const script = `${APP_DIR}/server/preview_conv.py`;
+      const pyBin = `${VENV_BIN}/python3`;
+      // 子进程运行转换脚本（避免阻塞事件循环）
+      const execFileP = (cmd, args) => new Promise((resolve) => {
+        execFile(cmd, args, { timeout: 30000, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
+          resolve({ err, stdout: String(stdout || ""), stderr: String(stderr || "") });
+        });
+      });
+      const r = await execFileP(pyBin, [script, fp]);
+      if (r.err || !r.stdout) {
+        log(`[preview/office] conv failed ${fp}: ${r.err?.message || r.stderr || "no output"}`);
+        return new Response(JSON.stringify({ error: "转换失败：" + (r.stderr || r.err?.message || "未知错误").slice(0, 200) }), { status: 500, headers: jsonHeaders() });
+      }
+      return new Response(r.stdout, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": corsOrigin,
+          "X-Preview-Name": encodeURIComponent(fp.split("/").pop() || "preview"),
+        },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: `Preview failed: ${err.message}` }), { status: 500, headers: jsonHeaders() });
+    }
+  }
   if (path.startsWith("/proxy/dashboard")) {
     const subPath = path.replace(/^\/proxy\/dashboard/, "") || "/";
     if (subPath.includes("..")) return new Response("Forbidden", { status: 403 });
@@ -7674,12 +8069,14 @@ function startServer() {
       }
       const sessionId = url.searchParams.get("session_id") || "";
       const _q = wsMessageQueue.get(sessionId);
-      if (!sessionId || !_q) {
+      if (!sessionId) {
         socket.write("HTTP/1.1 400 Bad Request\r\n\r\n"); socket.destroy(); return;
       }
-      wsMessageQueue.delete(sessionId);
+      // 允许无队列消息的连接（WS 断线重连场景：前端重连不会重新 POST，
+      // 此时 message=null，runChatWS 会从流缓存中继续取结果）
+      if (_q) wsMessageQueue.delete(sessionId);
       wss.handleUpgrade(req, socket, head, (ws) => {
-        ws.data = { sessionId, message: _q.message, system: _q.system || "", model: _q.model || "", provider: _q.provider || "", stopCtrl: null };
+        ws.data = { sessionId, message: _q ? _q.message : null, system: _q ? (_q.system || "") : "", model: _q ? (_q.model || "") : "", provider: _q ? (_q.provider || "") : "", stopCtrl: null };
         attachWsHandlers(ws);
       });
       return;
@@ -7715,26 +8112,37 @@ function startServer() {
       const cwd = url.searchParams.get("cwd") || DATA_DIR;
       wss.handleUpgrade(req, socket, head, (ws) => {
         log(`[TERMINAL] new session cwd=${cwd}`);
-        const shell = spawn("/bin/bash", ["-i"], {
-          cwd: existsSync(cwd) ? cwd : DATA_DIR,
-          env: { ...process.env, TERM: "xterm-256color", PS1: "\\u@\\h:\\w\\$ " },
-          stdio: ["pipe", "pipe", "pipe"],
+        // 真实 PTY：由 pty_bridge.py（pty.openpty + setsid + TIOCSCTTY）提供控制终端，
+        // 修复 pipe spawn 下 bash -i 报 “cannot set terminal process group / no job control”，
+        // Ctrl+C、前后台任务、vim 等全屏程序均可正常工作。
+        const pty = spawn(`${VENV_BIN}/python3`, [
+          `${APP_DIR}/server/pty_bridge.py`,
+          "--shell", "/bin/bash",
+          "--cwd", existsSync(cwd) ? cwd : DATA_DIR,
+        ], {
+          env: { ...process.env, TERM: "xterm-256color", LANG: "C.UTF-8" },
+          stdio: ["pipe", "pipe", "inherit"], // stderr 为 pty_bridge 日志，直接进 monitor 日志
         });
-        shell.stdout.on("data", (d) => { try { ws.send(JSON.stringify({ type: "output", data: d.toString() })); } catch {} });
-        shell.stderr.on("data", (d) => { try { ws.send(JSON.stringify({ type: "output", data: d.toString() })); } catch {} });
-        shell.on("close", (code) => { try { ws.send(JSON.stringify({ type: "exit", code })); ws.close(); } catch {} });
-        shell.on("error", (err) => { try { ws.send(JSON.stringify({ type: "output", data: `\r\n[ERROR] ${err.message}\r\n` })); } catch {} });
+        // PTY 输出可能含二进制（颜色/全屏程序），以二进制帧下发，前端做流式 UTF-8 解码
+        pty.stdout.on("data", (d) => { try { ws.send(d); } catch {} });
+        pty.on("close", (code) => { try { ws.send(JSON.stringify({ type: "exit", code })); ws.close(); } catch {} });
+        pty.on("error", (err) => { try { ws.send(JSON.stringify({ type: "output", data: `\r\n[ERROR] ${err.message}\r\n` })); } catch {} });
         ws.on("message", (msg) => {
           try {
             const data = JSON.parse(msg.toString());
-            if (data.type === "input" && shell.stdin.writable) shell.stdin.write(data.data);
-            if (data.type === "resize") { /* bash -i 不支持 resize，忽略 */ }
+            if (data.type === "input" && pty.stdin.writable) pty.stdin.write(data.data);
+            if (data.type === "resize" && pty.stdin.writable) {
+              // 以控制帧透传窗口尺寸 → pty_bridge 调 TIOCSWINSZ + SIGWINCH
+              const rows = Math.max(2, Math.min(parseInt(data.rows, 10) || 24, 32767));
+              const cols = Math.max(2, Math.min(parseInt(data.cols, 10) || 80, 32767));
+              pty.stdin.write(`\x1b[HERMES1\x1bRESIZE\x1b${rows};${cols}\x1b[HERMES2`);
+            }
           } catch {
-            // 纯文本输入
-            if (shell.stdin.writable) shell.stdin.write(msg.toString());
+            // 纯文本输入（向后兼容旧前端）
+            if (pty.stdin.writable) pty.stdin.write(msg.toString());
           }
         });
-        ws.on("close", () => { try { shell.kill("SIGHUP"); } catch {} });
+        ws.on("close", () => { try { pty.kill("SIGHUP"); } catch {} });
       });
       return;
     }
@@ -7873,4 +8281,10 @@ setInterval(() => {
     if (!hasReal) return;
     killForeignHermesProcesses();
   } catch (e) {}
+}, 60000);
+
+// 通道级模型覆盖同步（60s 一次）：把配置了模型/系统提示的平台的覆盖同步到网关路由索引中
+// 新增的 chat_id（新微信/新会话出现后也能自动应用通道模型，无需重新保存配置）
+setInterval(() => {
+  try { _syncChannelOverrides(); } catch (e) {}
 }, 60000);
