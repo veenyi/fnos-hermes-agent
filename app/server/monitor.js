@@ -4657,9 +4657,13 @@ async function handleFetch(req) {
   }
 
   // 替换/新增 config.yaml 顶层「列表」块（如 toolsets:）
-  // 通过 _setTopLevelBlock 写入：兼容 inline 与 block 形态，并清除重复顶层键
+  // 通过 _setTopLevelBlock 写入：兼容 inline 与 block 形态，并清除重复顶层键；
+  // 条目自动去重（防重复累积：残留顶格项 + 新项导致 toolsets 越写越长）
   function _setYamlListBlock(content, key, items){
-    const block = `${key}:\n` + items.map(it => `  - ${_yamlScalarSafe(it)}`).join("\n");
+    const uniq = [];
+    const seen = new Set();
+    (items || []).forEach(it => { const s = String(it).trim(); if (s && !seen.has(s)) { seen.add(s); uniq.push(s); } });
+    const block = `${key}:\n` + uniq.map(it => `  - ${_yamlScalarSafe(it)}`).join("\n");
     return _setTopLevelBlock(content, key, block);
   }
 
@@ -4787,10 +4791,12 @@ async function handleFetch(req) {
       if (_isTopLevelKey(line, key)) {
         const isFirst = (k === firstIdx);
         if (isFirst && !inserted && !removeOnly) { out.push(newBlock); inserted = true; }
-        // 跳过该顶层块的整段（block: 后续缩进行；inline: 仅本行）
+        // 跳过该顶层块的整段（block: 后续缩进行 + 顶格列表残留项；inline: 仅本行）
         if (line === key + ":") {
           let j = k + 1;
-          while (j < lines.length && (lines[j].startsWith(" ") || lines[j].startsWith("\t"))) j++;
+          // 缩进行是块的正常内容；顶格 "- item" 是历史残留的非法行（hermes 解析失败会
+          // 回退默认配置导致 "No inference provider configured"），一并跳过清除
+          while (j < lines.length && (lines[j].startsWith(" ") || lines[j].startsWith("\t") || /^-\s/.test(lines[j]))) j++;
           k = j - 1; // for 循环会执行 k++
         }
         continue;
@@ -4806,6 +4812,39 @@ async function handleFetch(req) {
     if (p === "~") return (process.env.HOME || process.env.USERPROFILE || "");
     if (p.startsWith("~/")) return (process.env.HOME || process.env.USERPROFILE || "") + p.slice(1);
     return p;
+  }
+
+  // ── 启动自愈：config.yaml 若被顶格残留/重复段写坏，hermes 解析失败会回退默认配置，
+  //    导致即使已配置模型也报 "No inference provider configured"。这里扫描并清除每个
+  //    顶层块内的顶格 "- item" 残留（非法 YAML），修复后网关重启即可恢复。 ──
+  function _repairConfigYaml(){
+    try {
+      const p = `${DATA_DIR}/config.yaml`;
+      if (!existsSync(p)) return false;
+      let yml = readFileSync(p, "utf8");
+      const lines = yml.split("\n");
+      const out = [];
+      let removed = 0;
+      for (let k = 0; k < lines.length; k++){
+        const line = lines[k];
+        if (/^[a-zA-Z_][a-zA-Z0-9_-]*:$/.test(line)){
+          out.push(line);
+          let j = k + 1;
+          while (j < lines.length && (lines[j].startsWith(" ") || lines[j].startsWith("\t"))) j++;
+          while (j < lines.length && /^-\s/.test(lines[j])) { removed++; j++; }
+          k = j - 1;
+          continue;
+        }
+        out.push(line);
+      }
+      if (removed > 0){
+        try { writeFileSync(p + ".pre-repair.bak", yml, { mode: 0o644 }); } catch (e) {}
+        writeFileSync(p, out.join("\n"), { mode: 0o644 });
+        log(`[config-repair] config.yaml 已修复：清除 ${removed} 行顶格残留（原文件备份 .pre-repair.bak）`);
+        return true;
+      }
+    } catch (e) { log("[config-repair] error: " + e.message); }
+    return false;
   }
   function _baseName(p){ return (p || "").split("/").filter(Boolean).pop() || ""; }
   function _dirName(p){ const a = (p || "").split("/").filter(Boolean); a.pop(); return "/" + a.join("/"); }
@@ -8274,6 +8313,13 @@ function startServer() {
   server.listen({ path: SOCKET_PATH }, () => {
     try { chmodSync(SOCKET_PATH, 0o777); } catch {}
     log(`Monitor ready — unix:${SOCKET_PATH} (base=${BASE_PATH || "/"}) | dashboard proxied at /proxy/dashboard/`);
+    // 启动自愈 config.yaml（顶格残留修复）；修复后 maybeAutoStartServices 会用干净配置拉起网关
+    const repaired = _repairConfigYaml();
+    if (repaired) {
+      // 配置曾被写坏：确保网关用修复后的配置重启（若已在运行则重启一次）
+      const gp = readPid(PID_GATEWAY);
+      if (gp && existsSync(`/proc/${gp}`)) { _triggerGatewayRestart("config-repair"); }
+    }
     // 若已存在模型配置，自动启动 Gateway/Dashboard（覆盖安装/升级后无需手动点启动）
     setTimeout(() => maybeAutoStartServices(), 2500);
   });
