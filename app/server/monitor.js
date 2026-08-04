@@ -3525,6 +3525,40 @@ function serveFile(filePath, contentType, opts) {
   return new Response(stream, { headers });
 }
 
+// ── 启动自愈：config.yaml 若被顶格残留/重复段写坏，hermes 解析失败会回退默认配置，
+//    导致即使已配置模型也报 "No inference provider configured"。这里扫描并清除每个
+//    顶层块内的顶格 "- item" 残留（非法 YAML），修复后网关重启即可恢复。 ──
+// 注：必须定义在模块顶层（handleFetch 之外），供 server.listen 回调调用。
+function _repairConfigYaml(){
+  try {
+    const p = `${DATA_DIR}/config.yaml`;
+    if (!existsSync(p)) return false;
+    let yml = readFileSync(p, "utf8");
+    const lines = yml.split("\n");
+    const out = [];
+    let removed = 0;
+    for (let k = 0; k < lines.length; k++){
+      const line = lines[k];
+      if (/^[a-zA-Z_][a-zA-Z0-9_-]*:$/.test(line)){
+        out.push(line);
+        let j = k + 1;
+        while (j < lines.length && (lines[j].startsWith(" ") || lines[j].startsWith("\t"))) j++;
+        while (j < lines.length && /^-\s/.test(lines[j])) { removed++; j++; }
+        k = j - 1;
+        continue;
+      }
+      out.push(line);
+    }
+    if (removed > 0){
+      try { writeFileSync(p + ".pre-repair.bak", yml, { mode: 0o644 }); } catch (e) {}
+      writeFileSync(p, out.join("\n"), { mode: 0o644 });
+      log(`[config-repair] config.yaml 已修复：清除 ${removed} 行顶格残留（原文件备份 .pre-repair.bak）`);
+      return true;
+    }
+  } catch (e) { log("[config-repair] error: " + e.message); }
+  return false;
+}
+
 // ─── 请求处理器 ─────────────────────────────────────────────────────────
 async function handleFetch(req) {
   const url  = new URL(req.url);
@@ -4814,38 +4848,6 @@ async function handleFetch(req) {
     return p;
   }
 
-  // ── 启动自愈：config.yaml 若被顶格残留/重复段写坏，hermes 解析失败会回退默认配置，
-  //    导致即使已配置模型也报 "No inference provider configured"。这里扫描并清除每个
-  //    顶层块内的顶格 "- item" 残留（非法 YAML），修复后网关重启即可恢复。 ──
-  function _repairConfigYaml(){
-    try {
-      const p = `${DATA_DIR}/config.yaml`;
-      if (!existsSync(p)) return false;
-      let yml = readFileSync(p, "utf8");
-      const lines = yml.split("\n");
-      const out = [];
-      let removed = 0;
-      for (let k = 0; k < lines.length; k++){
-        const line = lines[k];
-        if (/^[a-zA-Z_][a-zA-Z0-9_-]*:$/.test(line)){
-          out.push(line);
-          let j = k + 1;
-          while (j < lines.length && (lines[j].startsWith(" ") || lines[j].startsWith("\t"))) j++;
-          while (j < lines.length && /^-\s/.test(lines[j])) { removed++; j++; }
-          k = j - 1;
-          continue;
-        }
-        out.push(line);
-      }
-      if (removed > 0){
-        try { writeFileSync(p + ".pre-repair.bak", yml, { mode: 0o644 }); } catch (e) {}
-        writeFileSync(p, out.join("\n"), { mode: 0o644 });
-        log(`[config-repair] config.yaml 已修复：清除 ${removed} 行顶格残留（原文件备份 .pre-repair.bak）`);
-        return true;
-      }
-    } catch (e) { log("[config-repair] error: " + e.message); }
-    return false;
-  }
   function _baseName(p){ return (p || "").split("/").filter(Boolean).pop() || ""; }
   function _dirName(p){ const a = (p || "").split("/").filter(Boolean); a.pop(); return "/" + a.join("/"); }
   function _joinPath(a, b){ return (a || "").replace(/\/$/, "") + "/" + (b || "").replace(/^\//, ""); }
