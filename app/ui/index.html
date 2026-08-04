@@ -7660,7 +7660,7 @@ function sendRaw(text){
           meta.textContent = 'Hermes · '+fmtDateTime(Date.now())+' · ' + t + ' tokens';
         }
       },
-      onError: function(err){ mdEl.innerHTML = '<span class="error-text">⚠ '+esc(err)+'</span>'; if(statusEl){ statusEl.className='reply-status done'; statusEl.innerHTML='<span class="rs-icon">⚠️</span><span class="rs-text">回复出错</span>'; statusEl.style.color='var(--red)'; } _tabStreaming[sid]=false; renderSessionTabs(); _chatHTML[sid] = body.innerHTML; },
+      onError: function(err){ var _raw = String(err||''); var _needCfg = /No inference provider configured/i.test(_raw); var _html = _needCfg ? '⚠ 尚未配置模型服务：请先到「模型」页添加模型供应商并填写 API Key。<br><span style="font-size:11px;opacity:.8">（网关返回：'+esc(_raw)+'）</span>' : '⚠ '+esc(_raw); mdEl.innerHTML = '<span class="error-text">'+_html+'</span>' + (_needCfg ? '<div style="margin-top:8px"><button onclick="switchPage(\'models\')" style="padding:5px 12px;border-radius:8px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer;font-size:12px">去配置模型 →</button></div>' : ''); if(_needCfg) renderConfigBanner(); if(statusEl){ statusEl.className='reply-status done'; statusEl.innerHTML='<span class="rs-icon">⚠️</span><span class="rs-text">回复出错</span>'; statusEl.style.color='var(--red)'; } _tabStreaming[sid]=false; renderSessionTabs(); _chatHTML[sid] = body.innerHTML; },
       onDone: function(aborted){
         _tabStreaming[sid]=false; renderSessionTabs();
         mdEl.innerHTML = renderMarkdown(fullText) + (aborted ? ' <em>(已停止)</em>' : '');
@@ -8992,6 +8992,8 @@ function loadConfig(){
   return apiGet('/api/config').then(function(cfg){
     if(cfg && !cfg.error){
       _cfg = cfg;
+      // hermes 是否已配置模型（服务端判定：config.yaml 含 model/providers 段）
+      window.__hermesConfigured = (cfg.hermes_configured !== false);
       if(!_cfg.extensions) _cfg.extensions = { toolsets:{}, mcp_servers:[], skills_dirs:[], persona:'default', memory:{enabled:true,char_limit:2200}, team:[], team_name:'' };
       if(!_cfg.extensions.toolsets) _cfg.extensions.toolsets = {};
       if(!_cfg.extensions.memory) _cfg.extensions.memory = {enabled:true,char_limit:2200};
@@ -9020,9 +9022,16 @@ function loadConfig(){
         _agents = _cfg.extensions.agents.slice();
         if(!_agents.some(function(a){ return a.id==='default'; })) _agents.unshift({ id:'default', name:'默认主力助手', icon:'🤖', expertId:null });
       }
+      // 未配置模型时强制只保留默认分组：残留的专家/团队分组无意义，
+      // 且 saveAgents 回写 localStorage 后会顺便清掉浏览器端的旧残留
+      if(_cfg.hermes_configured === false){
+        _agents = [{ id:'default', name:'默认主力助手', icon:'🤖', expertId:null }];
+        _sessionAgent = {};
+      }
       if(_cfg.extensions.session_agent && typeof _cfg.extensions.session_agent==='object'){
         _sessionAgent = _cfg.extensions.session_agent;
       }
+      renderConfigBanner();
       _settingsLoaded = true;
       applySettingsToggles();
     } else {
@@ -9031,13 +9040,28 @@ function loadConfig(){
     return _cfg;
   }).catch(function(e){ toast('读取配置失败：'+e.message); return _cfg; });
 }
+/* 聊天页横幅：hermes 未配置模型时提示引导（点击跳「模型」页） */
+function renderConfigBanner(){
+  var chat = document.getElementById('page-chat');
+  if(!chat) return;
+  var old = document.getElementById('modelConfigBanner');
+  if(old && old.parentNode) old.parentNode.removeChild(old);
+  if(window.__hermesConfigured !== false) return;
+  var b = document.createElement('div');
+  b.id = 'modelConfigBanner';
+  b.style.cssText = 'margin:8px 14px 0;padding:10px 14px;border-radius:10px;background:var(--warn-banner-bg);border:1px solid var(--warn-banner-border);color:var(--warn-banner-text);font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;z-index:5';
+  b.innerHTML = '<span>⚠ 尚未配置模型服务，聊天暂时不可用。请先添加一个模型供应商并填写 API Key。</span>' +
+    '<button onclick="switchPage(\'models\')" style="margin-left:auto;padding:5px 12px;border-radius:8px;border:1px solid var(--warn-banner-border);background:transparent;color:var(--warn-banner-text);cursor:pointer;font-size:12px;white-space:nowrap">去配置模型 →</button>';
+  var bodyEl = chat.querySelector('.chat-body');
+  chat.insertBefore(b, bodyEl || chat.firstChild);
+}
 function saveConfig(){
   apiPost('/api/config', _cfg).catch(function(e){ console.error('saveConfig failed', e); });
 }
 function renderProviders(){
   var grid=document.getElementById('providerGrid'); if(!grid) return;
   var providers = _cfg.providers || [];
-  if(!providers.length){ grid.innerHTML='<div class="empty-state">暂无 Provider，点击右上角添加。</div>'; return; }
+  if(!providers.length){ grid.innerHTML='<div class="empty-state">'+(window.__hermesConfigured===false?'⚠ 尚未配置模型服务：点击右上角「添加」，选择一个模型供应商并填写 API Key 后即可使用。':'暂无 Provider，点击右上角添加。')+'</div>'; return; }
   var fallback = _cfg.fallback_providers || [];
   grid.innerHTML = providers.map(function(p, i){
     var pname = p.name || p.id || '未命名';

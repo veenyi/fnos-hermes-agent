@@ -5478,6 +5478,20 @@ async function handleFetch(req) {
         activeModel = modelMatch ? modelMatch[1] : "";
       }
 
+      // ── hermes 是否已配置模型：config.yaml 存在且含 model/providers 段 ──
+      // 全新安装/残留环境无此配置时，网关必报 "No inference provider configured"。
+      // 此时忽略残留的 providers-state（模型页不显示不可用的假 provider），
+      // 并清空 extensions 中的角色分组（左侧会话树不出现一堆残留条目）。
+      // 注：用 var 提升作用域，供本函数后续 safe 组装处读取。
+      var hermesConfigured = false;
+      try {
+        const _ymlPath = `${DATA_DIR}/config.yaml`;
+        if (existsSync(_ymlPath)) {
+          const _yml = readFileSync(_ymlPath, "utf8");
+          hermesConfigured = /^model:/m.test(_yml) && /^providers:/m.test(_yml);
+        }
+      } catch (e) {}
+
       // 读取控制面板专属 .env.providers 获取 API keys
       const envApiKeys = {};
       try {
@@ -5577,7 +5591,8 @@ async function handleFetch(req) {
       } catch (e) { provModelsMap = {}; }
 
       // ── 构建返回的 provider 列表 ────────────────────────────────────
-      Object.entries(provModelMap).forEach(([id, info]) => {
+      // 未配置 hermes 时跳过残留 provider 状态（全新环境不显示上一环境的假 provider）
+      if (hermesConfigured) Object.entries(provModelMap).forEach(([id, info]) => {
         const preset = PROVIDER_PRESETS[id];
         const isCustom = !preset;
         const savedName = (typeof info === "object" && info.name) ? info.name.trim() : "";
@@ -5632,6 +5647,7 @@ async function handleFetch(req) {
     const safe = {
       providers: visibleProviders,
       active_provider: activeProvName,
+      hermes_configured: hermesConfigured,
       fallback_providers: [],
       _version: CONFIG_VERSION,
       presets: Object.keys(PROVIDER_PRESETS).map(id => ({
@@ -5684,6 +5700,8 @@ async function handleFetch(req) {
         }
       }
       if (!ext.memory) ext.memory = { enabled: true, char_limit: 2200 };
+      // 未配置模型时清空残留的角色分组与会话→分组映射（全新环境左侧会话树保持干净）
+      if (!hermesConfigured) { ext.agents = []; ext.session_agent = {}; }
       safe.extensions = ext;
     } catch (e) {
       safe.extensions = { toolsets: {}, mcp_servers: [], skills_dirs: [], persona: "default" };
