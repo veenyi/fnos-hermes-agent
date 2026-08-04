@@ -1550,11 +1550,10 @@
     <div class="update-title">Hermes Agent 应用</div>
     <div class="update-ver">当前 <strong id="appCurrent">--</strong> · 最新 <strong id="appLatest">--</strong></div>
     <button class="ov-actbtn" onclick="checkAppUpdate(event)">检查更新</button>
-    <button class="ov-actbtn start" id="appHotPatchBtn" style="display:none" onclick="doHotPatch()">⚡ 热更新</button>
-    <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">完整安装</button>
+    <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">下载安装包 (.fpk)</button>
   </div>
 </div>
-<div class="update-gh"><a class="gh-button" href="https://github.com/veenyi/fnos-hermes-agent" target="_blank">GitHub 仓库 →</a></div>
+<div class="update-gh"><a class="gh-button" href="https://github.com/veenyi/fnos-hermes-agent/releases/latest" target="_blank">GitHub 下载页 →</a></div>
           </div>
         </section>
 
@@ -11721,15 +11720,14 @@ function confirmHermesUpdate(){
 function checkAppUpdate(evt){
   var btn=_resolveCheckBtn(evt); if(btn){btn.disabled=true;btn.textContent='检查中…';}
   apiGet('/api/app/update/check').then(function(data){
-    if(!data || data.error){ var b=document.getElementById('appUpdateBtn'); if(b) b.style.display='none'; var hb=document.getElementById('appHotPatchBtn'); if(hb) hb.style.display='none'; toast(data&&data.error?'检查失败：'+data.error:'检查应用更新失败'); return; }
+    if(!data || data.error){ var b=document.getElementById('appUpdateBtn'); if(b) b.style.display='none'; toast(data&&data.error?'检查失败：'+data.error:'检查应用更新失败'); return; }
     // 缓存更新信息供「完整安装」按钮使用（是否有 fpk 安装包/发布页链接）
-    window.__appUpdateInfo={ latest:data.latest||'', html_url:data.html_url||'', has_fpk:!!data.download_url };
+    window.__appUpdateInfo={ latest:data.latest||'', html_url:data.html_url||'', download_url:data.download_url||'' };
     var lat=document.getElementById('appLatest');
     if(data.rateLimited){
       // PAT 未配置或 GitHub 限流：显示提示，隐藏更新按钮
       if(lat) lat.textContent=data.hint||'无法检查更新';
       var btn2=document.getElementById('appUpdateBtn'); if(btn2) btn2.style.display='none';
-      var hbtn=document.getElementById('appHotPatchBtn'); if(hbtn) hbtn.style.display='none';
       toast(data.hint||'GitHub API 限流');
       return;
     }
@@ -11737,43 +11735,25 @@ function checkAppUpdate(evt){
       if(data.updateAvailable){
         lat.textContent='v'+data.latest;
         var btn3=document.getElementById('appUpdateBtn'); if(btn3) btn3.style.display='inline-flex';
-        var hbtn2=document.getElementById('appHotPatchBtn'); if(hbtn2) hbtn2.style.display=data.hot_patch_available?'inline-flex':'none';
-        toast('发现新版本：v'+data.latest+(data.hot_patch_available?' （支持热更新）':''));
+        toast('发现新版本：v'+data.latest+'，可点击「下载安装包」从 GitHub 获取');
       } else {
         lat.textContent='已是最新';
         var btn4=document.getElementById('appUpdateBtn'); if(btn4) btn4.style.display='none';
-        var hbtn3=document.getElementById('appHotPatchBtn'); if(hbtn3) hbtn3.style.display='none';
         toast('Hermes Agent 应用已是最新');
       }
     }
   }).catch(function(){ toast('检查应用更新失败'); }).finally(function(){ if(btn){btn.disabled=false;btn.textContent='检查更新';} });
 }
-function doHotPatch(){
-  if(!confirm('热更新仅下载并替换变更的应用文件（约几百KB），无需重装，完成后服务自动重启。确认执行？')) return;
-  toast('正在下载热更新包…');
-  apiPost('/api/app/hot-patch', {}).then(function(data){
-    if(!data || !data.ok){ toast('热更新失败：'+(data&&data.error||'未知错误')); return; }
-    toast(data.hint || '热更新完成');
-    if(data.need_restart){
-      setTimeout(function(){ location.reload(); }, 3000);
-    } else {
-      setTimeout(function(){ location.reload(); }, 1000);
-    }
-    var btn=document.getElementById('appHotPatchBtn'); if(btn) btn.style.display='none';
-    var btn2=document.getElementById('appUpdateBtn'); if(btn2) btn2.style.display='none';
-  }).catch(function(e){ toast('热更新请求失败：'+e.message); });
-}
 function confirmAppUpdate(){
-  // 完整安装 = 直接下载最新 .fpk 安装包，由用户在 fnOS 应用中心安装/覆盖（不在服务端自动替换文件）
+  // 完整安装：直接打开 GitHub 上最新 .fpk 安装包的下载地址（仓库公开，浏览器可直链下载），
+  // 下载完成后由用户在 fnOS「应用中心」手动安装/覆盖完成升级，不做服务端自动替换。
   var info=window.__appUpdateInfo||{};
-  if(info.has_fpk){
-    if(!confirm('完整安装将下载最新 .fpk 安装包，下载完成后请到 fnOS「应用中心」手动安装/覆盖以完成升级。继续？')) return;
-    toast('正在下载 v'+(info.latest||'最新')+' 安装包 (.fpk)…');
-    // 私有仓库浏览器无法直接下载，由后端认证中转下载
-    window.open('/api/app/update/fpk','_blank');
+  if(info.download_url){
+    toast('正在打开 GitHub 下载 v'+(info.latest||'最新')+' 安装包 (.fpk)…');
+    window.open(info.download_url,'_blank');
   } else {
-    toast('该版本暂无安装包直链，已打开 GitHub 发布页…');
-    window.open(info.html_url||'https://github.com/veenyi/fnos-hermes-agent/releases','_blank');
+    toast('未获取到安装包直链，已打开 GitHub 发布页…');
+    window.open(info.html_url||'https://github.com/veenyi/fnos-hermes-agent/releases/latest','_blank');
   }
 }
 
