@@ -549,6 +549,19 @@ hermes 0.20 网关不读 `platforms.<id>.profile` 字段（官方 dashboard 落�
 
 ---
 
+# v0.21.28–38（历史区间汇总）— 早期快速迭代（安装配置持久化 / profile 同步 / 网关重启提速）
+
+> 该区间为 v0.21.27（Hermes 0.20 升级）后的连续快速迭代，核心修复方向：
+
+- **v0.21.28**：`install_init` 配置路径修复（`TRIM_APPDEST` → `TRIM_PKGHOME`），根治「每次 FPK 安装后模型配置丢失」；新增 `_restoreProvidersState` 兜底重建
+- **v0.21.29**：profile 配置同步（`_setModelInConfig` 纯文本块级编辑替代 `hermes config set`）+ `newModel` 作用域修复
+- **v0.21.30**：网关停止/重启提速（`stop_process` 10s→3s、`stopPid` 5s→1.5s，状态持久化无需优雅退出）
+- **v0.21.31–38**：WebUI 与网关稳定性连续修复（专家/模型/API Key 弹窗、dashboard 兼容、圆桌与专家页迭代前奏）；每版本均含 FPK 包（pkg/ 目录），本区间未逐一保留独立日志
+
+---
+
+
+
 # v0.21.27 — Hermes 核心 0.20.0 升级 + WebUI 模型显示修复
 
 > 完整变更记录见 `CHANGELOG_v0.21.27.md`。要点：官方自 0.20.0 起停止 PyPI 分发，本包内置完整源码（`app/hermes-src`）editable 安装 + 预构建 web_dist/TUI bundle；monitor 适配 cron `--deliver`、版本日期、源码模式检查；实测修复 dashboard 前端加载（注入 `HERMES_WEB_DIST`）。WebUI：概览页新增「当前模型」卡片、`/status` 显示 Provider·模型、模型按钮/模型页卡片兜底显示全局默认模型（适配社区修复方案）。
