@@ -127,9 +127,6 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 ## 版本迭代
 
 
-### v0.22.x（Studio 系列）
-
-- **v0.22.1** — Studio P0：① **WebChat 语音对话**（v2026.8.3 语音能力落地）：麦克风录音→STT 转写→自动发送；助手回复服务端流式 TTS（`speak-stream`，int16 PCM 逐句播放、点击打断 barge-in）+ 整段 TTS 降级 + 浏览器兜底；自动朗读开关；语音设置弹窗（含试听）。② **Octop 风格欢迎页**：空会话 QUICK START 六宫格（总结文档/写邮件/解释代码/制定计划/翻译润色/头脑风暴）。③ **安全网关 tool_guard v1**：13 条危险命令拦截（rm -rf 根目录/dd 写盘/mkfs/关机/curl|sh/fork bomb 等）+ 身份证/手机号 PII 警告；`/api/studio/security` 开关（默认开启，持久化 data/studio/security.json）。完整记录见 `CHANGELOG_v0.22.1.md`。
 
 ### v0.21.x
 
