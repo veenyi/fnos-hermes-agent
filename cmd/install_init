@@ -3,6 +3,7 @@
 ### 安装前回调 — 清理残留进程和 socket，避免安装时权限设置失败
 
 TRIM_APPDEST="${TRIM_APPDEST:-/var/apps/hermes-agent}"
+TRIM_PKGHOME="${TRIM_PKGHOME:-/var/apps/hermes-agent/home}"
 TRIM_PKGVAR="${TRIM_PKGVAR:-/vol1/@appdata/hermes-agent}"
 LOG_FILE="${TRIM_PKGVAR}/info.log"
 
@@ -53,7 +54,7 @@ log_msg "app_version 覆盖文件清理完成"
 # （上一环境的 extensions.json / providers-state 等）会导致新装后左侧会话树
 # 出现一堆旧角色分组、模型页出现不可用的假 provider。
 # 仅清理配置类文件，保留 chat/ 会话历史与日志；升级安装（有 config.yaml）不动。
-if [ ! -f "${TRIM_APPDEST}/home/data/config.yaml" ]; then
+if [ ! -f "${TRIM_PKGHOME}/data/config.yaml" ]; then
     rm -f "${TRIM_PKGVAR}/extensions.json" \
           "${TRIM_PKGVAR}/providers-state.yaml" \
           "${TRIM_PKGVAR}/provider-models.json" \

@@ -27,3 +27,13 @@ Thumbs.db
 
 # Temp clone of upstream role repo (regenerated via gen_personas.py)
 _agency_clone/
+
+# Vendored upstream source (distributed via FPK, not in git)
+app/hermes-src/
+
+# FPK packages (distributed via GitHub Releases)
+pkg/
+
+# Local scratch/test files
+app/ui/_check*.js
+app/ui/_dup_test.js

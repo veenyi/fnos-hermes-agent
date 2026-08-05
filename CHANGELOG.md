@@ -1,4 +1,557 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.23)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.65)
+
+---
+
+
+
+# v0.21.65 — 手机端恢复「语音设置」按钮入口
+
+> 用户反馈：手机端打开设置看不到流式对话等语音开关。原因：v0.21.58 手机端精简时把输入工具栏的「语音设置」按钮（`#btnVoiceCfg`）一并隐藏了，而 v0.21.63/64 起语音对话模式、barge-in 打断、音色选择都在语音设置里配置，手机端失去入口。
+
+## 修复（仅 ui/index.html）
+
+- 移动端媒体查询的隐藏列表移除 `#btnVoiceCfg`：语音设置按钮在手机端恢复显示（输入工具栏齿轮），可打开语音对话模式 / 说话打断 / 音色 / 自动朗读等全部语音配置
+- 102 热更后服务健康
+
+---
+
+
+
+# v0.21.64 — 流式语音朗读（边生成边说话）+ Barge-in 说话打断（对齐官方 v2026.8.3 语音体验）
+
+> 用户引用官方 release 说明：Hermes 语音模式应支持「speaks clause-by-clause as the response streams」（回复流式生成时逐句朗读）+「interrupt it mid-sentence by just talking」（开口说话打断）。此前实现是回复完整生成后再整段朗读，无打断。
+
+## 实现（仅 ui/index.html，服务端 speak-stream 协议原生支持增量喂文本 + stop 打断）
+
+1. **流式语音朗读**（`_voiceStream*` 模块）：
+   - `onDelta` 收到流式文本增量 → 打开 speak-stream WS 后把增量持续喂给服务端（`{"text":增量}` 帧），服务端按句切分合成返回 PCM，前端 `voicePlayNext` 顺序播放 → **AI 生成一句、立刻朗读一句**（clause-by-clause）
+   - `onDone` 发 `{"done":true}` 收尾（剩余缓冲句子合成完自然结束）；`onError`/手动停止时 `_voiceStreamStop` 发 `{"stop":true}`
+   - 流式朗读未激活时（WS 失败等）回退原「整段朗读」
+2. **Barge-in 说话打断**（`_barge*` 模块）：
+   - 朗读开始时 `getUserMedia` 打开麦克风 + `AudioContext/AnalyserNode` 监听环境音量（120ms 轮询 RMS）
+   - 检测到用户说话（RMS>0.12）→ `_voiceBargeIn`：发 `{"stop":true}` 停止朗读 → 自动开始录音听用户（350ms 后 `startVoiceRecord`）→ 识别后发送，形成"你开口就插话"体验
+   - 语音设置新增「说话打断朗读（barge-in）」开关（`fnos-voice-barge`，默认开；关闭则不监听打断）
+3. **语音对话循环衔接**：流式朗读自然结束（WS onclose）触发 `_voiceChatMaybeRestart`，与 v0.21.63 语音对话模式打通（朗读完自动再录音）
+
+## 验证
+
+- index.html 3 个内联脚本语法通过；逻辑单测 3/3 PASS（流式喂文本+done、音量触发打断、开关关闭不打断）
+- 102 热更后服务健康
+
+## 使用说明
+
+自动朗读开启（默认）即生效：AI 回复时逐句朗读，你开口说话立即打断并开始听。打断监听需浏览器授权麦克风（首次会弹出权限请求）；HTTP 明文访问（8650）下麦克风不可用，请用 `https://NAS:5667` 或隧道访问。
+
+---
+
+
+
+# v0.21.63 — 语音对话模式：对齐官方 Hermes Voice Mode（免手连续语音会话）
+
+> 用户反馈：Hermes v0.20 官方支持「语音对话模式」（Voice Mode，回合制免手语音会话），我们此前只实现了语音转文字（STT→发送→文字回复），使用场景不对。参考官方文档（use-voice-mode-with-hermes：交互式麦克风循环 = 说话→转录→回复→TTS 朗读→循环自动重启）实现完整语音会话。
+
+## 实现（仅 ui/index.html）
+
+1. **语音设置新增「语音对话模式」开关**（`localStorage.fnos-voice-chat`）：
+   - 开启后点麦克风进入免手语音会话：说话 → 点麦克风停止发送 → 助手回复 → 自动朗读 → **朗读完毕 600ms 后自动重新开始录音**（toast「语音对话中，请说话…」），无需再操作，形成连续语音对话
+   - 关闭开关即结束循环；循环中 15s 无语音自动结束
+2. **循环状态机**（`_voice.chatLoop`）：
+   - `_voiceChatMaybeRestart`：朗读播放结束（WS 流式 finishOk / 降级 Audio.onended）后自动重启录音
+   - `_voiceChatSilent`：录音过短/无语音/空转写时重试，**连续 3 次未听清自动退出循环**（防死循环）
+   - 语音对话中即使「自动发送」关闭也强制发送（保证循环不断）；录音超时自动退出
+3. 交互说明（设置弹窗文案）：「免手连续对话：点麦克风说话，说完再点发送，回复朗读后自动重新录音；关闭开关即结束」
+
+## 验证
+
+- 状态机逻辑单测 5/5 PASS：开始录音置循环、停止后循环保持、朗读后自动重启、3 次未听清退出、开关关闭不重启
+- index.html 3 个内联脚本语法检查通过；102 热更后正常
+
+## 依赖说明
+
+语音对话循环依赖「自动朗读回复」开启（默认开）：回复朗读完才触发自动重启录音。STT 中文识别（v0.21.61 language=zh）与中文音色（v0.21.60）均在此循环中生效。
+
+---
+
+
+
+# v0.21.62 — 移动端浏览器兼容：100vh → 100dvh 动态视口（Edge/Chrome 底部遮挡修复）
+
+> 用户反馈：手机端三个浏览器对比，只有夸克正常，Edge 和系统自带浏览器显示异常（底部输入框被遮挡/布局跳动）；而 Edge 访问携程等正常站无问题——定位为应用自身的移动端视口兼容问题。
+
+## 根因
+
+`.app` 及弹窗/抽屉使用固定 `height:100vh`。移动端浏览器（Edge/Chrome 标准内核）地址栏展开/收起时，100vh 视口高度**不随动态视口变化**：地址栏占位时底部输入框被浏览器工具栏/系统导航遮挡或布局跳动。夸克浏览器对 vh 的处理策略不同（默认沉浸/全屏），所以表现"正常"。
+
+## 修复（仅 ui/index.html）
+
+- `.app`、`.chat-rail`（移动抽屉）、`.modal-backdrop/.modal-overlay` 全部改为 `height:100vh;height:100dvh`（dvh=动态视口高度，带 100vh 回退兼容旧浏览器）
+- 地址栏展开/收起时布局自动适配，底部输入框始终可见
+
+## 验证
+
+- index.html 3 个内联脚本语法检查通过；102 热更后页面正常
+- 建议用户分别用 Edge/自带浏览器强刷后确认
+
+## 备注
+
+手机底部浏览器自带的地址栏/工具栏属于浏览器 UI（非应用元素），配合浏览器全屏模式或 PWA「添加到主屏幕」体验最佳。
+
+---
+
+
+
+# v0.21.61 — 语音输入强制中文识别（STT language=zh）+ 移动端输入框聚焦滚动
+
+> 用户反馈：语音输入说中文，识别结果变成英文；手机端底部输入框显示异常。
+
+## ① STT 中文识别修复（NAS 运行时配置）
+
+根因：whisper-base 小模型对中文语音的**自动语言检测**不稳定（gateway 进程 locale 还是 en_US.UTF-8，实测中文语音被判为英文）。修复：主 `config.yaml` 的 `stt.local` 增加 `language: zh`（`_resolve_stt_language` 解析顺序：`stt.<provider>.language` → `stt.language` → env → 自动检测；配置后强制中文）。
+
+闭环验证（102）：用 edge-tts 合成中文语音「今天天气很好，我们出去散步吧」→ faster-whisper（language=zh）识别结果「今天天氣很好,我們出去散步吧」，detected lang=zh。
+
+## ② 移动端输入框聚焦自动滚动（ui/index.html）
+
+输入框 focus 后 320ms 执行 `scrollIntoView({block:'nearest'})`，键盘弹出时把输入框滚入可视区，缓解被手机键盘/浏览器工具栏遮挡；桌面端 block:nearest 无副作用。
+
+## 备注
+
+手机底部被浏览器自带工具栏（地址栏/导航条）遮挡属于浏览器 UI，非应用元素；建议浏览器全屏模式或改用 `https://NAS:5667` 门户访问。
+
+---
+
+
+
+# v0.21.60 — 语音设置新增「声音」选择（TTS 音色切换）
+
+> 用户需求：语音设置里可以选择不同朗读声音。
+
+## 实现
+
+1. **后端**（monitor.js）：
+   - `GET /api/voice/config`：返回当前音色（解析 config.yaml 的 `tts.edge.voice`）与可选音色列表（7 个 Edge 音色：晓晓/晓伊/云希/云健/云夏/晓北方言/Aria 英文）
+   - `POST /api/voice/config`：写入所选音色到 config.yaml（`_setTopLevelBlock` 行级更新，保留其它配置）；已加入 writePaths 令牌保护
+   - `_readTtsVoice` 解析正则须带 `/m` 标志（tts 块在文件末尾时 `^` 无 m 只匹配字符串开头 → 读不到，已修复）
+2. **前端**（index.html）：语音设置弹窗新增「声音（朗读音色）」下拉——打开时拉取当前音色与选项列表（当前值不在列表中也保留显示），「试听」按钮先写入所选音色再合成测试语音（真实反馈所选音色），保存时同步写入
+
+## 验证（102）
+
+- GET 读到当前 voice（zh-CN-XiaoxiaoNeural）；POST 切换 zh-CN-YunxiNeural 后 config.yaml 写入成功；切回晓晓后 `/api/audio/speak` 合成正常
+- monitor.js `node --check` 与 index.html 3 个内联脚本语法通过；服务 healthy
+
+## 备注
+
+用户反馈 dashboard「system」页面空白：`/proxy/dashboard/api/system` 返回 404——该页面调用的 API 在 hermes 0.20 上游不存在（官方 dashboard 自身问题，非代理/本项目问题）。系统信息请使用应用内「概览」页。
+
+---
+
+
+
+# v0.21.59 — 手机端麦克风 400 根治（whisper 模型文件不完整）+ 显示优化
+
+> 用户反馈（手机端）：①语音输入报「语音识别失败：transcribe 400」；②界面显示不全。
+
+## ① 麦克风 transcribe 400 根因与修复（NAS 运行时）
+
+错误详情实为 `Local transcription failed: <|startoftranscript|> token was not found in the prompt`。定位：本地 whisper-base 模型（`${DATA_DIR}/whisper-base`）的 `vocabulary.json` 只有 50258 条（缺 1607 个特殊 token，如 `<|startoftranscript|>`），而 `config.json` 声明 `vocab_size: 51865`——tokenizer 与权重不匹配，faster-whisper 转写直接报错。
+
+修复：从 ModelScope（`Systran/faster-whisper-base`，国内可达，HF 系域名在 NAS/本机均不通）下载完整文件替换：
+- `vocabulary.txt`（459861B，51864 条，含全部特殊 token）替换损坏的 `vocabulary.json`（已备份为 `.bad`）
+- `config.json`（2309B，原 1036B 不完整）与 `tokenizer.json` 一并替换
+- 验证：faster-whisper 加载+转写成功（lang=zh）；完整 API 链路 `/proxy/dashboard/api/audio/transcribe` 返回 `{"ok":true}`
+
+前端配套修复：transcribe 失败时错误信息改为 `j.error || j.detail`（此前后端 400 的 detail 被吞，只显示干巴巴的「transcribe 400」）；录音不足 800ms 直接提示「录音太短」不发起转写。
+
+## ② 消息「播放」按钮中文 TTS 修复（NAS 运行时）
+
+用户反馈：消息朗读只能念英文。根因：默认 TTS provider=Edge，`DEFAULT_EDGE_VOICE = "en-US-AriaNeural"`（英文女声），NAS 无 tts 配置 → 中文文本用英文音色朗读。修复：主 `config.yaml` 增加 `tts: { provider: edge, edge: { voice: zh-CN-XiaoxiaoNeural } }`（`_load_tts_config` 每次合成动态读取 + mtime 缓存自动失效，无需重启）。验证：带 `HERMES_HOME`（真实 gateway 环境）下 voice 解析为 zh-CN-XiaoxiaoNeural，`/api/audio/speak` 中文合成返回 mp3 正常。
+
+排查要点：hermes 侧 `load_config` 的配置路径由 `HERMES_HOME` 决定（有则读 `$HERMES_HOME/config.yaml`，无则 `~/.hermes/config.yaml`）——不带 HERMES_HOME 的测试脚本会误读不存在路径导致"配置没生效"假象。
+
+## ③ 手机端显示优化
+
+- viewport 加 `viewport-fit=cover` 适配全面屏安全区；输入区底部加 `env(safe-area-inset-bottom)` 留白（防系统导航条遮挡）
+- 手机端输入框字号 15px→16px（iOS Safari 对 <16px 输入框聚焦自动放大导致错位）
+- 隧道页：回源信息改「回源：127.0.0.1:端口（NAS 本机）」避免误用；公网地址旁新增「二维码」按钮（手机扫码直接打开当前有效地址，杜绝旧链接失效问题）＋ Quick 地址会变提示
+
+## 验证
+
+- faster-whisper 1.2.1 加载/转写实测通过；transcribe API 全链路 200
+- index.html 3 个内联脚本语法检查通过；102 热更后 MD5 一致、服务健康
+
+---
+
+
+
+# v0.21.58 — 手机端浏览器统一精简：顶栏/会话头/输入工具栏去拥挤
+
+> 用户反馈：手机端浏览器打开界面，顶栏与聊天头部图标过多、拥挤（4 张手机端截图对比）。统一在移动端媒体查询（≤768px）中隐藏低频/桌面功能按钮。
+
+## 实现（仅 ui/index.html，移动端媒体查询内追加）
+
+1. **顶栏右侧**（原 5 个按钮 → 2 个）：隐藏「在新标签打开」（`openNewWindow`）、「GitHub 项目」（`openGitHub`）、「跟随系统」（`btnThemeAuto`）；保留白天/黑夜主题切换
+2. **聊天头部**：隐藏「工作区」（`wsPanelToggle`，大纲/文件/终端为桌面功能）；保留圆桌讨论与多会话标签
+3. **输入工具栏**：隐藏「语音设置」（`btnVoiceCfg`，低频；语音输入麦克风按钮仍在输入框内）；其余按钮保留并支持横向滚动（既有 overflow-x:auto）
+4. 移动端会话抽屉汉堡、两级折叠按钮、主题切换等高频入口全部保留
+
+## 说明
+
+手机浏览器地址栏的「⚠️ 192.168.3.102:8650」是浏览器对 HTTP 明文访问的安全提示（非应用元素），改用 `https://NAS_IP:5667`（飞牛门户 HTTPS 入口）访问即可消除。
+
+## 验证
+
+- index.html 3 个内联脚本语法检查通过
+- 102 热更后页面正常访问（带 /app/hermes-agent/ 前缀）
+
+---
+
+
+
+# v0.21.57 — 折叠按钮合并：消除顶栏/会话头双按钮重叠（PC 与手机端）
+
+> 用户反馈：v0.21.56 后 PC 端与手机端左上角出现两个折叠按钮（顶栏菜单栏按钮 + 会话头折叠按钮），功能重复、视觉重叠。优化为统一入口。
+
+## 实现（仅 ui/index.html）
+
+1. **删除会话头（chat-header）的 desktop-only 折叠按钮**（`railToggle`）——与顶栏 `sidebarToggle` 功能重复；移动端抽屉汉堡按钮保留（打开会话抽屉）
+2. **顶栏 `sidebarToggle` 统一为两级折叠入口**（`toggleRail` 循环 0→1→2→0）：按一次收会话树、按两次连菜单栏一起收、第三次恢复全展开；图标随状态切换（收起/展开），标题同步（折叠会话树→折叠菜单栏→展开面板）
+3. **清理死代码**：移除 `toggleSidebar`、`iconCollapse`/`iconExpand` 及对已删按钮的全部引用（grep 确认零残留）
+4. 折叠态持久化（`localStorage.fnos-rail-state`）、移动端折叠样式覆盖均保留
+
+## 验证
+
+- index.html 3 个内联脚本语法检查通过；无死引用
+- 状态机逻辑单测：`toggleRail` 循环 1→2→0→1→2→0（PASS）；localStorage 恢复 state=2（PASS）、非法值兜底 state=0（PASS）
+
+---
+
+
+
+# v0.21.56 — 两级折叠：会话树→左侧菜单栏（Octop 式简洁界面）
+
+> 用户反馈：聊天界面不够简洁（"不 nice"），希望隐藏左侧菜单栏；会话折叠按钮按一次折叠会话树、再按一次折叠菜单栏，类似 Octop 的渐进式收起。
+
+## 实现（仅 ui/index.html）
+
+1. **两级折叠状态机**（`_railState`：0=全部展开，1=会话树折叠，2=会话树+菜单栏全折叠）：
+   - 聊天页顶部折叠按钮 `toggleRail` 循环 0→1→2→0：按一次收会话树，再按一次连左侧菜单栏一起收起，第三次恢复全展开
+   - 状态 1 按钮标题「折叠菜单栏」，状态 2「展开面板」，图标随状态切换（收起/展开箭头）
+2. **顶栏新增菜单栏折叠按钮**（`sidebarToggle`，品牌 Logo 左侧，所有页面可见）：菜单栏折叠后即使切到其它页面也能一键展开；与会话折叠按钮联动（折叠时切到 2、展开时回 0）
+3. **折叠态持久化**：`localStorage.fnos-rail-state` 保存当前状态，刷新/重进保持（与主题设置同机制）
+4. **CSS**：`.global-sidebar.collapsed` 宽度收缩为 0（带 0.2s 过渡动画），移动端媒体查询内同步覆盖（防止 56px 宽度顶掉折叠态）；会话树折叠沿用既有 `.chat-rail.hidden`
+5. 折叠状态与页面切换互不干扰：菜单栏折叠后切页保持折叠，主区域自动占满
+
+## 验证
+
+- index.html 3 个内联脚本语法检查通过
+- 状态机逻辑单测通过：`toggleRail` 循环 1→2→0→1→2（PASS）、`toggleSidebar` 独立切换（state1→2、state0→2、state2→0 全 PASS）
+
+---
+
+
+
+# v0.21.55 — 隧道 URL 提取修复（取最后一个而非第一个）+ 102 运维补全
+
+> 用户粘贴 cloudflared 运行日志反馈，排查发现隧道运行正常（8 项连通性预检全 PASS、公网 200），但存在两个问题：①隧道状态里显示的公网 URL 是旧的已失效地址；②手动重启 monitor 后 fnOS 门户访问报「无法连接后端」。
+
+## ① URL 提取 bug：日志轮转失败时取到第一个旧地址
+
+`_rotateTunnelLog` 的 rename 异常被 catch 静默吞掉（日志轮转失败，多次启动的日志追加在同一文件），而 `_extractTunnelUrl` 用 `match` 取**第一个** trycloudflare URL → 状态里永远显示最早那次启动的地址（已失效）。修复：
+
+- `_extractTunnelUrl` 改为 `matchAll` 取**最后一个** URL（当前活跃地址）
+- `/api/tunnel/status` 的恢复逻辑：running 时总是从日志提取最新 URL，与 state 不一致即刷新持久化（防止残留旧地址）
+- `_rotateTunnelLog` 失败时打印原因日志（不再静默）
+
+102 实测：monitor 重启后 status 自动把 state.url 从旧的 `airfare-salon-…` 纠正为当前活跃的 `magnitude-hereby-segment-field.trycloudflare.com`，公网访问 200。
+
+## ② 102 运维修正：手动启动 monitor 必须注入 BASE_PATH
+
+手动重启 monitor（为加载新代码）时漏注入 `BASE_PATH=/app/hermes-agent` → fnOS 门户经 `/app/hermes-agent/*` 前缀反代到应用，monitor 不认前缀 → 前端所有 API 404 → 页面报「加载会话失败，无法连接后端」。修正：`start-monitor.sh` 补全 `BASE_PATH=/app/hermes-agent`、`UI_PORT=8650`、`GATEWAY_PORT=8742`、`DASHBOARD_PORT=9219`（已固化于 `/vol1/@appdata/hermes-agent/start-monitor.sh`），重启后带前缀 `curl --unix-socket …/app/hermes-agent/api/health` 返回 200。
+
+## 备注
+
+cloudflared 日志中 `ICMP proxy feature is disabled error="Group ID 901 is not between ping group 1 to 0"` 为无害警告（用户组不在系统 ping 范围内），仅影响 ping 探测，不影响 HTTP 隧道。
+
+---
+
+
+
+# v0.21.54 — 102 验证修复：process.kill 信号简写全局失效（TERM/KILL→SIGTERM/SIGKILL）+ cloudflared 下载镜像
+
+> v0.21.53 隧道功能按流程部署到 102 NAS 验证时发现两个问题：①隧道 stop 后 cloudflared 进程不死；②首次下载 cloudflared 走 GitHub 直连在中国大陆仅 ~14KB/s（50MB 需近 1 小时）。
+
+## ① P0 信号 Bug：process.kill "TERM"/"KILL" 简写无效（潜伏全局）
+
+Node 在 Linux 上 `process.kill(pid, "TERM")` 抛 `Unknown signal: TERM`——只接受 `"SIGTERM"`（带 SIG 前缀）或数字信号。monitor.js 中 6 处简写信号（`TERM`×3、`KILL`×3）全部静默失效：被 try/catch 吞掉异常、进程从未收到信号。涉及：
+
+- `stopPid`（gateway/dashboard 停止）：信号从未发出，此前一直靠 `forceKillHermes` 的 `pkill -SIGKILL` 兜底才让「停止/重启」表面可用（waitForExit 空等 1.5s）
+- 单实例守卫对旧实例的退出请求（`oldPid`）
+- port-guard 对外来进程的清理
+- v0.21.53 新增的 `_stopTunnel`（隧道停止 → cloudflared 进程残留，实测 stop 后进程仍在跑）
+
+**修复**：全部改为 `"SIGTERM"` / `"SIGKILL"`（共 6 处），隧道 stop 实测 cloudflared 立即退出。
+
+## ② cloudflared 下载源镜像优先
+
+GitHub 直连下载实测 ~14KB/s（中国大陆网络），改为候选源列表顺序尝试：`ghfast.top` 镜像（实测 2.6MB/s）→ `ghproxy.net` → GitHub 直连兜底。日志记录每个源的尝试结果，全部失败才报错。
+
+## 102 NAS 验证记录（发布前置流程）
+
+- monitor.js/index.html/manifest MD5 与本地一致；monitor 重启（sudo TERM + start-monitor.sh 以 hermes-agent 身份、注入 TRIM_APPDEST/PKGHOME/PKGVAR + MONITOR_SOCKET_PATH）后 gateway/dashboard 自动拉起且 healthy
+- `POST /api/tunnel/start`（Quick, target 8650）→ 返回 `https://airfare-salon-stability-unsubscribe.trycloudflare.com`；公网访问 HTTP 200、`<title>Hermes Agent · 控制台</title>`（Cloudflare 边缘 → NAS 8650 回源正常）
+- `POST /api/tunnel/stop` → 状态清空、公网 URL 返回 530（隧道真实关闭）、cloudflared 进程退出
+- 信号修复前 stop 进程残留 → 修复后 stop 进程立即退出（对照实验确认）
+- 运维经验：veenyi 无权限 kill hermes-agent 进程，须 `echo '密码' | sudo -S kill`；`MONITOR_SOCKET_PATH` 缺失会 `[FATAL]` 退出（unix socket 模式强制）；手动启动脚本已固化于 `/vol1/@appdata/hermes-agent/start-monitor.sh`
+
+---
+
+
+
+# v0.21.53 — 「隧道」菜单：Cloudflare Tunnel 外网访问（Quick + Named）
+
+> 用户需求：参考官方 cloudflared + cloudflare-tunnel-skill，将技能固化进应用，在侧边栏新增「隧道」菜单实现外网访问。
+
+## 功能（v0.21.53）
+
+1. **侧边栏「隧道」菜单**：位于「通讯」与「连接器」之间，页面含状态卡片（运行状态 / 模式 / 目标 / PID / cloudflared 版本）、公网地址展示（点击复制 / 打开）、模式选择、转发目标下拉、启动/停止按钮、cloudflared 运行日志查看器、公网暴露安全提醒。
+2. **Quick 临时链接（开箱即用）**：`cloudflared tunnel --url http://127.0.0.1:<target>`，免费无需账号，启动后从日志提取 `https://*.trycloudflare.com` 公网地址。cloudflared 二进制首次启动自动从 GitHub Releases 下载（固定版 2026.7.3 linux-amd64，约 50MB）到 `${VAR_DIR}/bin/`（持久目录，chmod 755），无需预装。
+3. **Named 固定域名**：`cloudflared tunnel run --token <TOKEN>`，需用户在 Cloudflare 完成 login/create/DNS 路由后填入 token。
+4. **转发目标可配置**：Web UI（8650）/ Dashboard（9219）/ Gateway API（8742）/ 自定义端口；启动前校验目标端口监听，未监听直接报错。
+5. **可靠性设计**：日志每次启动轮转（保证 URL 提取只匹配本次）；状态持久化 `${VAR_DIR}/tunnel-state.json`（monitor 重启后仍能识别运行中的 cloudflared，stop/status 可用；start 前清理残留进程防重复拉起）；异步下载不阻塞事件循环；30s 无公网地址判超时自动清理。
+6. **技能固化**：项目根目录 `skills/cloudflare-tunnel/`（SKILL.md + references/{quick-tunnel,named-tunnel,security,troubleshooting}.md + scripts/tunnel_helper.py），开发者/Agent 可复用同一套工作流；不进 FPK（fnpack 仅打包 app/ 下内容）。
+
+## 后端 API
+
+- `GET /api/tunnel/status`：运行状态 / 模式 / 目标 / URL / PID / cloudflared 版本 / 日志尾部
+- `POST /api/tunnel/start`：body `{ mode: quick|named, target: 端口, token?: named 用 }`
+- `POST /api/tunnel/stop`：停止并清理状态
+- start/stop 均为写操作，受 MONITOR_TOKEN 保护（已加入 writePaths）
+
+## 验证
+
+- monitor.js `node --check` 通过；index.html 3 个内联脚本语法检查通过
+- trycloudflare URL 提取正则单测 6/6 通过（含真实日志横幅格式）
+
+---
+
+
+
+# v0.21.52 — FPK 体积裁剪：去掉 hermes-src 开发/文档内容（86M → 37M）
+
+> 用户反馈：为什么之前包只有 17-18M，现在安装包 86M。排查确认：v0.21.27 起打包策略把整个 hermes 上游源码树（hermes-src 160M）vendored 进 FPK，其中约一半是运行时不需要的开发/文档内容。
+
+## 裁剪内容（v0.21.52）
+
+1. **根因**：fnpack（v1.0.4）无排除机制——.fnpackignore/.gitignore 放在根目录与 app/ 下均实测无效，app/ 下全部内容整树打包。v0.21.22/23 时代包内无 hermes-src（31M），v0.21.27 起整树 vendored（86M）；且 fnpack 只打包 app/ 下已知结构目录（server/ui/bin/config/hermes-src/package.json），自定义目录名会被忽略。
+2. **方案**：副本裁剪打包——`build-slim.sh` 用 robocopy 复制仓库副本（fnos-hermes-agent-slim）时按目录名排除，再对副本 fnpack build。排除清单：`tests`(30M) + `apps`(28M 桌面端/安装器) + `website`(27M 文档站) + `docs`/`.github`/`assets`/`contributors`/`scripts`(~4M)，共 89M。
+3. **效果（实测）**：hermes-src 160M → 63M；app.tgz 77.2M → 30.1M；FPK 86.6M → **37.2M**（-57%）。保留运行必需全部源码（agent/gateway/plugins/tools/skills/optional-skills/hermes_cli/ui-tui/web/cron）。
+4. **流程固化**：chat-1 根目录 `bash build-slim.sh`（robocopy 复制排除 → fnpack build → 版本/大小确认），产出 hermes-agent.fpk 后移入 pkg/。注意 git bash 下原生 exe 参数转换坑：robocopy 的 /E /XD 等须加 `MSYS2_ARG_CONV_EXCL='*'` 前缀，否则报"无效参数"。
+
+## 验证（实测）
+
+- 外层 manifest `version = 0.21.52` ✓；内层 app.tgz 解包：hermes-src 63M、无 tests/apps/website ✓
+- 必需文件抽查：`server/monitor.js`、`ui/index.html`、`hermes-src/gateway/run.py`、`hermes-src/tools/send_message_tool.py`（含 v0.21.51 wecom 补丁）全部在位 ✓
+- 产物：`pkg/fnos-hermes-agent_v0.21.52.fpk`（39,051,051 B ≈ 37.2 MiB），MD5 `43ad55b9094b4b7ff1fdb9e7c02e7d1a`
+
+## 备注
+
+- 未裁部分中仍有可压空间（后续可选）：optional-skills 8M（未启用可选技能）、config/prompts 20M（提示词库，有实际用途）。
+- 裁剪仅影响安装包体积，运行时行为与 v0.21.51 完全一致；NAS 侧无需热更（本轮无线上变更）。
+
+---
+
+
+
+# v0.21.51 — 企业微信接入整体收尾：群消息策略 + 出站推送通道 + 上游 send 补丁
+
+> 用户反馈：「你不应该这么说的，你应该配置好，做好开箱即用的。你看看整体处理一下。」——在 v0.21.50 修复企微群消息（WECOM_GROUP_POLICY=open）之后，对企微接入做整体审计与收尾：出站链路（hermes send / cron 定时推送）当时不可用，且接入配置分散在多处需要统一。
+
+## 修复内容（v0.21.51）
+
+1. **出站链路补丁（hermes-src/tools/send_message_tool.py）**：`_parse_target_ref` 缺 wecom 分支（上游 bug）——`resolve_channel_name` 已能从 channel_directory 解析出 wecom chat_id（群 wrxtfhCAAA… / 私聊 userid），但 `_parse_target_ref` 对 wecom 无专门分支、chat_id 非数字也不以 !/@ 开头，落到默认 `return None` → chat_id 变空 → send 误报 "No home channel set"。修复：wecom 分支直接 pass-through 解析出的平台原生 id。验证：`hermes send --to wecom:tanweien` → sent（私聊 dm 送达成功）。
+2. **WECOM_HOME_CHANNEL 写入 profile 级 .env**：multiplex 模式下 gateway 读取 `data/profiles/<profile>/.env` 而非顶层 `data/.env`——此前 WECOM_HOME_CHANNEL 写在顶层不生效（gateway env 里缺失，与 WECOM_GROUP_POLICY 同坑）。写入 profile .env 并重启后：gateway env 含 `WECOM_HOME_CHANNEL=tanweien`，`hermes send --to wecom`（home channel 形式）→ "Sent to wecom home channel (chat_id: tanweien)"。定时任务（cron deliver=wecom）与脚本主动推送通道自此可用。
+3. **接入配置统一为开箱即用**：dm 私聊 pairing 策略 + group_policy=open（群消息全放行）+ home channel=tanweien（主动推送目标）三条链路全部验证通过；wecom 测试套件 `tests/gateway/test_wecom.py` 19 个用例全部通过（补装 pytest-asyncio）；媒体链路（图片 base64/url+aeskey、文件、appmsg、引用、混排）代码审查完整，入站媒体由企微客户端发起后自动走既有处理管线。
+
+## 部署说明
+
+hermes-src 补丁随包部署（vendored 源码已同步）；.env 配置项为 NAS 侧运行时配置（群策略/推送通道），随各 profile 的 .env 持久化。
+
+---
+
+> 用户反馈：①聊天窗口依旧很卡——长会话与圆桌讨论每轮发言都往 DOM 追加消息块，累积数千节点后浏览器布局/重绘开销剧增，最终冻结；②无论用浏览器还是手机都无法使用麦克风语音输入——根因是浏览器安全限制：HTTP 明文页面（navigator.mediaDevices 为 undefined）禁止调用 getUserMedia，代码本身链路（getUserMedia → MediaRecorder → /transcribe）是完好的。
+
+## 修复内容（v0.21.50）
+
+1. **condenseChatBody 消息折叠（防卡治理）**：聊天区 `.msg` 超过 60 条时，自动把最早的多余消息折叠为内存 HTML 数组（`_foldedMsgs`，数据不丢失），顶部显示「↕ 查看更早的 N 条消息」折叠条，点击一次性展开全部（60 秒防抖窗口防止展开后立即再折叠）。覆盖 6 个消息追加/渲染调用点：加载会话、普通发送（rtSend + sendRaw）、sendRaw onDone、圆桌 Agent 发言、主持人总结。效果：普通长会话与圆桌 20 轮全程 DOM 节点数恒定在 ~60 条上限，不再无限累积，浏览器保持流畅。
+2. **麦克风安全上下文前置检查**：startVoiceRecord 开头增加 `window.isSecureContext` 检查，HTTP 访问时直接 toast 提示「浏览器禁止 HTTP 页面使用麦克风，请改用 https://IP:5667 访问（首次需点击「继续访问」信任自签名证书）」。浏览器与手机语音输入在 HTTPS 入口（fnOS 5667 门户）下均可正常使用；HTTP 入口（5666/8650）受浏览器安全策略限制无法启用。
+
+## 单测
+
+index.html 全部 3 个内联脚本语法检查通过；关键标记（condenseChatBody / MAX_VISIBLE_MSGS / rtCondenseBar / isSecureContext / 5667 提示）确认在位。
+
+## 部署说明
+
+仅 ui/index.html 更新，热更新立即生效，monitor 无需重启。
+
+---
+
+# v0.21.49 — 多窗口/多端消息同步：独立窗口与飞牛内置页实时拉齐
+
+> 用户反馈：独立打开的浏览器窗口与飞牛 App Center 内置页面同时使用时，两边的消息不同步。根因：流式事件（SSE/WS delta）只推送给发起请求的那一个连接，另一个窗口没有任何通知机制，页面保持静止；而会话文件本身是实时镜像（用户消息立即落盘、助手回复每 5 秒/1000 字符增量 checkpoint 落盘），缺的只是「发现变化」的通道。
+
+## 实现方案（v0.21.49）
+
+1. **后端会话签名接口** `GET /api/sessions/:id/sync`：返回几十字节的签名（消息数 + 最后消息的角色/时间戳/内容长度/流式标记/工具数 + updated_at），由 saveSession 每次落盘时同步刷新内存缓存（`_sessionSigCache`），接口零读盘、O(1) 命中。前端轮询成本约等于一次心跳。
+2. **前端同步轮询**（startSessionSync）：每 4 秒轮询当前会话签名（页面隐藏时跳过，visibilitychange/focus 时立即补一次）；签名变化才拉取全量消息重渲染。首次轮询只建立基线不重渲染。**本窗口自己流式（_tabStreaming）或圆桌运行中自动跳过**，防止远端拉取打断本地实时气泡。
+3. **滚动位置保护**：loadSessionMessages 增加 keepScroll 参数——远端消息到来时，用户正在阅读历史则保持原滚动位置，仅在用户位于底部时跟随新内容。
+4. **「另一窗口正在回复」提示**：检测到远端刚发来新用户消息且回复尚未落盘时，底部显示「⏳ 另一窗口正在回复…」，回复落盘后随重渲染消失。
+5. **同步效果**：另一窗口发的消息 4 秒内出现；其流式回复以 checkpoint 粒度（每 ~5 秒）增量增长显示；工具/最终结果落盘后完整呈现。圆桌讨论在另一窗口同样可见（每个 Agent 发言=一次正常对话轮次）。
+
+## 单测
+
+签名格式 + 轮询判断逻辑 9 项全过（空会话/用户消息/流式长度变化/流式标记/tools 数/tip 显示与不显示条件）。monitor.js node --check 与 index.html 全部脚本语法检查通过。
+
+## 部署说明
+
+monitor.js 与 ui/index.html 双文件更新，monitor 进程需重启生效（沿用 pkill + cmd/main start 模式，备份 /tmp/monitor.js.bak-02148 与 /tmp/ui/index.html.bak-02148）。
+
+---
+
+
+# v0.21.48 — 圆桌讨论三连修复：上下文截断防 400 + 手动停止整场终止 + 共识自动收尾
+
+> 用户反馈：①圆桌设定 20 轮，主持人总结时 HTTP 400「prompt text length 4217683 exceeds the character limit 2097152」——165 条消息全部完整拼接（约 421 万字符），超过网关 209 万字符上限被拒，总结请求直接失败；②希望讨论过程中一旦达成共识就**自动关闭讨论并出最终总结**，不必跑满 20 轮；③手动结束后**整个浏览器卡死**——chatStop 只关闭当前 WS，onDone 后 rtAfterAgent 仍推进下一个 Agent，圆桌继续跑满 20 轮，DOM 无限累积导致页面冻结。
+
+## 修复内容（v0.21.48）
+
+1. **上下文截断（rtBuildContext）**：所有 Agent 发言与主持人总结的上下文不再完整拼接全部 history，改为「用户议题（截 2000 字）+ 最近 50 条发言 + 30 万字符上限」（主持人放宽到 40 万），超出部分标注「（较早的 N 条记录已省略，上下文保持精简）」。165 条/421 万字符的膨胀场景压缩到 30 万以内，彻底杜绝 400。
+2. **手动停止整场终止（rtStopRoundtable）**：新增 `_rtState.stopped` 全程标志，chatStop 触发的 `onDone(stoppedByUser=true)` 走 rtStopRoundtable：置 stopped/ended、插入「⏹ 已手动停止圆桌讨论」分界线、不再推进下一 Agent、不再触发总结，浏览器立刻解卡。rtAgentSpeak/rtAfterAgent/rtNextRound/rtSummarize 全部加 stopped guard。
+3. **共识自动收尾（rtCheckConsensus + rtEndEarly）**：系统提示新增规则 5/6——认为已达成共识时在发言末尾单独一行输出「[达成共识]」；检测到任一 Agent 发言含共识标记（/\[达成共识\]|\[共识\]|\[结束讨论\]|\[END\]|讨论已达成共识|达成共识|一致通过|已达成一致|无需继续讨论|无异议，可以结束/i）即插入「✅ 讨论已达成共识，提前结束（共 N 轮）」分界线，800ms 后自动触发主持人综合总结——不用跑满设定轮数。
+4. **主持人总结收尾**：rtSummarize 完成/出错/停止后统一置 ended/stopped，结束分界线后不再有任何轮转。
+
+## 单测
+
+test-rt-context.cjs 12 项全过：空历史、165 条截断（≤30 万字符/保留议题/省略标记/≤52 条）、共识标记命中、普通发言不命中、无议题不崩溃、超长单条跳过。另发现 harness 伪影：模板字符串内 `\[` 丢失反斜杠会把正则变成字符类，已用 `\\[` 修正。
+
+---
+
+
+# v0.21.47 — 圆桌「断流」误判修复：圆桌接入 genBar 状态条 + 长静默「仍在工作」提示
+
+> 用户反馈：团队圆桌模式「开始写入 Skill 然后就没下文了」，疑似工具层面断流。SSH 全链路诊断（agent.log / info.log / gateway.log / errors.log / ss 连接表）证实**并非断流**：①agent.log 显示首个 Agent（默认助手）连续 11 分钟执行 8 次 write_file 全部成功，16:18:22 正常结束发言（1304 字，Turn ended），随后 16:18:23 下一个 Agent 正常开始发言并持续工作；②monitor info.log 显示聊天 WS 连接 16:06:50 open → 16:18:22 close，**单条连接持续 11.5 分钟从未断开**，close 后 1 秒内重开（圆桌轮转到下一 Agent）；③真实原因是模型每次 API call 之间思考长达 65–184 秒（sensenova-6.7-flash-lite 写 Skill 场景），期间无任何输出，而**圆桌 rtAgentSpeak 直接调 streamChat，绕过了 genBar 状态机，全程没有任何工作状态反馈**——页面完全静止，看起来像死了。
+
+## 修复内容（v0.21.47）
+
+1. **圆桌模式接入 genBar 状态条**：Agent 发言开始显示「🤔 XX 正在发言」；工具调用实时同步状态（💻 正在写代码 / 🤖 正在调用 Agent / 📝 正在处理文件 / 🧩 正在调用技能…，复用 GEN_TOOL_STATES 映射）；推理中显示「💭 正在思考」；发言完成「✅ 回复完成」、出错「⚠️ 回复出错」；主持人综合总结同样接入（「✍️ 正在生成综合方案」）。
+2. **新增长静默「仍在工作」提示**：状态条持续 45 秒无任何内容/工具事件时，自动追加「仍在思考 · 已持续 Xs」（每秒刷新秒数，点阵动画保持跳动）；有任何事件活动立即恢复。配合右侧实时计时器，长思考期用户也能明确看到「连接未断、模型仍在工作」。
+3. **事件时间戳同步**：sendRaw 的 onDelta / onReasoning / onTool / onInfo 全部更新 `_genLastEventTs`，普通聊天同样获得长静默提示。
+
+## 附：诊断结论（供参考）
+
+- 后端 agent 全程正常：16:05:14 – 16:18:22 首个 Agent turn 完成 11 次 API call + 10 次工具调用；16:18:23 起后续 Agent 依次发言。
+- UI WS 全程正常：无异常断开、无重连失败、无 401（16:05:13 的单条 401 为瞬时失败，16:05:14 同请求即 200）。
+- 16:17:57 工具报 `python: command not found` 是 Agent 写 Skill 脚本后执行环境缺 python 命令（NAS 仅 python3），不影响流。
+- manifest 版本此前因热更部署停留在 0.21.44（monitor 启动检测日志可证），本轮 FPK 全量部署后对正为 0.21.47。
+
+---
+
+
+# v0.21.46 — 千问式聊天界面融合：顶部状态条 + 发送/停止一体按钮
+
+> 用户反馈：希望像千问 App 一样，在对话框上方用一整条区域显示生成状态（文案 + 计时器），取消消息里的「🤔 正在思考」气泡；生成中发送按钮变成红色停止按钮，点击直接中断当前进度；发送按钮与麦克风等对话按钮统一放到这条区域里。
+
+## ① 顶部状态区域条 genBar
+
+对话框输入区上方新增整条状态区域：左侧状态图标 + 文案 + 三个动画圆点，右侧实时计时器。状态流转与聊天请求全链路绑定：
+
+- `🤔 正在思考` → SSE 首块到达后 `✍️ 正在回复`（onDelta 首次触发）→ 工具调用时 `🛠 XX执行中` → `✅ 回答完成` / `⚠️ 回复出错` / `⏹ 已停止`。
+- streaming 期间区域条切换绿色高亮（rgba(16,185,129,.08) 背景 + 绿色边框 + 呼吸阴影）。
+- 计时器 100ms 刷新、tabular-nums 数字稳定不抖动，回复结束定格最终耗时 2.2s 后自动复位。
+
+## ② 移除消息内「正在思考」气泡
+
+删掉 assistant 消息里的 `reply-status` 气泡（`🤔 正在思考 / 生成中 / 完成` + 4s fade-out 自动消失逻辑），状态展示统一收敛到顶部区域条，不再出现「气泡先出来又消失」的闪烁。
+
+## ③ 发送按钮 ↔ 停止按钮（直接中断）
+
+发送按钮改为 38px 黑色圆形纸飞机，移到区域条右侧；流式生成期间自动变为红色「⏹」停止按钮：
+
+- 点击停止走全链路中断：POST /api/chat/stop（monitor 终止 `activeChatStreams` 的 AbortController）+ WS close(1000,'user stop') + XHR AbortController.abort() —— 直接中止当前进度，不等待自然结束。
+- 停止后按钮立即恢复发送态，区域条显示 `⏹ 已停止`。
+- 文本为空或正在生成时发送按钮禁用（防止重复提交）。
+
+## ④ 对话按钮统一收纳
+
+麦克风按钮从输入区下方 toolbar 移入区域条右侧（与发送按钮并排），录音转文字逻辑（toggleVoiceRecord / startVoiceRecord / stopVoiceRecord）零改动复用。
+
+---
+
+# v0.21.45 — 通道「测试」按钮真实连接验证 + 企微群聊策略兜底 + 通道角色路由同步
+
+> 用户反馈两个问题：① 通道配置弹窗点「测试」只提示「该渠道暂不支持在线测试」，想知道 Octop 是怎么点一下就能测通过的；② 企业微信把 bot 拉进群后发消息完全不回复。
+
+## ① 通道「测试」按钮：真实连接验证（对齐 Octop probe_channel）
+
+Octop 后端 `POST /config/channels/{name}/check` → `gateway.probe_channel` 会构造临时 ChannelRow 启动真实适配器实例连接验证。我们平台复刻为 `POST /api/channels/:id/test`：
+
+- **wecom**：wss 握手到 `wss://openws.work.weixin.qq.com`，发送 `{"cmd":"aibot_subscribe","headers":{"req_id":...},"body":{"bot_id","secret","device_id"}}`，回包按 `headers.req_id` 匹配、跳过 `ping` 心跳包，`errcode==0/缺失` 即凭证有效。实测：假凭证返回 `853000 invalid bot_id or secret`，真实凭证返回 `0 ok`。
+- **weixin**：iLink `getconfig`（只读零副作用），peer 从活跃 profile 的 `weixin/accounts/*.context-tokens.json` 提取，`ret===-14` 报会话过期提示重新扫码。
+- **telegram**：`getMe` 校验 Bot Token。
+- **其余渠道**：必填凭证齐全检查（label 含「(可选)」的跳过）。
+
+**重要坑**：不能使用 Node 内置全局 WebSocket —— NAS 的 Node 24 上 undici WebSocket 有 `#onSocketClose TypeError` bug（本机与 NAS 实测连任何 wss 均失败，curl 101 正常），必须使用 vendored ws 库（monitor 的 WS 服务同款）。
+
+## ② 企微群聊策略兜底：group_policy: open
+
+hermes 0.20 wecom 适配器 `_is_group_allowed` 默认 `group_policy=pairing` 会**拒绝所有群消息**（仅 debug 日志 `Group blocked by policy`，无任何回复），这就是拉 bot 进群没反应的原因。保存企微通道配置时若未显式设置，自动兜底写入 `extra.group_policy: open`（所有群可收发）。
+
+## ③ 通道绑定角色 → 顶层 profile_routes 同步
+
+hermes 0.20 网关不读 `platforms.<id>.profile` 字段（官方 dashboard 落盘字段），只有顶层 `profile_routes` 生效。新增 `_syncChannelProfileRoute`：行级编辑 YAML，强制 `multiplex_profiles: true`，按 `- name: channel-<id>` 条目 upsert（绑定）/删除（解除）。保存 wecom/weixin 通道时自动同步，绑定角色的通道按角色运行（微信→飞牛操作员、企微→程序员）。
+
+---
+
+# v0.21.44 — 修复专家聊天空回复「(Gateway 连接失败)」+ port-guard 误杀自己 dashboard
+
+> 用户反馈：用专家模板「以此创建」的 NAS 深度运维角色，点「对话」发消息后回复显示「(Gateway 连接失败)」。SSH 诊断锁定根因链：`profiles/nas_____/` 目录没有 config.yaml（`hermes profile create` 不带 clone 创建的空 profile，且创建时未传入模型配置）→ 激活该 profile 后网关报 `No inference provider configured` → 请求返回 200 + SSE error 事件 → monitor 第 2106 行 `requestError = null` 把错误清空 → 空回复 → UI 显示误导性的「(Gateway 连接失败)」（default/coder profile 均有完整 model/providers 配置，故不受影响）。
+>
+> 修复三点：①新增 `_ensureProfileModel(id)`：激活 profile 前若其 config.yaml 缺失或无有效 model 块，自动从「当前活跃 profile → default」继承 model/providers 配置块 + .env API 密钥（CUSTOM_*_API_KEY 等，按 key 去重合并），在 `_setActiveProfile` 入口调用，覆盖专家创建（POST /api/experts/create）、激活（POST /api/profiles/:id/activate）、专家一键对话全部路径；已存在的坏 profile 下次激活即自动修复，网关重启后立即可用。②SSE 流内错误事件不再被吞：`fullReply` 为空时保留 `requestError`，错误分支展示真实原因（如「所有模型均失败: No inference provider configured」），避免误导。③port-guard 豁免本包进程：dashboard 以 `python3 -m hermes_cli.main ... dashboard` 启动，命令行不含 HERMES_BIN，此前每 60s 被 `killForeignHermesProcesses` 误杀一次；改为同时豁免命令行含本包 APP_DIR/DATA_DIR 路径的进程（外来 hermes-studio 等仍按原逻辑清除）。
+
+---
+
+# v0.21.43 — 欢迎页快捷提问点击即发送
+
+> 用户反馈：在 Agent 欢迎页点「诊断网络不通问题」等快捷提问卡片，文字只是被填进输入框，会话没有开始。原 `quickFill`/`quickStartFill` 仅做输入框填充。改为 `quickSend`：填入输入框后立即调用 `sendChat` 直接发送（`sendRaw` 自带无会话时自动创建会话的兜底，`injectExpertSystem` 注入 Agent 提示词），点一下即开启对话；Agent 个性化欢迎页与默认欢迎页的快捷卡片统一生效。
+
+---
+
+# v0.21.42 — 专家页一键对话 + 工作流专家头像兜底
+
+> 用户反馈：用「以此创建」新建角色后，卡片上只有「编辑 / 使用」按钮，点了「使用」也不进入对话页，无法与角色对话。修复：「我的专家」卡片按钮改为「编辑 + 对话」；「对话」= 激活该 Agent（hermes profile use + 网关重载）+ 打开该 Agent 专属会话分组（复用既有会话，无则新建，分组名为 p-<id>，与扩展页专家独立会话机制一致；同时互斥停用工作流/专家团，避免会话混组）并自动跳转对话页、聚焦输入框。内置页签中已创建（含使用中）的卡片同样增加「对话」按钮（保留「激活」）。头像问题根因：AGENCY_PERSONAS 个别条目 emoji 字段存的是纯文本（如「微信公众号管理」的 emoji 是「公众号」三个字，不是表情），卡片头像直接渲染出文字；新增 `_wfEmoji` 兜底函数（合法 emoji 白名单校验，非法一律 🧠），映射与创建表单预填均走兜底。
+
+---
+
+# v0.21.41 — 268 个工作流专家并入内置专家页签
+
+> 扩展页 js/personas_library.js 的 268 位工作流专家（20 个部门分类：学术/设计/工程/营销/专项等，全部自带完整 SOUL prompt）并入专家页「内置专家」页签：与内置精选 30 个动态合并为 298 个（按 slug 去重、内置优先，前端直接合并 AGENCY_PERSONAS，零数据复制、零打包体积增长）；页签顶部新增来源筛选 chips「全部 / 内置精选 / 工作流专家」（带计数），场景筛选与来源联动；工作流专家同样支持「以此创建」——以模板预填创建表单（含完整 prompt / emoji / 场景=部门分类），调整后一键生成独立 Agent；搜索对 3.5MB 工作流数据不做 prompt 全文匹配（仅名称/描述/分类）防卡顿；顺带修复 setExpScene 未定义 bug（专家页场景 chips 点击无反应的既有缺陷）。圆桌讨论/团队等工作流继续引用 AGENCY_PERSONAS 原数据，互不影响。
+
+---
+
+# v0.21.40 — 专家页 UI 精简：删除冗余新建按钮与来源徽标
+
+> 专家页顶部「+ 从内置专家新建」按钮点击后仅提示"从卡片一键创建"，属于多余入口，直接删除（连同 openExpertCreate 函数）；内置专家卡片不再显示来源徽标（「内置 / Octop 专家库」标签，Octop 专家已并入内置清单，来源信息无意义）。
+
+---
+
+# v0.21.39 — 修复 API 密钥配置弹窗透明错乱（P0）
+
+> 用户三次反馈的 P0 bug：编辑 Agent 后点「配置/修改 API 密钥」，弹窗整层透明、下层 Agent 编辑弹窗内容（标题、快捷提问、技能目录、底部按钮）全部透出混叠，几乎无法使用。根因：CSS 变量 `--card`（16 处使用）与 `--muted`（14 处使用）在 `:root` / `body.theme-dark` 中从未定义，`openPersonaEnvEditor` 弹窗卡片 `background:var(--card)` 解析无效 → 背景透明。修复：亮/暗主题补定义 `--card`（=--bg2）与 `--muted`（=--text3）；顺带修正 10 处 `var(--text1)` 笔误为 `var(--text)`（欢迎页标题、代码编辑器、圆桌弹窗等）。覆盖范围：env 弹窗、欢迎页快捷提问卡（.wq-card）、圆桌 Agent 芯片、cron 模板卡等全部恢复正常底色。
+
+---
+
+# v0.21.27 — Hermes 核心 0.20.0 升级 + WebUI 模型显示修复
+
+> 完整变更记录见 `CHANGELOG_v0.21.27.md`。要点：官方自 0.20.0 起停止 PyPI 分发，本包内置完整源码（`app/hermes-src`）editable 安装 + 预构建 web_dist/TUI bundle；monitor 适配 cron `--deliver`、版本日期、源码模式检查；实测修复 dashboard 前端加载（注入 `HERMES_WEB_DIST`）。WebUI：概览页新增「当前模型」卡片、`/status` 显示 Provider·模型、模型按钮/模型页卡片兜底显示全局默认模型（适配社区修复方案）。
 
 ---
 
@@ -237,3 +790,7 @@
 ---
 
 > 更早版本请参阅各独立 CHANGELOG 文件（CHANGELOG_v0.20.38.md – CHANGELOG_v0.20.42.md）。
+
+---
+
+---

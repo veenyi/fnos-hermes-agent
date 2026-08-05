@@ -1,11 +1,10 @@
 {
-  "version": "0.21.23",
-  "base_version": "0.21.22",
-  "description": "v0.21.23 热更新：① 终端改用真实 PTY（server/pty_bridge.py），修复 bash cannot set terminal process group / no job control，支持 Ctrl+C 与前后台任务 ② Profile 隔离文件上传、剪贴板图片/文件粘贴、工作区附件（uploads/<profile>/）③ 文件下载 /api/download 按解析路径兼容 local/Docker/SSH/Singularity ④ 预览 /api/preview + /api/preview/office：HTML/PDF/DOCX/PPTX/XLSX/CSV/图片/Markdown/源码 ⑤ 修复 pty_bridge 控制帧与用户输入同批到达时丢命令 ⑥ 修复 docx/xlsx/pptx 服务端转换（inlineStr 单元格、a:p 段落）⑦ 修复会话窗口切换模型不生效：网关忽略请求 model 字段，改为直接热改写网关 config.yaml 的 model.default（保留 agent 工具能力），并修复模块级误用嵌套 _yamlBlockOf 导致 providers 解析失败 ⑧ 修复检查更新/热更拉取 release 按 created_at 排序可能命中重建过的旧 release，改为按 published_at 选最新已发布版本",
+  "version": "0.21.50",
+  "base_version": "0.21.49",
+  "description": "v0.21.50：聊天窗口防卡 DOM 治理 + 麦克风语音输入可用性修复。①condenseChatBody 消息折叠：超过 60 条 .msg 时自动把最早的多余消息折叠为内存 HTML（不丢数据），显示「↕ 查看更早的 N 条消息」折叠条，点击展开（60 秒防抖窗口）；覆盖 6 个追加/渲染调用点（加载会话、普通发送、圆桌发言、主持人总结等），长会话/圆桌 20 轮不再无限累积 DOM 导致浏览器冻结。②麦克风修复：浏览器安全限制下 HTTP 页面（navigator.mediaDevices 为 undefined）无法调用 getUserMedia，startVoiceRecord 增加 isSecureContext 前置检查，非 HTTPS 直接 toast 提示改用 https://IP:5667（自签名证书首次需「继续访问」信任）——浏览器与手机语音输入在 HTTPS 入口下均可正常使用。仅 ui/index.html，热更新生效，无需重启。",
   "files": [
-    { "path": "server/monitor.js" },
-    { "path": "server/pty_bridge.py" },
-    { "path": "server/preview_conv.py" },
-    { "path": "ui/index.html" }
+    {
+      "path": "ui/index.html"
+    }
   ]
 }
