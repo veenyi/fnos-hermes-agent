@@ -2,7 +2,7 @@
 import { spawn, spawnSync, execSync, execFile } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, rmSync, copyFileSync } from "fs";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { networkInterfaces } from "os";
 import { resolve as resolvePath, dirname, join } from "path";
@@ -10,6 +10,8 @@ import { fileURLToPath } from "url";
 import { PROVIDER_PRESETS, PROVIDER_MODELS, PROVIDER_API_KEYS, PROVIDER_CLASSES, PROVIDER_HERMES_IDS } from "./provider-config.js";
 import { handleCustomRoute } from "./custom_routes.js";
 import { CONNECTOR_CATALOG, getConnector, callConnectorTool, probeConnector } from "./connectors.js";
+import { BUILTIN_EXPERTS } from "./experts-data.js";
+import { MARKET_EXPERTS } from "./market-data.js";
 
 // 加载 vendor 目录内置的 ws 库（Node.js 无内置 WebSocket 服务器）
 const _require = createRequire(import.meta.url);
@@ -125,9 +127,10 @@ function writeAppVersion(version) {
   return reloadAppVersion();
 }
 
-// hermes-agent PyPI 版本对应的发布日期，仅用于 UI 展示区分（例如 v0.19.0 (2026.7.20)）。
-// 默认值取 0.19.0 的发布日期；后台尝试从 PyPI 拉取当前版本的准确日期覆盖之（失败则保留默认值）。
-let HERMES_VERSION_DATE = "2026.7.20";
+// hermes-agent 版本对应的发布日期，仅用于 UI 展示区分（例如 v0.20.0 (2026.8.3)）。
+// 默认值取 0.20.0 的发布日期（2026-08-03，tag v2026.8.3）；0.20.0 起官方停止 PyPI 分发，
+// 后台 PyPI 拉取将失败并保留默认值。
+let HERMES_VERSION_DATE = "2026.8.3";
 (function fetchHermesReleaseDate() {
   try {
     const v = HERMES_VERSION.replace(/^v/, "").split(" ")[0];
@@ -392,13 +395,13 @@ const CHANNEL_DEFS = {
   wecom: {
     name: "企业微信 (WeCom)", icon: "💼", qrLogin: true,
     fields: [
-      { env: "WECOM_CORP_ID", path: "extra.corp_id", label: "Corp ID", placeholder: "企业微信 Corp ID（扫码授权需要）" },
-      { env: "WECOM_AGENT_ID", path: "extra.agent_id", label: "Agent ID", placeholder: "自建应用 Agent ID" },
-      { env: "WECOM_BOT_ID", path: "extra.bot_id", label: "Bot ID", placeholder: "..." },
-      { env: "WECOM_SECRET", path: "extra.secret", label: "Secret", placeholder: "...", secret: true },
+      { env: "WECOM_BOT_ID", path: "extra.bot_id", label: "Bot ID", placeholder: "（扫码授权后自动填入）" },
+      { env: "WECOM_SECRET", path: "extra.secret", label: "Secret", placeholder: "（扫码授权后自动填入）", secret: true },
+      { env: "WECOM_CORP_ID", path: "extra.corp_id", label: "Corp ID (可选)", placeholder: "传统自建应用模式才需要" },
+      { env: "WECOM_AGENT_ID", path: "extra.agent_id", label: "Agent ID (可选)", placeholder: "传统自建应用模式才需要" },
     ],
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
-    note: "企业微信支持「扫码授权自建应用」：先填写 Corp ID / Agent ID / Secret，再点「企业微信扫码登录」用企业微信扫码授权。",
+    note: "企业微信「AI 智能机器人」扫码授权：点下方「企业微信扫码登录」，用企业微信扫码后在手机端确认，Bot ID / Secret 自动填入（与 Octop 一致，无需自备 Corp ID）。",
   },
 };
 
@@ -432,6 +435,17 @@ const WHATSAPP_SESSION_DIR    = `${DATA_DIR}/whatsapp/session`;
 const WHATSAPP_ONBOARDING_TTL = 600000; // 10 分钟（与官方一致）
 const _telegramPairings = new Map(); // pairing_id -> {poll_token, expires_at_ts, bot_token, bot_username, owner_user_id}
 const _whatsappPairings = new Map(); // pairing_id -> {proc, status, qr_payload, mode, account_id, account_name, account_phone, error, expires_at_ts}
+const _wecomQrCache = new Map();      // scode -> {ts, bot_id, secret}（腾讯 ai/qc 接口扫码结果缓存，3s TTL）
+let _gwRestartTimer = null;            // 网关重启防抖定时器（模块级，handleFetch 内声明会被每请求重置）
+let _gwRestartInProgress = false;      // 网关重启进行中标志（防止并发重启互相杀死对方）
+
+// ─── 定时任务 Webhook 出站投递配置 ──────────────────────────────────────
+// hermes cron 原生 deliver 只支持内置通道（weixin/telegram/dingtalk/feishu/wecom 等），
+// 不支持出站 Webhook POST。本包在 monitor 侧实现：创建任务时把 webhook 投递目标
+// 写入 CRON_WEBHOOKS_FILE，后台轮询 jobs.json 的 last_run_at 变化，新输出 POST 到
+// 企微机器人/钉钉机器人等任意 webhook 地址（body 兼容 {"msgtype":"text"} 与纯文本）。
+// 结构：{ "<job_id>": [ { url, message, label, last_run_at, last_status, last_error } ] }
+const CRON_WEBHOOKS_FILE = `${DATA_DIR}/cron-webhooks.json`;
 
 // ─── HERMES_TUI_DIR：TUI 运行时 shim 目录 ──────────────────────────────
 const TUI_DIR = `${DATA_DIR}/tui`;
@@ -577,18 +591,27 @@ try {
   mkdirSync(`${TUI_DIR}/dist`, { recursive: true });
   const tuiEntry = `${TUI_DIR}/dist/entry.js`;
   if (!existsSync(tuiEntry)) {
-    // 动态探测 hermes_cli 的 tui_dist/entry.js（不硬编码 python 版本）
-      const pyResult = spawnSync(
+    // 动态探测候选项（不硬编码 python 版本）：
+    // ① 旧版 wheel 模式：hermes_cli/tui_dist/entry.js（0.19.0）
+    // ② v0.20.0 源码模式：hermes-src/ui-tui/dist/entry.js（打包时预构建）
+    const pyResult = spawnSync(
       `${VENV_BIN}/python3`, ["-c", "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))"],
       { stdout: "pipe", stderr: "pipe" }
     );
     const hermesCli = pyResult.stdout?.toString().trim();
-    if (hermesCli && existsSync(`${hermesCli}/tui_dist/entry.js`)) {
+    const candidates = [];
+    if (hermesCli) candidates.push(`${hermesCli}/tui_dist/entry.js`);
+    candidates.push(`${APP_DIR}/hermes-src/ui-tui/dist/entry.js`);
+    let linked = null;
+    for (const cand of candidates) {
+      if (cand && existsSync(cand)) { linked = cand; break; }
+    }
+    if (linked) {
       try { unlinkSync(tuiEntry); } catch {}
-      symlinkSync(`${hermesCli}/tui_dist/entry.js`, tuiEntry);
-      console.log(`[monitor] tui symlink: ${tuiEntry} -> ${hermesCli}/tui_dist/entry.js`);
+      symlinkSync(linked, tuiEntry);
+      console.log(`[monitor] tui symlink: ${tuiEntry} -> ${linked}`);
     } else {
-      console.log("[monitor] WARNING: hermes_cli/tui_dist/entry.js not found, TUI may rely on bundled fallback");
+      console.log("[monitor] WARNING: TUI bundle not found (checked hermes_cli/tui_dist and hermes-src/ui-tui/dist), TUI may rely on bundled fallback");
     }
   }
 } catch (e) {
@@ -789,8 +812,8 @@ function migrateDisplayMarkdown() {
 function readJSON(path) {
   return JSON.parse(readFileSync(path, "utf-8"));
 }
-function writeJSON(path, data) {
-  writeFileSync(path, JSON.stringify(data, null, 2));
+function writeJSON(path, data, pretty) {
+  writeFileSync(path, pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data));
   try { chmodSync(path, 0o600); } catch {}
 }
 
@@ -828,7 +851,7 @@ function getChatConfig() {
     if (!cfg._version || cfg._version !== CONFIG_VERSION ||
         !Array.isArray(cfg.providers) || cfg.providers.length === 0) {
       const def = defaultConfig();
-      writeJSON(CONFIG_FILE, def);
+      writeJSON(CONFIG_FILE, def, true);
       return def;
     }
     syncActiveProviderFromConfigYaml(cfg);
@@ -873,7 +896,7 @@ function getChatConfig() {
         }
       }
     });
-    if (needsSave) writeJSON(CONFIG_FILE, cfg);
+    if (needsSave) writeJSON(CONFIG_FILE, cfg, true);
     return cfg;
   } catch {
     const def = defaultConfig();
@@ -882,7 +905,7 @@ function getChatConfig() {
   }
 }
 function saveChatConfig(cfg) {
-  writeJSON(CONFIG_FILE, cfg);
+  writeJSON(CONFIG_FILE, cfg, true);
 }
 function getActiveProvider() {
   const cfg = getChatConfig();
@@ -1232,16 +1255,36 @@ function resolveChatProviders(cfg, modelOverride) {
 function sessionFile(id) {
   return `${SESSIONS_DIR}/${id}.json`;
 }
-function listSessions() {
+// ── 会话列表内存缓存：避免每次 /api/sessions 全量读盘 + JSON.parse 所有会话文件 ──
+// 会话文件随对话增长（含全部消息），50 个会话 × 数百 KB 时每次同步解析可达秒级。
+// saveSession/deleteSession 主动维护缓存（列表实时），TTL 仅作外部改动兜底。
+let _sessionMetaCache = null;                 // { builtAt, map: Map<id,meta> }
+const SESSION_META_TTL = 5000;                // ms，兜底重建周期
+// 活跃 profile 内存缓存（模块级！handleFetch 每请求执行，若声明在函数内每次请求都会重置而失效）
+let _activeProfileCache = null;
+function _sessionMetaFromData(s) {
+  return { id: s.id, title: s.title, created_at: s.created_at, updated_at: s.updated_at, message_count: (s.messages || []).length };
+}
+function _buildSessionMetaMap() {
+  const map = new Map();
   try {
     const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith(".json"));
-    return files.map(f => {
+    files.forEach(f => {
       try {
         const s = readJSON(`${SESSIONS_DIR}/${f}`);
-        return { id: s.id, title: s.title, created_at: s.created_at, updated_at: s.updated_at, message_count: (s.messages || []).length };
-      } catch { return null; }
-    }).filter(Boolean).sort((a, b) => b.updated_at - a.updated_at);
-  } catch { return []; }
+        const meta = _sessionMetaFromData(s);
+        if (meta.id) map.set(meta.id, meta);
+      } catch { /* 忽略损坏/不可读文件 */ }
+    });
+  } catch { /* 目录不可读时返回空 */ }
+  return map;
+}
+function listSessions() {
+  const now = Date.now();
+  if (!_sessionMetaCache || (now - _sessionMetaCache.builtAt) > SESSION_META_TTL) {
+    _sessionMetaCache = { builtAt: now, map: _buildSessionMetaMap() };
+  }
+  return Array.from(_sessionMetaCache.map.values()).sort((a, b) => b.updated_at - a.updated_at);
 }
 function getSession(id) {
   const f = sessionFile(id);
@@ -1251,10 +1294,12 @@ function getSession(id) {
 function saveSession(s) {
   s.updated_at = Date.now();
   writeJSON(sessionFile(s.id), s);
+  if (_sessionMetaCache) _sessionMetaCache.map.set(s.id, _sessionMetaFromData(s));
 }
 function deleteSession(id) {
   const f = sessionFile(id);
   if (existsSync(f)) unlinkSync(f);
+  if (_sessionMetaCache) _sessionMetaCache.map.delete(id);
 }
 
 function createSSEParser(onDelta, onDone, onError, onToolEvent, onUsage, onReasoning) {
@@ -2402,8 +2447,8 @@ function setupDashboardProxy(ws) {
     ws.data.sendQueue = [];
     const up = ws.data.upstream;
     if (up && up.readyState === WebSocket.OPEN) {
-      for (const data of q) {
-        try { up.send(data); } catch {}
+      for (const item of q) {
+        try { up.send(item.d, { binary: item.b }); } catch {}
       }
     }
   }
@@ -2438,7 +2483,7 @@ function setupDashboardProxy(ws) {
         log(`[WS-PROXY] upstream connected`);
         flushQueue();
       });
-      upstream.on("message", (data) => {
+      upstream.on("message", (data, isBinary) => {
         if (ws.readyState !== WebSocket.OPEN) return;
         const path = ws.data.targetUrl?.replace(/\?.*$/, "") || "unknown";
         const isJsonPath = path.endsWith("/api/ws") || path.endsWith("/api/events");
@@ -2448,7 +2493,11 @@ function setupDashboardProxy(ws) {
             const payload = Buffer.isBuffer(data) ? data.toString("utf8") : (typeof data === "string" ? data : String(data));
             ws.send(payload, { binary: false });
           } else {
-            ws.send(data);
+            // 关键：保留上游帧类型（文本帧→文本帧、二进制帧→二进制帧）。
+            // 此前一律 ws.send(data)（Buffer）会把服务端文本帧（如 speak-stream 的
+            // {"type":"fallback"}）转成二进制帧，前端 JSON.parse 失败、PCM 帧也区分不了。
+            // /api/pty 的 Python 端同时接受 text/bytes 不受影响。
+            ws.send(data, { binary: isBinary });
           }
         } catch {}
       });
@@ -2526,15 +2575,17 @@ function attachWsHandlers(ws) {
           try { up.send(payload, { binary: false }); } catch {}
         } else if (!ws.data.closing) {
           ws.data.sendQueue = ws.data.sendQueue || [];
-          ws.data.sendQueue.push(payload);
+          ws.data.sendQueue.push({ d: payload, b: false });
         }
         return;
       }
       if (up && up.readyState === WebSocket.OPEN) {
-        try { up.send(data); } catch {}
+        // 同样保留客户端帧类型：浏览器发送的 {"text":...}/{"stop":true} 是文本帧，
+        // speak-stream 服务端用 receive_text() 读取，转成二进制帧会抛错；/api/pty 输入同时兼容。
+        try { up.send(data, { binary: isBinary }); } catch {}
       } else if (!ws.data.closing) {
         ws.data.sendQueue = ws.data.sendQueue || [];
-        ws.data.sendQueue.push(data);
+        ws.data.sendQueue.push({ d: data, b: isBinary });
       }
       return;
     }
@@ -2700,7 +2751,7 @@ async function stopPid(pidPath) {
   const pid = readPid(pidPath);
   if (pid) {
     try { process.kill(pid, "TERM"); } catch {}
-    await waitForExit(pid, 5000);
+    await waitForExit(pid, 1500);
     if (pidAlive(pid)) {
       try { process.kill(pid, "KILL"); } catch {}
       await new Promise(r => setTimeout(r, 200));
@@ -2810,6 +2861,12 @@ function spawnHermes(name, pidPath, args) {
   if (name === "dashboard") {
     // 固定仪表盘会话令牌，使 monitor 代理转发时能通过鉴权（见 proxyDashboard）
     env.HERMES_DASHBOARD_SESSION_TOKEN = DASHBOARD_SESSION_TOKEN;
+    // 预构建前端（hermes-src/hermes_cli/web_dist）随包分发，显式指定后 dashboard
+    // 直接 serve 静态产物，避免源码模式下无 npm（0.20.0 只查 managed node tree）
+    // 触发 _web_ui_build_needed → "Web UI frontend not built and npm is not available"
+    if (existsSync(`${APP_DIR}/hermes-src/hermes_cli/web_dist/index.html`)) {
+      env.HERMES_WEB_DIST = `${APP_DIR}/hermes-src/hermes_cli/web_dist`;
+    }
   }
 
   // 关键修复（Issue #3）：网关进程继承 process.env，但控制面板把 API key 写在
@@ -2947,8 +3004,15 @@ async function getStatus() {
 
   let lastLog = "";
   try {
-    const lines = readFileSync(LOG_FILE, "utf8").split("\n").filter(l => l.trim());
-    lastLog = lines.slice(-20).join("\n");
+    // 只读日志尾部（最多 64KB），避免 /api/status 每 3 秒轮询时全量读取持续增长的 hermes.log 阻塞事件循环
+    const size = statSync(LOG_FILE).size;
+    const fd = openSync(LOG_FILE, "r");
+    try {
+      const readLen = Math.min(size, 65536);
+      const buf = Buffer.alloc(readLen);
+      readSync(fd, buf, 0, readLen, size - readLen);
+      lastLog = buf.toString("utf8").split("\n").filter(l => l.trim()).slice(-20).join("\n");
+    } finally { closeSync(fd); }
   } catch {}
 
   return {
@@ -2996,10 +3060,13 @@ async function proxyDashboard(req) {
     headers.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
     // Node 的全局 fetch 在转发流 body（ReadableStream）时必须显式传 duplex:'half'，
     // 否则报 "RequestInit: duplex option is required when sending a body"。
+    // 语音端点超时放宽：/api/audio/transcribe 含 STT 推理（本地 Whisper 或远程 round-trip）、
+    // /api/audio/speak 含整段 TTS 合成，10s 默认超时必然误杀；统一放宽到 3 分钟，其余保持 10s 快速失败。
+    const _audioPath = subPath.startsWith("/api/audio/");
     const init = {
       method: req.method,
       headers,
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(_audioPath ? 180000 : 10000),
     };
     if (req.method !== "GET" && req.method !== "HEAD" && req.body) {
       init.body = req.body;
@@ -3525,9 +3592,11 @@ function serveFile(filePath, contentType, opts) {
   return new Response(stream, { headers });
 }
 
-// ── 启动自愈：config.yaml 若被顶格残留/重复段写坏，hermes 解析失败会回退默认配置，
-//    导致即使已配置模型也报 "No inference provider configured"。这里扫描并清除每个
-//    顶层块内的顶格 "- item" 残留（非法 YAML），修复后网关重启即可恢复。 ──
+// ── 启动自愈：config.yaml 若被顶格 "- item" 行写坏（非法 YAML），hermes 解析失败会
+//    回退默认配置，导致即使已配置模型也报 "No inference provider configured"。
+//    注意：PyYAML 等工具输出的顶格序列（如 "toolsets:\n- hermes-cli"）是合法 YAML，
+//    绝不能删除或丢弃缩进内容。这里仅把紧跟顶层键行后的顶格 "- " 行缩进 2 空格，
+//    转为等价且更保守的嵌套写法，其余行一律原样保留（数据无损）。 ──
 // 注：必须定义在模块顶层（handleFetch 之外），供 server.listen 回调调用。
 function _repairConfigYaml(){
   try {
@@ -3536,28 +3605,141 @@ function _repairConfigYaml(){
     let yml = readFileSync(p, "utf8");
     const lines = yml.split("\n");
     const out = [];
-    let removed = 0;
+    let fixed = 0;
     for (let k = 0; k < lines.length; k++){
       const line = lines[k];
       if (/^[a-zA-Z_][a-zA-Z0-9_-]*:$/.test(line)){
         out.push(line);
+        // 只处理紧随顶层键后的顶格 "- item" 行：缩进修复，不删除、不跳过任何内容
         let j = k + 1;
-        while (j < lines.length && (lines[j].startsWith(" ") || lines[j].startsWith("\t"))) j++;
-        while (j < lines.length && /^-\s/.test(lines[j])) { removed++; j++; }
+        while (j < lines.length && /^-\s/.test(lines[j])) {
+          out.push("  " + lines[j]);
+          fixed++; j++;
+        }
         k = j - 1;
         continue;
       }
       out.push(line);
     }
-    if (removed > 0){
+    if (fixed > 0){
       try { writeFileSync(p + ".pre-repair.bak", yml, { mode: 0o644 }); } catch (e) {}
       writeFileSync(p, out.join("\n"), { mode: 0o644 });
-      log(`[config-repair] config.yaml 已修复：清除 ${removed} 行顶格残留（原文件备份 .pre-repair.bak）`);
+      log(`[config-repair] config.yaml 已修复：${fixed} 行顶格列表项已缩进（原文件备份 .pre-repair.bak）`);
       return true;
     }
   } catch (e) { log("[config-repair] error: " + e.message); }
   return false;
 }
+
+// ─── 启动防御：providers-state.yaml 缺失时从 config.yaml 自动重建 ────────
+// 场景：install_init 误判全新安装 / 用户手动删除 / 文件损坏
+// config.yaml 是真实来源（provider 配置持久化在这里），重建时 base_url 默认空、
+// name 默认 id，用户可在控制面板「编辑」补全；但 API Key 保留在 .env.providers，
+// 因此重建后网关仍可正常工作。
+function _restoreProvidersState(){
+  try {
+    const statePath = `${VAR_DIR}/providers-state.yaml`;
+    if (existsSync(statePath)) return; // 正常情况：文件存在，无需重建
+    const yamlPath = `${DATA_DIR}/config.yaml`;
+    if (!existsSync(yamlPath)) return; // 全新安装无配置，不重建
+    const yml = readFileSync(yamlPath, "utf8");
+    if (!/^providers:/m.test(yml)) return; // config.yaml 无 providers 段
+    // 提取 providers 块（到下一个顶层键或文件结尾）
+    const blockMatch = yml.match(/^providers:\n([\s\S]*?)(?=\n[a-zA-Z_][a-zA-Z0-9_-]*:|$)/m);
+    if (!blockMatch) return;
+    const lines = blockMatch[1].split("\n");
+    const out = ["providers:"];
+    let hasReal = false;
+    for (let i = 0; i < lines.length; i++){
+      const km = lines[i].match(/^  ([a-zA-Z0-9_-]+):\s*$/);
+      if (km) {
+        out.push(`  ${km[1]}:`);
+        out.push(`    model: auto`);
+        out.push(`    base_url: ""`);
+        out.push(`    name: "${km[1]}"`);
+        if (km[1] !== "hermes") hasReal = true;
+      }
+    }
+    if (!hasReal) return; // 无真实 provider，不重建
+    writeFileSync(statePath, out.join("\n") + "\n", { mode: 0o644 });
+    log(`[providers-restore] providers-state.yaml 缺失，已从 config.yaml 重建（${out.length - 1} 个 provider）`);
+  } catch (e) { log("[providers-restore] error: " + e.message); }
+}
+
+/* ═══ 安全网关 v1（tool_guard）：拦截危险操作 / 标记敏感信息 ═══
+ * 拦截点：用户消息入队（/api/chat/ws-send）与 SSE 流式入口（/api/chat/stream）。
+ * 设计原则：保守拦截——只拦"破坏性命令且目标明确指向系统级路径/设备"的组合，
+ * 避免误伤正常讨论（如"rm -rf 的用法是什么"这类纯知识提问）。
+ * PII（身份证/手机号）仅记录警告不阻断：允许用户起草含证件的文档，AI 也不会
+ * 因一句"分析这段文本"就被拦死。开关经 GET/PUT /api/studio/security 查看/切换，
+ * 持久化到 data/studio/security.json（默认开启）。
+ * 融合来源：Octop tool_guard（allow/deny 规则 + 敏感挂载点拒绝）× shellward
+ * L3 Tool Blocker / L4 Input Auditor（中文注入规则 + 危险命令清单）。 */
+const TOOL_GUARD_BLOCK_RULES = [
+  { re: /\brm\s+-\S*[rf]\S*\s+(\/|\/\*|~)\s*(;|&|\||$)/i, hint: "rm -rf 递归删除根目录/主目录" },
+  { re: /\brm\s+-\S*[rf]\S*\s+\/(etc|boot|usr|var|bin|sbin|root|lib|lib64)\b/i, hint: "rm -rf 递归删除系统目录" },
+  { re: /\bdd\s+if=[^\s]+\s+of=\/dev\/(sd|hd|vd|nvme)/i, hint: "dd 直写磁盘设备" },
+  { re: /\bmkfs\.[a-z0-9]+\s+\/dev\//i, hint: "mkfs 格式化磁盘" },
+  { re: /\b(reboot|poweroff|halt|shutdown\s+-[a-z]*[rh])/i, hint: "关机/重启系统" },
+  { re: /:\(\)\s*\{\s*:\s*\|/i, hint: "fork bomb 分叉炸弹" },
+  { re: /(curl|wget)\s+[^\s|&]+\s*\|\s*(sudo\s+)?(sh|bash)\b/i, hint: "下载并直接执行脚本 (curl|sh)" },
+  { re: /\bchmod\s+-R\s+777\s+\//i, hint: "chmod -R 777 根目录" },
+  { re: /\bchown\s+-R\s+(root|0:0)\s+\//i, hint: "chown -R root 根目录" },
+  { re: />\s*\/dev\/(sd|hd|vd|nvme)[a-z]?\d?/i, hint: "向磁盘设备写入数据" },
+  { re: /\bkill\s+-9\s+[10]\b/i, hint: "kill -9 系统进程 (pid 0/1)" },
+  { re: /\b(iptables\s+-F|ufw\s+disable)\b/i, hint: "清空防火墙规则/关闭防火墙" },
+  { re: /\bcryptsetup\s+luksFormat/i, hint: "加密格式化磁盘 (LUKS)" },
+];
+const TOOL_GUARD_WARN_RULES = [
+  { re: /(?<!\d)1[3-9]\d{9}(?!\d)/g, hint: "手机号", kind: "PII" },
+  { re: /\b[1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b/g, hint: "身份证号", kind: "PII" },
+];
+let _toolGuardEnabled = true; // 默认开启；持久化 data/studio/security.json
+const TOOL_GUARD_CFG_FILE = `${DATA_DIR}/studio/security.json`;
+function toolGuardLoad() {
+  try {
+    if (existsSync(TOOL_GUARD_CFG_FILE)) {
+      const j = JSON.parse(readFileSync(TOOL_GUARD_CFG_FILE, "utf8") || "{}");
+      _toolGuardEnabled = j.enabled !== false;
+    }
+  } catch (e) { log("[tool-guard] config load failed: " + e.message); }
+}
+function toolGuardSave() {
+  try {
+    mkdirSync(dirname(TOOL_GUARD_CFG_FILE), { recursive: true });
+    writeFileSync(TOOL_GUARD_CFG_FILE, JSON.stringify({ enabled: _toolGuardEnabled }, null, 2), { mode: 0o644 });
+  } catch (e) { log("[tool-guard] config save failed: " + e.message); }
+}
+function toolGuardTextOf(msg) {
+  if (typeof msg === "string") return msg;
+  if (Array.isArray(msg)) return msg.map(p => (p && typeof p === "object" ? String(p.text || "") : "")).join(" ");
+  if (msg && typeof msg === "object") return String(msg.text || "");
+  return "";
+}
+function toolGuardScan(msg) {
+  const text = toolGuardTextOf(msg);
+  const out = { blocked: false, warnings: [] };
+  if (!text) return out;
+  for (const r of TOOL_GUARD_BLOCK_RULES) {
+    if (r.re.test(text)) { out.blocked = true; out.hint = r.hint; return out; }
+  }
+  for (const r of TOOL_GUARD_WARN_RULES) {
+    const m = text.match(r.re);
+    if (m && m.length) out.warnings.push({ hint: r.hint, kind: r.kind, count: m.length });
+  }
+  return out;
+}
+function toolGuardCheckAndRespond(msg) {
+  if (!_toolGuardEnabled) return null;
+  const scan = toolGuardScan(msg);
+  if (!scan.blocked) return null;
+  log(`[tool-guard] 拦截危险操作：${scan.hint}`);
+  return new Response(JSON.stringify({
+    blocked: true,
+    error: `⚠ 安全网关已拦截：检测到危险操作「${scan.hint}」。为防止 AI 误执行破坏性命令，这条消息未发送。如确属必要，请到「语音设置→安全网关」或 /api/studio/security 关闭后重试。`,
+  }), { status: 403, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+}
+toolGuardLoad();
 
 // ─── 请求处理器 ─────────────────────────────────────────────────────────
 async function handleFetch(req) {
@@ -3698,42 +3880,50 @@ async function handleFetch(req) {
       let latest = "unknown";
       let latestDate = "";
 
-      // 优先 PyPI JSON API（可获取发布日期）
-      try {
-        const r = await fetch("https://pypi.org/pypi/hermes-agent/json", {
-          signal: AbortSignal.timeout(10000),
-        });
-        if (r.ok) {
-          const data = await r.json();
-          if (data.info && data.info.version) {
-            latest = data.info.version;
-            const rels = data.releases && data.releases[latest];
-            if (rels && rels.length > 0 && rels[0].upload_time) {
-              const d = new Date(rels[0].upload_time);
-              latestDate = `(${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()})`;
-            }
-          }
-        }
-      } catch {}
+      // v0.20.0 起官方停止 PyPI 分发（wheel/sdist 被构建守卫拦截），PyPI 上永远显示旧版
+      // 0.19.0。源码模式（本包内置 hermes-src）下不再查询 PyPI，latest 直接展示当前版本。
+      const sourceMode = compareVersions(currentVer, "0.20.0") >= 0;
 
-      // 兜底：阿里云镜像 simple index（无日期信息）
-      if (latest === "unknown") {
+      // 优先 PyPI JSON API（可获取发布日期）
+      if (!sourceMode) {
         try {
-          const r2 = await fetch("https://mirrors.aliyun.com/pypi/simple/hermes-agent/", {
+          const r = await fetch("https://pypi.org/pypi/hermes-agent/json", {
             signal: AbortSignal.timeout(10000),
           });
-          const html = await r2.text();
-          const versions = [...html.matchAll(/hermes-agent-(\d+\.\d+\.\d+)/g)].map(m => m[1]);
-          if (versions.length > 0) {
-            versions.sort((a, b) => {
-              const pa = a.split(".").map(Number);
-              const pb = b.split(".").map(Number);
-              for (let i = 0; i < 3; i++) { if (pa[i] !== pb[i]) return pa[i] - pb[i]; }
-              return 0;
-            });
-            latest = versions[versions.length - 1];
+          if (r.ok) {
+            const data = await r.json();
+            if (data.info && data.info.version) {
+              latest = data.info.version;
+              const rels = data.releases && data.releases[latest];
+              if (rels && rels.length > 0 && rels[0].upload_time) {
+                const d = new Date(rels[0].upload_time);
+                latestDate = `(${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()})`;
+              }
+            }
           }
         } catch {}
+
+        // 兜底：阿里云镜像 simple index（无日期信息）
+        if (latest === "unknown") {
+          try {
+            const r2 = await fetch("https://mirrors.aliyun.com/pypi/simple/hermes-agent/", {
+              signal: AbortSignal.timeout(10000),
+            });
+            const html = await r2.text();
+            const versions = [...html.matchAll(/hermes-agent-(\d+\.\d+\.\d+)/g)].map(m => m[1]);
+            if (versions.length > 0) {
+              versions.sort((a, b) => {
+                const pa = a.split(".").map(Number);
+                const pb = b.split(".").map(Number);
+                for (let i = 0; i < 3; i++) { if (pa[i] !== pb[i]) return pa[i] - pb[i]; }
+                return 0;
+              });
+              latest = versions[versions.length - 1];
+            }
+          } catch {}
+        }
+      } else {
+        latest = currentVer;
       }
 
       const latestDisplay = latest !== "unknown" ? `v${latest} ${latestDate}`.trim() : "未知";
@@ -3767,11 +3957,13 @@ async function handleFetch(req) {
     };
 
     try {
-      const proc = spawn(
-        UV_BIN_PATH,
-        ["pip", "install", "--python", `${DATA_DIR}/venv/bin/python3`, "--upgrade", "--no-cache", "hermes-agent[all]"],
-        { env, stdio: ["ignore", "pipe", "pipe"] }
-      );
+      // v0.20.0+ 源码模式：hermes 不再从 PyPI 分发，更新 = 重新执行内置源码 editable 安装
+      // （无源码时退回旧版 PyPI 升级，用于旧包/热补丁场景）
+      const srcMode = existsSync(`${APP_DIR}/hermes-src/pyproject.toml`);
+      const installArgs = srcMode
+        ? ["pip", "install", "--python", `${DATA_DIR}/venv/bin/python3`, "--no-cache", "-e", `${APP_DIR}/hermes-src[all]`]
+        : ["pip", "install", "--python", `${DATA_DIR}/venv/bin/python3`, "--upgrade", "--no-cache", "hermes-agent[all]"];
+      const proc = spawn(UV_BIN_PATH, installArgs, { env, stdio: ["ignore", "pipe", "pipe"] });
       updateProc = proc;
 
       const decoder = new TextDecoder();
@@ -4319,6 +4511,24 @@ async function handleFetch(req) {
   // 通过 `hermes profile create/use/delete` CLI 管理，profile 目录 = DATA_DIR/profiles/<name>/
   const PROFILES_DIR = `${DATA_DIR}/profiles`;
 
+  // ── 辅助：从 config.yaml 提取模型名（支持三种格式，避免 \s 跨行吞嵌套键名）──
+  // 1) hermes config set model.model 写入: "model:\n  model: deepseek-v4-flash"
+  // 2) hermes 0.20 主配置: "model:\n  provider: xxx\n  default: sensenova-6.7-flash-lite"
+  // 3) 旧版单行: "model: deepseek-v4-flash"
+  function _extractConfigModel(cfg) {
+    const block = cfg.match(/^model:[ \t]*\n((?:[ \t]+[^\n]*\n?)+)/m);
+    if (block) {
+      const inner = block[1];
+      const dm = inner.match(/^[ \t]+default:[ \t]*(\S.*)$/m);
+      if (dm) return dm[1].trim();
+      const nm = inner.match(/^[ \t]+model:[ \t]*(\S.*)$/m);
+      if (nm) return nm[1].trim();
+    }
+    const single = cfg.match(/^model:[ \t]*(\S.*)$/m);
+    if (single) return single[1].trim();
+    return "";
+  }
+
   // ── 辅助：读取某个 profile 目录的详细信息 ──
   function _readProfileInfo(dir, id) {
     let soul = ""; try { soul = readFileSync(`${dir}/SOUL.md`, "utf8"); } catch {}
@@ -4326,9 +4536,7 @@ async function handleFetch(req) {
     let provider = "";
     try {
       const cfg = readFileSync(`${dir}/config.yaml`, "utf8");
-      model = (cfg.match(/^\s*default:\s*(.+)$/m) || [])[1] || "";
-      // 尝试提取 model.model 格式
-      if (!model) model = (cfg.match(/^\s*model:\s*(.+)$/m) || [])[1] || "";
+      model = _extractConfigModel(cfg);
       provider = (cfg.match(/^\s*provider:\s*(.+)$/m) || [])[1] || "";
     } catch {}
     // 读取 .env 中的 API 密钥（仅检测是否配置，不暴露完整密钥）
@@ -4368,6 +4576,8 @@ async function handleFetch(req) {
       has_api_key: hasApiKey,
       env_keys: envKeys,
       skills,
+      scene: meta.scene || "通用",
+      quick_prompts: Array.isArray(meta.quick_prompts) ? meta.quick_prompts : [],
       is_default: false,
     };
   }
@@ -4377,7 +4587,7 @@ async function handleFetch(req) {
     // 默认 profile（主目录 DATA_DIR 本身 = ~/.hermes）
     let defaultSoul = ""; try { defaultSoul = readFileSync(`${DATA_DIR}/SOUL.md`, "utf8"); } catch {}
     const mainCfg = _readHermesConfig();
-    const mainModel = (mainCfg.match(/^\s*default:\s*(.+)$/m) || [])[1] || "";
+    const mainModel = _extractConfigModel(mainCfg) || (mainCfg.match(/^\s*default:\s*(.+)$/m) || [])[1] || "";
     let defaultSkills = [];
     try {
       const sd = `${DATA_DIR}/skills`;
@@ -4393,6 +4603,8 @@ async function handleFetch(req) {
       has_api_key: true,
       env_keys: [],
       skills: defaultSkills,
+      scene: "通用",
+      quick_prompts: [],
       is_default: true,
       is_active: _getActiveProfile() === "default",
     });
@@ -4413,7 +4625,10 @@ async function handleFetch(req) {
   }
 
   // ── 活跃 profile 检测：优先使用 hermes profile list 解析，兜底 .active_profile 文件 ──
+  // 注意：CLI 每次 spawn 拉起 venv Python（页面加载 /api/profiles 的瓶颈），
+  // 因此结果做内存缓存（_activeProfileCache 声明在模块级）；_setActiveProfile 时同步更新，避免陈旧。
   function _getActiveProfile() {
+    if (_activeProfileCache) return _activeProfileCache;
     // 方式1：解析 hermes profile list 输出（活跃 profile 带 ◆ 前缀）
     // 实际格式: " ◆default         sensenova-6.7-flash-lite     running      —            —"
     try {
@@ -4428,20 +4643,21 @@ async function handleFetch(req) {
           // ◆ 标记 = 当前活跃 profile（可能无空格直接连接名称）
           if (trimmed.includes("◆")) {
             const name = trimmed.replace(/^[\s◆]+/, "").trim().split(/\s+/)[0];
-            if (name) return name;
+            if (name) { _activeProfileCache = name; return name; }
           }
           // 兼容其他可能的标记格式: "* coder" 或 "→ coder" 或 "(active)"
           if (/^[\*→>]\s+/.test(trimmed) || /\(active\)|\(current\)/.test(trimmed)) {
             const name = trimmed.replace(/^[\*→>]\s+/, "").replace(/\s*\(active\)|\s*\(current\)/, "").trim().split(/\s+/)[0];
-            if (name && name !== "Profile") return name;
+            if (name && name !== "Profile") { _activeProfileCache = name; return name; }
           }
         }
         // 有输出但没找到标记，默认 default
+        _activeProfileCache = "default";
         return "default";
       }
     } catch {}
     // 方式2：兜底读取本地记录文件
-    try { return readFileSync(`${DATA_DIR}/.active_profile`, "utf8").trim(); } catch { return "default"; }
+    try { _activeProfileCache = readFileSync(`${DATA_DIR}/.active_profile`, "utf8").trim(); return _activeProfileCache; } catch { return "default"; }
   }
 
   function _setActiveProfile(id) {
@@ -4459,6 +4675,7 @@ async function handleFetch(req) {
     }
     // 同时写入本地记录文件（供 CLI 不可用时兜底）
     try { writeFileSync(`${DATA_DIR}/.active_profile`, id || "default"); } catch {}
+    _activeProfileCache = id || "default";  // 同步内存缓存，避免陈旧
   }
 
   function _createProfile(id, body) {
@@ -4502,17 +4719,104 @@ async function handleFetch(req) {
     }
     // 写入 UI 元数据（emoji、显示名等，Hermes CLI 不管理这些）
     const meta = { name: body.name || id, emoji: body.emoji || "🤖", created_at: Date.now() };
+    if (body.scene) meta.scene = String(body.scene).trim();
+    if (Array.isArray(body.quick_prompts) && body.quick_prompts.length) {
+      meta.quick_prompts = body.quick_prompts.filter(s => typeof s === "string" && s.trim()).slice(0, 12);
+    }
     writeFileSync(`${dir}/metadata.json`, JSON.stringify(meta, null, 2));
     return { ok: true, id };
+  }
+
+  // 将技能 id 列表写入 profile 的 config.yaml skills 块（替换旧块或追加；default 写主配置）
+  function _writeProfileSkills(id, skills) {
+    const cfgPath = id === "default" ? `${DATA_DIR}/config.yaml` : `${PROFILES_DIR}/${id}/config.yaml`;
+    if (!existsSync(cfgPath)) return;
+    let cfg = ""; try { cfg = readFileSync(cfgPath, "utf8"); } catch { return; }
+    const list = Array.isArray(skills) ? skills.filter(s => typeof s === "string" && s.trim()) : [];
+    if (!list.length) return; // 空数组 = 不动（避免误清）
+    const skillsYaml = list.map(s => "  - " + s.trim()).join("\n") + "\n";
+    if (/^skills:[ \t]*\n/m.test(cfg)) cfg = cfg.replace(/^skills:[ \t]*\n(?:[ \t].*\n?)*/m, "skills:\n" + skillsYaml);
+    else cfg = cfg.replace(/\n*$/, "\n") + "skills:\n" + skillsYaml;
+    writeFileSync(cfgPath, cfg);
+    log(`[profiles] ${id} skills 已更新: ${list.join(", ")}`);
+  }
+
+  // 模型名 → hermes 内置 provider id（仅收录 auth.py ProviderConfig 确认存在的 id；无匹配返回 null 保留现有 provider）。
+  // 注：模型名含 ":" 或 "/"（如 ollama 的 deepseek-v4-flash:0731）视为自定义模型，不联动内置 provider。
+  function _modelProviderId(model) {
+    const m = String(model || "").toLowerCase();
+    if (m.includes(":") || m.includes("/")) return null;
+    const rules = [
+      [/^deepseek/, "deepseek"], [/^qwen/, "alibaba"], [/^kimi/, "kimi-coding"],
+      [/^minimax/, "minimax"], [/^claude/, "anthropic"], [/^gemini/, "gemini"],
+      [/^grok/, "xai"],
+    ];
+    for (const [re, id] of rules) if (re.test(m)) return id;
+    return null;
+  }
+
+  // 在 config.yaml 的 providers: 段内查找 default_model 与目标模型精确匹配的 provider id
+  //（覆盖 ollama/custom 等用户自建 provider，如 249 的 custom_umsalmjwyizjv），无匹配返回 null。
+  function _providerForModel(yml, model) {
+    if (!yml || !model) return null;
+    const lines = yml.split("\n");
+    let inProv = false, curId = null;
+    for (const l of lines) {
+      if (/^providers:[ \t]*$/.test(l)) { inProv = true; continue; }
+      if (inProv) {
+        if (/^[a-zA-Z_]/.test(l)) break; // providers 段结束（下一顶层键）
+        const m = l.match(/^  ([a-zA-Z_][\w-]*):/);
+        if (m) { curId = m[1]; continue; }
+        if (curId) {
+          const dm = l.match(/default_model:[ \t]*(\S+)/);
+          if (dm && dm[1] === model) return curId;
+        }
+      }
+    }
+    return null;
+  }
+
+  // 块级文本编辑 config.yaml 的 model 块：替换/新增 default 与 provider 行，
+  // 清除 0.19 遗留的嵌套 "model: xxx" 键（hermes 0.20 不识别该格式），无 model 块时追加。
+  // 不调 hermes config set：0.20 的 config set 会写 0.19 旧格式或产生空键骨架。
+  function _setModelInConfig(yml, model, providerId) {
+    const lines = yml.split("\n");
+    let idx = -1;
+    for (let i = 0; i < lines.length; i++) { if (/^model:[ \t]*$/.test(lines[i])) { idx = i; break; } }
+    if (idx < 0) {
+      const add = "model:\n" + (providerId ? `  provider: ${providerId}\n` : "") + `  default: ${model}\n`;
+      return (yml ? yml.replace(/\n?$/, "\n") : "") + add;
+    }
+    let end = idx + 1;
+    while (end < lines.length && /^[ \t]/.test(lines[end])) end++;
+    const out = [lines[idx]];
+    let hasDefault = false, hasProvider = false;
+    for (let i = idx + 1; i < end; i++) {
+      const l = lines[i];
+      if (/^[ \t]+default:/.test(l)) { out.push(l.replace(/^([ \t]+default:).*$/, `$1 ${model}`)); hasDefault = true; }
+      else if (providerId && /^[ \t]+provider:/.test(l)) { out.push(l.replace(/^([ \t]+provider:).*$/, `$1 ${providerId}`)); hasProvider = true; }
+      else if (/^[ \t]+model:/.test(l)) { /* 0.19 遗留嵌套 model 键：清除 */ }
+      else out.push(l);
+    }
+    if (providerId && !hasProvider) out.push(`  provider: ${providerId}`);
+    if (!hasDefault) out.push(`  default: ${model}`);
+    return lines.slice(0, idx).concat(out, lines.slice(end)).join("\n");
   }
 
   function _updateProfile(id, body) {
     if (id === "default") {
       // 默认 profile：更新主目录下的 SOUL.md / config.yaml
       if (body.prompt != null) writeFileSync(`${DATA_DIR}/SOUL.md`, body.prompt);
+      if (body.skills != null && Array.isArray(body.skills)) _writeProfileSkills("default", body.skills);
       if (body.model) {
-        // 通过 hermes config set 更新模型（官方方式）
-        try { spawnSync(HERMES_BIN, ["config", "set", "model.model", body.model], { stdout: "pipe", stderr: "pipe", timeout: 8000 }); } catch {}
+        // 纯文本块级编辑 model 块（hermes config set 在 0.20 会写 0.19 旧嵌套键 model.model
+        // 或产生空键骨架，弃用）；provider 推断：providers 段 default_model 匹配优先，其次内置前缀
+        try {
+          let yml = readFileSync(HERMES_CONFIG, "utf8");
+          const pid = _providerForModel(yml, body.model) || _modelProviderId(body.model);
+          yml = _setModelInConfig(yml, body.model, pid);
+          writeFileSync(HERMES_CONFIG, yml, { mode: 0o644 });
+        } catch (e) { log(`[profiles] 更新主配置模型失败: ${e.message}`); }
       }
       return { ok: true };
     }
@@ -4520,22 +4824,14 @@ async function handleFetch(req) {
     if (!existsSync(dir)) return { ok: false, error: "profile not found" };
     // 更新 SOUL.md（个性/指令）
     if (body.prompt != null) writeFileSync(`${dir}/SOUL.md`, body.prompt);
-    // 更新模型配置
+    // 更新模型配置（纯文本块级编辑，见 _setModelInConfig 注释）
     if (body.model) {
       try {
-        // 优先使用 hermes -p <name> config set（官方方式）
-        const r = spawnSync(HERMES_BIN, ["-p", id, "config", "set", "model.model", body.model], { stdout: "pipe", stderr: "pipe", timeout: 8000 });
-        if (r.status !== 0) throw new Error("cli failed");
-      } catch {
-        // 兜底：直接写 config.yaml
-        let cfg = ""; try { cfg = readFileSync(`${dir}/config.yaml`, "utf8"); } catch {}
-        if (cfg.match(/^\s*default:\s*.+$/m)) {
-          cfg = cfg.replace(/^(\s*default:\s*).+$/m, `$1${body.model}`);
-        } else {
-          cfg += `\nmodel:\n  default: ${body.model}\n`;
-        }
-        writeFileSync(`${dir}/config.yaml`, cfg);
-      }
+        let yml = readFileSync(`${dir}/config.yaml`, "utf8");
+        const pid = _providerForModel(yml, body.model) || _modelProviderId(body.model);
+        yml = _setModelInConfig(yml, body.model, pid);
+        writeFileSync(`${dir}/config.yaml`, yml);
+      } catch (e) { log(`[profiles] 更新 ${id} 模型失败: ${e.message}`); }
     }
     // 更新 .env（API 密钥等）
     if (body.env && typeof body.env === "object") {
@@ -4552,10 +4848,20 @@ async function handleFetch(req) {
       const newEnv = Object.keys(envMap).map(k => `${k}=${envMap[k]}`).join("\n") + "\n";
       writeFileSync(`${dir}/.env`, newEnv);
     }
+    // 更新 skills（写入 config.yaml 的 skills 块；[] = 清空独立技能回到预置）
+    if (body.skills != null && Array.isArray(body.skills)) {
+      _writeProfileSkills(id, body.skills);
+    }
     // 更新 UI 元数据
     let meta = {}; try { meta = JSON.parse(readFileSync(`${dir}/metadata.json`, "utf8")); } catch {}
     if (body.name != null) meta.name = body.name;
     if (body.emoji != null) meta.emoji = body.emoji;
+    if (body.scene != null) meta.scene = String(body.scene).trim() || "通用";
+    if (body.quick_prompts != null) {
+      meta.quick_prompts = Array.isArray(body.quick_prompts)
+        ? body.quick_prompts.filter(s => typeof s === "string" && s.trim()).slice(0, 12)
+        : [];
+    }
     meta.updated_at = Date.now();
     writeFileSync(`${dir}/metadata.json`, JSON.stringify(meta, null, 2));
     return { ok: true };
@@ -4597,6 +4903,9 @@ async function handleFetch(req) {
       const body = await req.json().catch(() => ({}));
       const id = (body.id || body.name || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_") || ("agent_" + Date.now());
       const r = _createProfile(id, body);
+      if (r.ok && Array.isArray(body.skills) && body.skills.length) {
+        try { _writeProfileSkills(id, body.skills); } catch (e) { log(`[profiles] 写入 ${id} skills 失败: ${e.message}`); }
+      }
       return new Response(JSON.stringify(r), { status: r.ok ? 200 : 400, headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
@@ -4654,11 +4963,110 @@ async function handleFetch(req) {
           if (idx < 0) return;
           const key = s.slice(0, idx).trim();
           const val = s.slice(idx + 1).trim();
+          // 过滤历史脏键（如模型名 "sensenova-6.7-flash-lite"、非法字符），避免假键混入面板
+          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return;
           // 脱敏：只显示前4位 + ***
           envObj[key] = val.length > 8 ? val.slice(0, 4) + "****" : (val ? "****" : "");
         });
       } catch {}
       return new Response(JSON.stringify({ ok: true, env: envObj }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // PUT /api/profiles/:id/env → 更新 profile 的 .env（API 密钥等），保存后重启网关生效
+  // body: { env: { KEY: value } }，value 为空字符串则删除该键；不存在的键不处理
+  if (profileEnvMatch && req.method === "PUT") {
+    try {
+      const id = profileEnvMatch[1];
+      const body = await req.json().catch(() => ({}));
+      const updates = body.env && typeof body.env === "object" ? body.env : {};
+      // 键名 sanitize：仅接受标准环境变量名（拒绝模型名/含特殊字符的历史脏键），同时删除 .env 中已有的非法键
+      const KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+      const cleanUpdates = {};
+      Object.keys(updates).forEach(k => { if (KEY_RE.test(k)) cleanUpdates[k] = updates[k]; });
+      const keys = Object.keys(cleanUpdates);
+      if (!keys.length) return new Response(JSON.stringify({ ok: false, error: "env 为空或包含非法键名" }), { status: 400, headers: jsonHeaders() });
+      const envPath = id === "default" ? `${DATA_DIR}/.env` : `${PROFILES_DIR}/${id}/.env`;
+      let lines = [];
+      try {
+        const content = readFileSync(envPath, "utf8");
+        lines = content.split("\n");
+      } catch {}
+      const seen = new Set();
+      let existed = false;
+      const out = lines.map(line => {
+        const s = line.trim();
+        if (!s || s.startsWith("#") || s.indexOf("=") < 0) return line;
+        const key = s.slice(0, s.indexOf("=")).trim();
+        if (!KEY_RE.test(key)) return null; // 历史脏键 → 本次保存时清洗删除
+        if (seen.has(key)) return line; // 重复键：保留首条，后续由追加逻辑处理
+        seen.add(key);
+        if (!(key in cleanUpdates)) return line;
+        existed = true;
+        const val = String(cleanUpdates[key] || "").trim();
+        return val ? `${key}=${val}` : null; // 空值 → 删除该行
+      }).filter(l => l !== null);
+      keys.forEach(key => {
+        if (seen.has(key)) return;
+        const val = String(cleanUpdates[key] || "").trim();
+        if (val) out.push(`${key}=${val}`);
+      });
+      mkdirSync(dirname(envPath), { recursive: true });
+      writeFileSync(envPath, out.join("\n").replace(/\n+$/, "") + "\n");
+      // 密钥变更需重启网关才生效（网关只在启动时读 .env）
+      _triggerGatewayRestart("profile-env-" + id);
+      return new Response(JSON.stringify({ ok: true, updated: keys, restarting: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // ─── 专家：市场清单与创建 ──────────────────────────────────────────────
+  // GET /api/experts?scope=builtin|market → 内置专家 / 专家市场清单（本地捆绑，字段对齐 Octop MarketExpert 子集）
+  if (path === "/api/experts" && req.method === "GET") {
+    try {
+      const url = new URL(req.url, "http://localhost");
+      const scope = (url.searchParams.get("scope") || "builtin").trim();
+      const list = scope === "market" ? MARKET_EXPERTS : BUILTIN_EXPERTS;
+      return new Response(JSON.stringify({ ok: true, scope, experts: list }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // POST /api/experts/create → 内置/市场专家模板 → profile 创建（含 skills 写入）并激活
+  // body: { slug }
+  if (path === "/api/experts/create" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const slug = String(body.slug || "").trim();
+      const exp = BUILTIN_EXPERTS.find(e => e.slug === slug || e.id === slug)
+        || MARKET_EXPERTS.find(e => e.slug === slug || e.id === slug);
+      if (!exp) return new Response(JSON.stringify({ ok: false, error: "未找到专家模板: " + slug }), { status: 404, headers: jsonHeaders() });
+      const id = (exp.slug || exp.name || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      let r = _createProfile(id, { name: exp.name, emoji: exp.emoji, prompt: exp.prompt, scene: exp.scene, quick_prompts: exp.quick_prompts });
+      if (!r.ok) {
+        // 已存在 → 直接激活（不改写已有配置）
+        if (String(r.error).includes("已存在")) {
+          _setActiveProfile(id);
+          _triggerGatewayRestart("expert-activate-" + id);
+          return new Response(JSON.stringify({ ok: true, profile: { id, name: exp.name }, activated: true }), { headers: jsonHeaders() });
+        }
+        return new Response(JSON.stringify(r), { status: 400, headers: jsonHeaders() });
+      }
+      // 写入 profile 的 skills 块（hermes 技能 id 列表；替换旧块或追加）
+      if (Array.isArray(exp.skills) && exp.skills.length) {
+        const cfgPath = `${PROFILES_DIR}/${id}/config.yaml`;
+        let cfg = ""; try { cfg = readFileSync(cfgPath, "utf8"); } catch {}
+        const skillsYaml = exp.skills.map(s => "  - " + s).join("\n") + "\n";
+        if (/^skills:[ \t]*\n/m.test(cfg)) cfg = cfg.replace(/^skills:[ \t]*\n(?:[ \t].*\n?)*/m, "skills:\n" + skillsYaml);
+        else cfg = cfg.replace(/\n*$/, "\n") + "skills:\n" + skillsYaml;
+        writeFileSync(cfgPath, cfg);
+        log(`[experts] ${id} skills 已写入: ${exp.skills.join(", ")}`);
+      }
+      _setActiveProfile(id);
+      _triggerGatewayRestart("expert-create-" + id);
+      return new Response(JSON.stringify({ ok: true, profile: { id, name: exp.name } }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
@@ -4882,11 +5290,20 @@ async function handleFetch(req) {
   }
   function _getEnvValue(content, key){
     const m = content.match(new RegExp("^" + key.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*=\\s*(.+)$", "m"));
-    return m ? m[1].trim() : "";
+    if (!m) return "";
+    let v = m[1].trim();
+    // 去除引号包裹
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    else {
+      // 未加引号的值：去除内联 # 注释（# 前有空格才算注释）
+      const ci = v.indexOf(" #");
+      if (ci >= 0) v = v.slice(0, ci).trim();
+    }
+    return v;
   }
   function _setEnvValue(content, key, value){
     const safeKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const line = key + "=" + (value || "");
+    const line = key + "=" + (value ?? "");
     if (content.match(new RegExp("^" + safeKey + "\\s*=", "m"))) {
       return content.replace(new RegExp("^" + safeKey + "\\s*=.*$", "m"), line);
     }
@@ -5002,27 +5419,87 @@ async function handleFetch(req) {
     for (const p of parts) { if (cur == null || typeof cur !== "object") return undefined; cur = cur[p]; }
     return cur;
   }
-  // 读取 config.yaml 中 platforms.<id> 下的嵌套键值
+  // 读取 config.yaml 中 platforms.<id> 下的嵌套键值（支持任意缩进深度）
   function _readPlatformConfig(id){
     const yml = _readHermesConfig();
-    const re = new RegExp("^  " + id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ":(?:\\n((?:    .*(?:\\n      .*)*\\n?)*))?", "m");
-    const m = yml.match(re);
-    if (!m || !m[1]) return {};
+    const lines = yml.split("\n");
+    // 1. 找到 platforms: 段
+    let platHeader = -1;
+    for (let i = 0; i < lines.length; i++) { if (/^platforms:\s*$/.test(lines[i])) { platHeader = i; break; } }
+    if (platHeader < 0) return {};
+    // 2. 在 platforms 下找到目标 id 块
+    const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const blockRe = new RegExp("^  " + escaped + ":\\s*(.*)$");
+    let blockStart = -1, inlineVal = "";
+    for (let i = platHeader + 1; i < lines.length; i++) {
+      if (/^[a-zA-Z_]/.test(lines[i])) break; // 顶层键 → platforms 段结束
+      const m = lines[i].match(blockRe);
+      if (m) { blockStart = i; inlineVal = m[1].trim(); break; }
+    }
+    if (blockStart < 0) return {};
+    if (inlineVal && inlineVal !== "{}") return _yamlUnquote(inlineVal); // 内联值
+    // 3. 收集该块所有子行（缩进 >= 4 空格），遇到下一个 2 空格平台键或顶层键则停止
+    const childLines = [];
+    for (let i = blockStart + 1; i < lines.length; i++) {
+      const l = lines[i];
+      if (l.trim() === "") continue; // 跳过空行
+      if (/^[a-zA-Z_]/.test(l)) break; // 顶层键
+      if (/^  [a-zA-Z_]/.test(l)) break; // 下一个平台键
+      if (/^    /.test(l)) childLines.push(l); // 4+ 空格缩进 → 属于此块
+    }
+    if (childLines.length === 0) return {};
+    // 4. 按缩进层级递归解析为嵌套对象
+    return _parseIndentBlock(childLines, 4);
+  }
+  // 解析一组按缩进排列的 YAML 行为嵌套对象（支持任意深度）
+  function _parseIndentBlock(lines, baseIndent){
     const obj = {};
-    let curObj = null;
-    m[1].split("\n").forEach(l => {
-      if (!l.trim()) return;
-      const mm = l.match(/^    ([a-zA-Z_][\w-]*):\s*(.*)$/);
-      if (mm) {
-        const key = mm[1], val = mm[2].trim();
-        if (val === "") { obj[key] = {}; curObj = obj[key]; }
-        else { obj[key] = _yamlUnquote(val); curObj = null; }
+    const pad = " ".repeat(baseIndent);
+    let i = 0;
+    while (i < lines.length) {
+      const l = lines[i];
+      if (!l.startsWith(pad)) { i++; continue; } // 缩进不足，跳过
+      // 检查是否正好是 baseIndent 级别的键
+      const afterPad = l.slice(baseIndent);
+      if (afterPad.startsWith(" ")) { i++; continue; } // 更深层，不属于当前级别
+      const kvMatch = afterPad.match(/^([a-zA-Z_][\w-]*):\s*(.*)$/);
+      if (!kvMatch) { i++; continue; }
+      const key = kvMatch[1], val = kvMatch[2].trim();
+      if (val && val !== "|" && val !== ">") {
+        // 叶子键值
+        if (val.startsWith("[") && val.endsWith("]")) {
+          // 内联数组 [a, b, c]
+          obj[key] = val.slice(1, -1).split(",").map(s => _yamlUnquote(s.trim())).filter(s => s !== "");
+        } else {
+          obj[key] = _yamlUnquote(val);
+        }
+        i++;
       } else {
-        const em = l.match(/^      ([a-zA-Z_][\w-]*):\s*(.*)$/);
-        if (em) { const k = em[1], v = _yamlUnquote(em[2].trim()); (curObj && typeof curObj === "object" ? curObj : (obj.__extra = obj.__extra || {}))[k] = v; }
+        // 子块：收集更深缩进的行
+        i++;
+        const subLines = [];
+        while (i < lines.length) {
+          const sl = lines[i];
+          if (sl.trim() === "") { i++; continue; }
+          if (sl.startsWith(pad + "  ")) { subLines.push(sl); i++; } // 更深缩进
+          else break;
+        }
+        if (subLines.length > 0) {
+          // 检测子块是列表还是映射
+          const firstSub = subLines.find(s => s.trim() !== "");
+          if (firstSub && /^ *- /.test(firstSub.slice(baseIndent + 2))) {
+            // YAML 列表
+            obj[key] = subLines
+              .filter(s => s.trim().startsWith("- "))
+              .map(s => _yamlUnquote(s.trim().slice(2).trim()));
+          } else {
+            obj[key] = _parseIndentBlock(subLines, baseIndent + 2);
+          }
+        } else {
+          obj[key] = val === "|" || val === ">" ? "" : (val === "" ? {} : _yamlUnquote(val));
+        }
       }
-    });
-    delete obj.__extra;
+    }
     return obj;
   }
   function _setPlatformConfig(id, obj){
@@ -5299,6 +5776,11 @@ async function handleFetch(req) {
         const v = body.config[p]; if (v != null) _setValByPath(cfg, p, v);
       });
     }
+    // 确保 skills 始终为数组（YAML {} 会解析为空对象，导致前端 indexOf 崩溃）
+    if (cfg.skills != null && !Array.isArray(cfg.skills)) {
+      if (typeof cfg.skills === "object") cfg.skills = Object.keys(cfg.skills);
+      else cfg.skills = [];
+    }
     // 通道级模型/系统提示：网关只认 channel_overrides[chat_id]（platforms.<id>.model 会被忽略），
     // 保存时同步到该平台全部已知 chat_id（新增会话由 _syncChannelOverrides 定时补齐）
     const chModel = (body.config && body.config.model != null) ? String(body.config.model).trim() : "";
@@ -5316,12 +5798,47 @@ async function handleFetch(req) {
         cfg.channel_overrides = ov;
         log(`[ChannelOverride] 通道 ${id} 保存：模型覆盖已应用到 ${chatIds.length} 个会话`);
       }
-    } else if (cfg.channel_overrides && typeof cfg.channel_overrides === "object" && !Object.keys(cfg.channel_overrides).length) {
-      // 用户清空模型/系统提示（跟随角色）→ 移除本功能写入的 channel_overrides
-      delete cfg.channel_overrides;
+    } else if (cfg.channel_overrides && typeof cfg.channel_overrides === "object") {
+      // 用户清空模型/系统提示（跟随角色）→ 移除本功能写入的 model/system_prompt
+      const ov = cfg.channel_overrides;
+      Object.keys(ov).forEach(cid => {
+        if (ov[cid] && typeof ov[cid] === "object") {
+          delete ov[cid].model;
+          delete ov[cid].system_prompt;
+          if (!Object.keys(ov[cid]).length) delete ov[cid];
+        }
+      });
+      if (!Object.keys(ov).length) delete cfg.channel_overrides;
+      log(`[ChannelOverride] 通道 ${id}：用户清空模型/系统提示，已移除覆盖`);
     }
     cfg.updated_at = Date.now();
     _writeHermesConfig(_setPlatformConfig(id, cfg));
+    // ── 自动启用通道对应的 hermes 插件 toolset ───────────────────────────
+    // wecom / dingtalk / feishu 等是 hermes 插件平台，必须在 config.yaml 的
+    // toolsets 里列出对应条目（如 hermes-wecom）网关才会在启动时加载该插件。
+    // 用户保存通道配置时自动补上，避免「配置了却不连」的困惑。
+    const _PLUGIN_TOOLSET = {
+      wecom: "hermes-wecom", wecom_callback: "hermes-wecom-callback",
+      dingtalk: "hermes-dingtalk", feishu: "hermes-feishu",
+      telegram: "hermes-telegram", discord: "hermes-discord",
+      slack: "hermes-slack", matrix: "hermes-matrix",
+      signal: "hermes-signal", qqbot: "hermes-qqbot",
+      whatsapp: "hermes-whatsapp", email: "hermes-email",
+      homeassistant: "hermes-homeassistant", mattermost: "hermes-mattermost",
+    };
+    if (_PLUGIN_TOOLSET[id]) {
+      try {
+        const needed = _PLUGIN_TOOLSET[id];
+        let y2 = _readHermesConfig();
+        const curTs = _extractYamlList(y2, "toolsets");
+        if (!curTs.includes(needed)) {
+          curTs.push(needed);
+          y2 = _setYamlListBlock(y2, "toolsets", curTs);
+          _writeHermesConfig(y2);
+          log(`[ChannelToolset] 自动启用 ${needed}（通道 ${id} 需要此插件）`);
+        }
+      } catch (e) { log(`[ChannelToolset] 启用 ${_PLUGIN_TOOLSET[id]} 失败: ${e.message}`); }
+    }
     return { ok: true };
   }
 
@@ -6190,14 +6707,29 @@ async function handleFetch(req) {
     }
   }
 
-  // ─── 定时任务（Cron）管理 API（读取 DATA_DIR/cron/jobs.json + hermes cron CLI）───
+  // ─── 定时任务（Cron）管理 API（读取活跃 profile 的 jobs.json，兼容旧全局路径）───
+  // 注：hermes 0.20.0 起 cron 数据按 profile 隔离（profiles/<id>/cron/jobs.json），
+  // 若仍读全局 DATA_DIR/cron/jobs.json 将永远得到空列表（0.20 升级遗留问题，此处修复）。
   const CRON_DIR = `${DATA_DIR}/cron`;
   const CRON_JOBS_FILE = `${CRON_DIR}/jobs.json`;
 
+  // 优先读活跃 profile 的 jobs.json；不存在时回退全局路径（兼容旧版/异常状态）
+  function _cronJobsFile() {
+    try {
+      const prof = _getActiveProfile();
+      if (prof) {
+        const p = `${DATA_DIR}/profiles/${prof}/cron/jobs.json`;
+        if (existsSync(p)) return p;
+      }
+    } catch {}
+    return CRON_JOBS_FILE;
+  }
+
   function _readCronJobs() {
     try {
-      if (!existsSync(CRON_JOBS_FILE)) return [];
-      const raw = readFileSync(CRON_JOBS_FILE, "utf8");
+      const f = _cronJobsFile();
+      if (!existsSync(f)) return [];
+      const raw = readFileSync(f, "utf8");
       const data = JSON.parse(raw);
       return Array.isArray(data) ? data : (data.jobs || Object.values(data));
     } catch { return []; }
@@ -6206,7 +6738,16 @@ async function handleFetch(req) {
   if (path === "/api/cron-jobs" && req.method === "GET") {
     try {
       const jobs = _readCronJobs();
-      return new Response(JSON.stringify({ ok: true, jobs }), { headers: jsonHeaders() });
+      // 附带 webhook 投递配置（前端展示 🔗 通道与投递状态）
+      const webhooks = _readCronWebhooks();
+      const hooks = {};
+      Object.keys(webhooks).forEach(id => {
+        hooks[id] = (webhooks[id] || []).map(h => ({
+          url: h.url, label: h.label || "", message: h.message || "",
+          last_run_at: h.last_run_at || null, last_status: h.last_status || null, last_error: h.last_error || null,
+        }));
+      });
+      return new Response(JSON.stringify({ ok: true, jobs, webhooks: hooks }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message, jobs: [] }), { status: 500, headers: jsonHeaders() });
     }
@@ -6221,7 +6762,29 @@ async function handleFetch(req) {
       const schedule = String(body.schedule || "").trim() || "every 1h";
       const args = ["cron", "create", schedule, prompt];
       if (body.name) args.push("--name", String(body.name));
-      if (body.deliver_to) args.push("--deliver-to", String(body.deliver_to));
+      // 多通道投递：body.deliveries = [{channel, url, message, label}]。
+      // 内置通道（weixin/telegram/dingtalk/feishu/wecom/discord/origin/local）→ 逗号合并为 --deliver；
+      // webhook 通道 → monitor 侧持久化配置，由 _cronWebhookTick 轮询投递（hermes 不支持出站 webhook）。
+      let deliverArg = String(body.deliver_to || "").trim();
+      const webhooks = [];
+      if (Array.isArray(body.deliveries)) {
+        const parts = [];
+        for (const d of body.deliveries) {
+          if (!d || !d.channel) continue;
+          const ch = String(d.channel).trim();
+          if (ch === "webhook") {
+            const url = String(d.url || "").trim();
+            if (/^https?:\/\//i.test(url)) {
+              webhooks.push({ url, message: String(d.message || "").trim(), label: String(d.label || d.url || "").trim() });
+            }
+          } else {
+            parts.push(ch);
+          }
+        }
+        if (parts.length) deliverArg = parts.join(",");
+        else if (!deliverArg && webhooks.length) deliverArg = "local"; // 纯 webhook 任务：输出存本地供轮询读取
+      }
+      if (deliverArg) args.push("--deliver", deliverArg);
       if (body.repeat) args.push("--repeat", String(body.repeat));
       if (Array.isArray(body.skills)) body.skills.forEach(sk => { if (sk) args.push("--skill", sk); });
       const r = spawnSync(HERMES_BIN, args, { stdout: "pipe", stderr: "pipe", timeout: 15000, env: { ...process.env, HERMES_HOME: DATA_DIR } });
@@ -6230,7 +6793,19 @@ async function handleFetch(req) {
       if (r.status !== 0) {
         return new Response(JSON.stringify({ ok: false, error: stderr || stdout || "创建失败" }), { status: 500, headers: jsonHeaders() });
       }
-      return new Response(JSON.stringify({ ok: true, output: stdout }), { headers: jsonHeaders() });
+      // 创建成功：把 webhook 投递目标关联到 job_id
+      if (webhooks.length) {
+        const idMatch = stdout.match(/Created job:\s*([^\s\n]+)/i);
+        const jobId = idMatch ? idMatch[1].trim() : "";
+        if (jobId) {
+          const hooks = _readCronWebhooks();
+          hooks[jobId] = (hooks[jobId] || []).concat(webhooks);
+          _writeCronWebhooks(hooks);
+        } else {
+          log(`[cron-webhook] 无法解析 job_id，webhook 配置未关联: ${stdout.slice(0, 200)}`);
+        }
+      }
+      return new Response(JSON.stringify({ ok: true, output: stdout, webhooks_attached: webhooks.length }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
@@ -6240,7 +6815,7 @@ async function handleFetch(req) {
   const cronActionMatch = path.match(/^\/api\/cron-jobs\/([^/]+)\/action$/);
   if (cronActionMatch && req.method === "POST") {
     try {
-      const jobId = decodeURIComponent(cronActionMatch[1]);
+      const jobId = decodeURIComponent(cronActionMatch[1]).trim();
       const body = await req.json().catch(() => ({}));
       const action = String(body.action || "").trim();
       const validActions = ["pause", "resume", "run", "remove"];
@@ -6250,6 +6825,13 @@ async function handleFetch(req) {
       const stderr = (r.stderr || "").toString().trim();
       if (r.status !== 0) {
         return new Response(JSON.stringify({ ok: false, error: stderr || stdout || "操作失败" }), { status: 500, headers: jsonHeaders() });
+      }
+      // 删除任务时同步清理其 webhook 投递配置
+      if (action === "remove") {
+        try {
+          const hooks = _readCronWebhooks();
+          if (hooks[jobId]) { delete hooks[jobId]; _writeCronWebhooks(hooks); }
+        } catch {}
       }
       return new Response(JSON.stringify({ ok: true, action, output: stdout }), { headers: jsonHeaders() });
     } catch (e) {
@@ -6614,7 +7196,30 @@ async function handleFetch(req) {
       const body = await req.json().catch(() => ({}));
       const r = _saveChannel(id, body);
       if (!r.ok) return new Response(JSON.stringify(r), { status: 400, headers: jsonHeaders() });
-      return new Response(JSON.stringify(r), { headers: jsonHeaders() });
+      // 保存后立即重启网关使新凭证/配置生效（微信此前缺失：网关只在 spawn 时读 .env/config.yaml，
+      // 不重启则继续用旧 token，用户会误以为「无法重新配置」）。对齐 telegram/whatsapp 的 qr/apply 行为。
+      _triggerGatewayRestart(id + "-bind");
+      return new Response(JSON.stringify(Object.assign({ restarting: true }, r)), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  // POST /api/channels/:id/clear → 清空渠道配置（env 凭据 + platforms.<id> 块），并重启网关
+  const chClearMatch = path.match(/^\/api\/channels\/([a-zA-Z0-9_]+)\/clear$/);
+  if (chClearMatch && req.method === "POST") {
+    try {
+      const id = chClearMatch[1];
+      const def = CHANNEL_DEFS[id];
+      if (!def) return new Response(JSON.stringify({ ok: false, error: "unknown channel" }), { status: 400, headers: jsonHeaders() });
+      // 1) 清空 .env 中该渠道的全部凭据键
+      let env = _readEnvFile();
+      (def.fields || []).forEach(f => { if (f.env) env = _setEnvValue(env, f.env, ""); });
+      _writeEnvFile(env);
+      // 2) 清空 config.yaml 中 platforms.<id> 整块
+      _writeHermesConfig(_setPlatformConfig(id, {}));
+      log(`[ChannelClear] 渠道 ${id} 配置已清空（env 凭据 + platforms.${id} 块）`);
+      _triggerGatewayRestart(id + "-clear");
+      return new Response(JSON.stringify({ ok: true, clearing: true }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
@@ -6649,25 +7254,96 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 502, headers: jsonHeaders() });
     }
   }
-  // 企业微信扫码授权：按已配置的 Corp ID / Agent ID / Secret 生成网页授权二维码（与 Octop 一致）
+  // 企业微信扫码授权：腾讯官方 AI 机器人扫码接口（与 Octop 一致），
+  // 无需预先配置 Corp ID / Agent ID / Secret——扫码授权后直接返回 bot_id + secret。
+  // GET /api/channels/wecom/qr → 生成二维码（scode + auth_url）
   if (path === "/api/channels/wecom/qr" && req.method === "GET") {
     try {
-      const pc = (_readPlatformConfig ? _readPlatformConfig("wecom") : {}) || {};
-      const extra = pc.extra || {};
-      const corpId = extra.corp_id || process.env.WECOM_CORP_ID || "";
-      const agentId = extra.agent_id || process.env.WECOM_AGENT_ID || "";
-      const secret = extra.secret || process.env.WECOM_SECRET || "";
-      if (!corpId || !agentId || !secret) {
-        return new Response(JSON.stringify({ ok: false, error: "请先在「手动输入」中填写企业微信 Corp ID / Agent ID / Secret 后再扫码授权。" }), { status: 400, headers: jsonHeaders() });
+      const res = await fetch("https://work.weixin.qq.com/ai/qc/generate?source=hermes&plat=3", {
+        headers: { "Accept": "application/json" },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`腾讯扫码接口 ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      const d = (data && data.data) || {};
+      const scode = String(d.scode || "").trim();
+      const authUrl = String(d.auth_url || "").trim();
+      if (!scode || !authUrl) throw new Error("接口响应缺少 scode/auth_url：" + JSON.stringify(data).slice(0, 200));
+      _wecomQrCache.set(scode, { ts: Date.now(), bot_id: "", secret: "" });
+      return new Response(JSON.stringify({ ok: true, scode, qr_payload: authUrl, qr_url: authUrl, deep_link: authUrl }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: "无法生成企业微信二维码：" + e.message }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+  // GET /api/channels/wecom/qr/status?scode=... → 轮询扫码结果（3s 缓存避免频繁打腾讯接口）
+  if (path === "/api/channels/wecom/qr/status" && req.method === "GET") {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      const scode = (u.searchParams.get("scode") || "").trim();
+      if (!scode) return new Response(JSON.stringify({ ok: false, error: "缺少 scode" }), { status: 400, headers: jsonHeaders() });
+      const now = Date.now();
+      const cached = _wecomQrCache.get(scode);
+      if (cached && now - cached.ts < 3000) {
+        if (cached.bot_id) return new Response(JSON.stringify({ ok: true, status: "ready", bot_id: cached.bot_id, secret: cached.secret }), { headers: jsonHeaders() });
+        return new Response(JSON.stringify({ ok: true, status: "waiting" }), { headers: jsonHeaders() });
       }
-      const origin = (req.headers.get("origin") || "").replace(/\/+$/, "") || (req.headers.get("referer") || "").replace(/\/+$/, "");
-      const redirect = (origin ? origin : "http://localhost") + (BASE_PATH || "") + "/api/channels/wecom/qr/callback";
-      const state = "hermes_wecom_" + Date.now();
-      const authUrl = "https://open.weixin.qq.com/connect/oauth2/authorize?appid=" + encodeURIComponent(corpId) +
-        "&redirect_uri=" + encodeURIComponent(redirect) +
-        "&response_type=code&scope=snsapi_base&agentid=" + encodeURIComponent(agentId) +
-        "&state=" + encodeURIComponent(state) + "#wechat_redirect";
-      return new Response(JSON.stringify({ ok: true, qr_payload: authUrl, qr_url: authUrl, deep_link: authUrl }), { headers: jsonHeaders() });
+      const res = await fetch("https://work.weixin.qq.com/ai/qc/query_result?scode=" + encodeURIComponent(scode), {
+        headers: { "Accept": "application/json" },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`腾讯扫码接口 ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      const d = (data && data.data) || {};
+      const status = String(d.status || "pending").trim();
+      if (status === "success") {
+        const botId = String((d.bot_info && d.bot_info.botid) || "").trim();
+        const secret = String((d.bot_info && d.bot_info.secret) || "").trim();
+        if (!botId || !secret) throw new Error("扫码成功但缺少 bot 信息");
+        _wecomQrCache.set(scode, { ts: now, bot_id: botId, secret });
+        return new Response(JSON.stringify({ ok: true, status: "ready", bot_id: botId, secret }), { headers: jsonHeaders() });
+      }
+      if (status === "error" || status === "expired") {
+        return new Response(JSON.stringify({ ok: false, error: String(d.message || ("扫码" + status + "，请重新获取二维码")) }), { status: 410, headers: jsonHeaders() });
+      }
+      _wecomQrCache.set(scode, { ts: now, bot_id: "", secret: "" });
+      return new Response(JSON.stringify({ ok: true, status: "waiting" }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: "轮询企业微信状态失败：" + e.message }), { status: 502, headers: jsonHeaders() });
+    }
+  }
+  // POST /api/channels/wecom/qr/apply → 保存 bot_id + secret 并启用平台（自动重启网关生效）
+  if (path === "/api/channels/wecom/qr/apply" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const scode = String(body.scode || "").trim();
+      const cached = scode ? _wecomQrCache.get(scode) : null;
+      const botId = String(body.bot_id || (cached && cached.bot_id) || "").trim();
+      const secret = String(body.secret || (cached && cached.secret) || "").trim();
+      if (!botId || !secret) return new Response(JSON.stringify({ ok: false, error: "缺少 bot_id / secret，请先完成扫码授权" }), { status: 400, headers: jsonHeaders() });
+      let env = _readEnvFile();
+      env = _setEnvValue(env, "WECOM_BOT_ID", botId);
+      env = _setEnvValue(env, "WECOM_SECRET", secret);
+      _writeEnvFile(env);
+      const cfg = _readPlatformConfig("wecom");
+      cfg.enabled = true;
+      cfg.extra = cfg.extra || {};
+      cfg.extra.bot_id = botId;
+      cfg.extra.secret = secret;
+      cfg.updated_at = Date.now();
+      _writeHermesConfig(_setPlatformConfig("wecom", cfg));
+      // 自动启用 hermes-wecom 插件 toolset（网关需要此条目才加载 wecom 平台模块）
+      try {
+        let y2 = _readHermesConfig();
+        const curTs = _extractYamlList(y2, "toolsets");
+        if (!curTs.includes("hermes-wecom")) {
+          curTs.push("hermes-wecom");
+          _writeHermesConfig(_setYamlListBlock(y2, "toolsets", curTs));
+          log(`[ChannelToolset] wecom QR apply: 自动启用 hermes-wecom`);
+        }
+      } catch (e) { log(`[ChannelToolset] wecom QR toolset 启用失败: ${e.message}`); }
+      if (scode) _wecomQrCache.delete(scode);
+      _triggerGatewayRestart("wecom-bind");
+      return new Response(JSON.stringify({ ok: true, bot_id: botId, gateway_restarting: true }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
@@ -6675,28 +7351,38 @@ async function handleFetch(req) {
 
   // ── 触发网关重启（异步、尽力而为）─────────────────────────────────────
   // 用于频道绑定 / 配置变更后让网关重新加载 .env 与 config.yaml。
-  // 直接 POST 到 Dashboard 的 /api/gateway/restart（monitor 代理会处理
-  // 官方「复用旧进程」守卫导致的空操作并重发）。网关未运行时跳过。
+  // 旧版 POST 到 Dashboard /api/gateway/restart 依赖 systemd user service，
+  // fnOS 未启用 linger 导致重启静默失败（gateway-restart.log: "Cannot restart
+  // gateway as a service — linger is not enabled"）。改为直接杀进程+重启。
+  // 防抖变量（_gwRestartTimer / _gwRestartInProgress）声明在模块级（line ~437），
+  // 不可放在 handleFetch 内——每请求重置会让防抖完全失效。
   function _triggerGatewayRestart(reason) {
     const tag = reason || "config";
-    try {
-      if (!isPortListening(GATEWAY_PORT)) {
-        log(`[gw-restart] ${tag}: 网关未运行，跳过重启`);
-        return;
-      }
-      const h = new Headers();
-      h.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
-      h.set("Content-Type", "application/json");
-      fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/gateway/restart`, {
-        method: "POST", headers: h, signal: AbortSignal.timeout(10000),
-      }).then(async (r) => {
-        log(`[gw-restart] ${tag}: 已发送重启请求，status=${r && r.status}`);
-      }).catch((e) => {
-        log(`[gw-restart] ${tag}: 重启请求失败 ${e?.message || e}`);
-      });
-    } catch (e) {
-      log(`[gw-restart] ${tag}: 异常 ${e?.message || e}`);
+    if (_gwRestartInProgress) {
+      log(`[gw-restart] ${tag}: 重启进行中，跳过`);
+      return;
     }
+    log(`[gw-restart] ${tag}: 已排队重启请求（2s 防抖）`);
+    if (_gwRestartTimer) clearTimeout(_gwRestartTimer);
+    _gwRestartTimer = setTimeout(async () => {
+      _gwRestartTimer = null;
+      _gwRestartInProgress = true;
+      try {
+        log(`[gw-restart] ${tag}: 开始重启 gateway + dashboard ...`);
+        await stopPid(PID_GATEWAY);
+        await stopPid(PID_DASHBOARD);
+        await forceKillHermes();
+        resetGatewayCrashLoop();
+        await new Promise(r => setTimeout(r, 1500));
+        const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run"]);
+        const r2 = spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
+        log(`[gw-restart] ${tag}: 重启完成 gateway=${JSON.stringify(r1)} dashboard=${JSON.stringify(r2)}`);
+      } catch (e) {
+        log(`[gw-restart] ${tag}: 重启失败 ${e?.message || e}`);
+      } finally {
+        _gwRestartInProgress = false;
+      }
+    }, 2000);
   }
 
   // 启动时自动注册已由模块级 _moduleLevelAutoRegisterMcp() 完成，此处无需重复
@@ -7249,12 +7935,13 @@ async function handleFetch(req) {
         })
         .filter(Boolean);
       const providersBlock = customEntries.length > 0 ? `providers:\n${customEntries.join("\n")}\n` : "";
+      let newModel = "";
 
       try {
         let ymlContent = existsSync(yamlPath) ? readFileSync(yamlPath, "utf8") : "";
         // model.provider 经 PROVIDER_HERMES_IDS 映射（openai → openai-api，其余用自身 id）
         const hermesProvider = PROVIDER_HERMES_IDS[providerId] || providerId;
-        const newModel = `model:\n  provider: ${hermesProvider}\n  default: ${resolvedModel}`;
+        newModel = `model:\n  provider: ${hermesProvider}\n  default: ${resolvedModel}`;
         // 用单一可靠函数替换 model / providers 顶层块：兼容 inline 与 block 两种形态，
         // 且无论文件里残留多少重复顶层键（重复 model:/providers: 是「No inference provider configured」的根因），
         // 都只保留我们写入的这一份，彻底消除配置漂移导致的网关 502。
@@ -7497,6 +8184,32 @@ async function handleFetch(req) {
         saveChatConfig(chatCfg);
       } catch {}
 
+      // ── 同步活跃 profile 的 config.yaml（修复网关用错 profile 的 provider）───
+      // hermes CLI 启动 dashboard/gateway 时优先读 .active_profile 指向的
+      // profiles/<id>/config.yaml 的 model 块；如果该文件里 provider 与面板
+      // 配置不一致，网关会去用旧 provider（找不到 key → 502）。
+      // 每次用户在前端保存 model 配置时，把 model 块同步到活跃 profile。
+      try {
+        let activeProfile = "default";
+        try { activeProfile = readFileSync(`${DATA_DIR}/.active_profile`, "utf8").trim() || "default"; } catch {}
+        if (activeProfile && activeProfile !== "default") {
+          const profileCfgPath = `${DATA_DIR}/profiles/${activeProfile}/config.yaml`;
+          if (existsSync(profileCfgPath)) {
+            let py = readFileSync(profileCfgPath, "utf8");
+            // 替换或追加 model 块（与主 config.yaml 一致）
+            py = _setTopLevelBlock(py, "model", newModel);
+            // 同步 providers 段（至少包含当前活跃 provider，确保网关能找到 base_url + api_key 引用）
+            if (providersBlock) {
+              py = _setTopLevelBlock(py, "providers", providersBlock.trimEnd());
+            }
+            writeFileSync(profileCfgPath, py, { mode: 0o644 });
+            log(`[profile-sync] 已同步 model/providers 到 profile "${activeProfile}" 的 config.yaml`);
+          }
+        }
+      } catch (e) {
+        log(`[profile-sync] 同步活跃 profile 失败: ${e.message}`);
+      }
+
       return new Response(JSON.stringify({ ok: true, gateway_restarting: _toolsetsChanged }), { headers: jsonHeaders() });
     }
 
@@ -7559,7 +8272,7 @@ async function handleFetch(req) {
     } catch {}
     const newModelSection = `model:\n  provider: ${body.provider || ""}\n  default: ${body.model || ""}\n`;
     if (ymlContent.match(/^model:/m)) {
-      ymlContent = ymlContent.replace(/^model:[\s\S]*?^(?=\S)/m, newModelSection);
+      ymlContent = ymlContent.replace(/^model:\n(?:[ \t].*\n?)*/m, newModelSection);
     } else {
       ymlContent = newModelSection + ymlContent;
     }
@@ -7708,10 +8421,24 @@ async function handleFetch(req) {
     }
   }
 
+  // ─── 安全网关设置（tool_guard 开关，持久化 data/studio/security.json）──────
+  if (path === "/api/studio/security" && req.method === "GET") {
+    return new Response(JSON.stringify({ enabled: _toolGuardEnabled, blockRules: TOOL_GUARD_BLOCK_RULES.length, warnRules: TOOL_GUARD_WARN_RULES.length }), { headers: jsonHeaders() });
+  }
+  if (path === "/api/studio/security" && req.method === "PUT") {
+    const body = await req.json().catch(() => ({}));
+    _toolGuardEnabled = body.enabled !== false;
+    toolGuardSave();
+    log(`[tool-guard] 已切换为 ${_toolGuardEnabled ? "开启" : "关闭"}`);
+    return new Response(JSON.stringify({ ok: true, enabled: _toolGuardEnabled }), { headers: jsonHeaders() });
+  }
+
   // ─── Chat: WebSocket 消息队列（前端先 POST 消息入队，再建 WS 连接取流）──────
   if (path === "/api/chat/ws-send" && req.method === "POST") {
     const body = await req.json();
     const { session_id, message, system, model, provider } = body;
+    const guardResp = toolGuardCheckAndRespond(message);
+    if (guardResp) return guardResp;
     const messageEmpty = message == null || (Array.isArray(message) && message.length === 0) || (typeof message === "string" && message.length === 0);
     if (!session_id || messageEmpty) {
       return new Response(JSON.stringify({ error: "session_id and message required" }), { status: 400, headers: jsonHeaders() });
@@ -7740,6 +8467,8 @@ async function handleFetch(req) {
   if (path === "/api/chat/stream" && req.method === "POST") {
     const body = await req.json();
     const { session_id, message, system, model, provider } = body;
+    const guardResp = toolGuardCheckAndRespond(message);
+    if (guardResp) return guardResp;
     const messageEmpty = message == null || (Array.isArray(message) && message.length === 0) || (typeof message === "string" && message.length === 0);
     if (!session_id || messageEmpty) {
       return new Response(JSON.stringify({ error: "session_id and message required" }), {
@@ -8316,6 +9045,7 @@ function startServer() {
     try { chmodSync(SOCKET_PATH, 0o777); } catch {}
     log(`Monitor ready — unix:${SOCKET_PATH} (base=${BASE_PATH || "/"}) | dashboard proxied at /proxy/dashboard/`);
     // 启动自愈 config.yaml（顶格残留修复）；修复后 maybeAutoStartServices 会用干净配置拉起网关
+    _restoreProvidersState();
     const repaired = _repairConfigYaml();
     if (repaired) {
       // 配置曾被写坏：确保网关用修复后的配置重启（若已在运行则重启一次）
@@ -8448,3 +9178,130 @@ setInterval(() => {
 setInterval(() => {
   try { _syncChannelOverrides(); } catch (e) {}
 }, 60000);
+
+// ─── 定时任务 Webhook 出站投递（monitor 侧实现，hermes 不支持出站 webhook）───
+function _readCronWebhooks() {
+  try {
+    const raw = readFileSync(CRON_WEBHOOKS_FILE, "utf8");
+    const data = JSON.parse(raw);
+    return data && typeof data === "object" ? data : {};
+  } catch { return {}; }
+}
+function _writeCronWebhooks(map) {
+  try {
+    mkdirSync(dirname(CRON_WEBHOOKS_FILE), { recursive: true });
+    writeFileSync(CRON_WEBHOOKS_FILE, JSON.stringify(map, null, 2));
+  } catch (e) {
+    log(`[cron-webhook] 写配置失败: ${e?.message || e}`);
+  }
+}
+// 模块级轻量活跃 profile 解析（webhook 轮询用；优先内存缓存，其次 .active_profile 文件，
+// 避免每次 tick 拉起 venv CLI）。注：_getActiveProfile 定义在 handleFetch 闭包内，模块级不可用。
+function _cronProfileName() {
+  if (_activeProfileCache) return _activeProfileCache;
+  try {
+    const raw = readFileSync(`${DATA_DIR}/.active_profile`, "utf8");
+    const name = raw.trim();
+    if (name) return name;
+  } catch {}
+  return "default";
+}
+// 模块级 jobs.json 定位（profile 隔离路径优先，回退全局），供 webhook 轮询使用
+function _cronProfileJobsFile() {
+  try {
+    const prof = _cronProfileName();
+    const p = `${DATA_DIR}/profiles/${prof}/cron/jobs.json`;
+    if (existsSync(p)) return p;
+  } catch {}
+  return `${DATA_DIR}/cron/jobs.json`;
+}
+// 读取任务最近一次输出（0.20.0 输出目录按 profile 隔离 profiles/<p>/cron/output/<job_id>/*.md，
+// 兼容全局 cron/output/<job_id>/*.md 与旧版 cron/<id>/outputs/*.md）
+function _cronLatestOutput(jobId) {
+  let prof = "default";
+  try { prof = _cronProfileName() || "default"; } catch {}
+  const candidates = [
+    `${DATA_DIR}/profiles/${prof}/cron/output/${jobId}`,
+    `${DATA_DIR}/profiles/${prof}/cron/${jobId}/outputs`,
+    `${DATA_DIR}/cron/output/${jobId}`,
+    `${DATA_DIR}/cron/${jobId}/outputs`,
+  ];
+  for (const dir of candidates) {
+    try {
+      if (!existsSync(dir)) continue;
+      const files = readdirSync(dir).filter(f => f.endsWith(".md")).sort();
+      if (!files.length) continue;
+      return readFileSync(`${dir}/${files[files.length - 1]}`, "utf8").slice(0, 8000);
+    } catch {}
+  }
+  return "";
+}
+// POST 到 webhook：企微机器人/钉钉机器人均为 {"msgtype":"text","text":{"content":...}}，
+// 失败时尝试通用 JSON 原样 POST（部分自定义 webhook 期望原始文本/JSON）
+async function _postWebhookText(url, text) {
+  const payload = { msgtype: "text", text: { content: text } };
+  let r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  let t = "";
+  try { t = await r.text(); } catch {}
+  // 企微机器人 {"errcode":0,"errmsg":"ok"}；钉钉 {"errcode":0}；其它 webhook 返回任意 2xx 均视为成功
+  try {
+    const j = JSON.parse(t || "{}");
+    if (j.errcode && Number(j.errcode) !== 0) throw new Error(`errcode ${j.errcode}: ${j.errmsg || t}`);
+  } catch (e) {
+    if (e instanceof SyntaxError) return t; // 非 JSON 响应（如纯文本 ok），2xx 即成功
+    throw e;
+  }
+  return t;
+}
+// 轮询一次：对配置了 webhook 的任务，检测 last_run_at 变化 → 组装消息 → POST
+async function _cronWebhookTick() {
+  const hooks = _readCronWebhooks();
+  const ids = Object.keys(hooks).filter(id => Array.isArray(hooks[id]) && hooks[id].length);
+  if (!ids.length) return;
+  let jobs = [];
+  try {
+    const raw = readFileSync(_cronProfileJobsFile(), "utf8");
+    const data = JSON.parse(raw);
+    jobs = Array.isArray(data) ? data : (data.jobs || Object.values(data));
+  } catch {}
+  const byId = {};
+  jobs.forEach(j => { const id = j.id || j.job_id || j.name || ""; if (id) byId[id] = j; });
+  let changed = false;
+  for (const id of ids) {
+    const list = hooks[id];
+    const job = byId[id];
+    if (!job) continue; // 任务已删除
+    const runAt = job.last_run_at || job.lastRunAt || "";
+    const status = job.last_status || "ok";
+    for (const h of list) {
+      if (!h || !h.url) continue;
+      if (!runAt || h.last_run_at === runAt) continue; // 无新执行
+      const output = _cronLatestOutput(id);
+      let text = String(h.message || "").trim();
+      if (text) {
+        text = text.split("{output}").join(output || "(无输出)");
+        if (!/^\s*$/.test(text) && text.indexOf("{output}") < 0) text = text + "\n\n" + (output || "(无输出)");
+      } else {
+        text = output || "(无输出)";
+      }
+      try {
+        await _postWebhookText(h.url, text);
+        h.last_run_at = runAt; h.last_status = "ok"; h.last_error = "";
+        log(`[cron-webhook] 任务 ${id} → ${h.label || h.url} 投递成功 (${runAt})`);
+      } catch (e) {
+        h.last_status = "error"; h.last_error = String(e?.message || e);
+        log(`[cron-webhook] 任务 ${id} → ${h.label || h.url} 投递失败: ${h.last_error}`);
+      }
+      changed = true;
+    }
+  }
+  if (changed) _writeCronWebhooks(hooks);
+}
+// 轮询周期 20s：仅在存在 webhook 配置时才真正读 jobs.json，开销可忽略
+setInterval(() => { _cronWebhookTick().catch(e => log(`[cron-webhook] tick 异常: ${e?.message || e}`)); }, 20000);
