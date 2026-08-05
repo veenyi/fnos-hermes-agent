@@ -27,14 +27,33 @@
 
 | 文件 | 变更 |
 |---|---|
-| `app/server/monitor.js` | ① proxyDashboard 语音端点超时放宽 ② 新增 TOOL_GUARD 规则模块 + 两个聊天入口拦截 + `/api/studio/security` GET/PUT ③ 模块级 toolGuardLoad 启动加载 |
+| `app/server/monitor.js` | ① proxyDashboard 语音端点超时放宽（10s→180s） ② 新增 TOOL_GUARD 规则模块 + 两个聊天入口拦截 + `/api/studio/security` GET/PUT ③ 模块级 toolGuardLoad 启动加载 ④ **WS 反代帧类型修复（关键）**：dashboard-proxy 双向保留文本/二进制帧类型（此前服务端文本帧如 `{"type":"fallback"}` 被转成二进制帧，前端 JSON.parse 失败；`/api/pty` 不受影响） |
 | `app/ui/index.html` | ① 工具栏新增麦克风/语音设置按钮 ② 语音对话模块（流式 TTS + barge-in + 降级链 + STT 录音 + 设置弹窗）③ 欢迎页 QUICK START 六宫格 ④ 空会话渲染欢迎页 ⑤ ws-send 拦截兜底（还原输入 + toast）⑥ 回复完成自动朗读钩子 |
-| `manifest` | version 0.21.35 → 0.22.1 |
-| `hot-patch.json` | 版本同步 0.22.0（files: server/monitor.js、ui/index.html） |
-| `CHANGELOG_v0.22.0.md` | 本文件 |
+| `cmd/install_callback` | 安装时 editable 安装改为 `hermes-src[all,voice]`，新装即带 faster-whisper STT 依赖（不再首次使用才懒安装） |
+| `manifest` | version 0.21.35 → 0.22.1（fnpack 构建自动 bump → 0.22.2） |
+| `hot-patch.json` | 版本同步 0.22.1（files: server/monitor.js、ui/index.html） |
+| `CHANGELOG_v0.22.1.md` | 本文件 |
+
+## 🧪 真机验证（102 + 249 双机，2026-08-05）
+
+- 安全网关：`rm -rf /` → 403 拦截并提示；正常消息 → 200 放行；含手机号 → 200（PII 仅警告不阻断）
+- `/api/studio/security`：GET 返回 `{enabled:true, blockRules:13, warnRules:2}`；PUT 持久化
+- TTS 整段：`POST /proxy/dashboard/api/audio/speak` → 200 `{ok:true, data_url}`（edge-tts 真实合成）
+- WS 流式 TTS：`/proxy/dashboard/api/audio/speak-stream` → 未配流式 provider 时正确回 `{"type":"fallback"}`（文本帧直通修复后前端自动降级整段 TTS）
+- STT 端到端：1s 静音 WAV → 200 `{ok:true, transcript:""}`（faster-whisper base 本地模型）
+- 前端/后端标记：`WELCOME_QUICK`/`speak-stream`/`btnMic`/`toolGuardScan` 双机就位
+
+## 🗂 STT 本地模型（国内网络离线化）
+
+faster-whisper 首次使用需从 huggingface.co 下载模型（国内不可达，且每重启重试）。已落地离线方案：
+- 模型下载经 modelscope（`Systran/faster-whisper-base`），缺失的 `vocabulary.json` 由 `tokenizer.json` 生成、`preprocessor_config.json`/`config.json` 用标准内容补齐（ctranslate2 此版本要求 vocabulary.json 为**纯字符串数组**格式）
+- 模型目录：`data/whisper-base/`（约 130MB，含 model.bin 145MB fp16）
+- 配置：`stt.local.model: <data>/whisper-base`（config.yaml，先备份 config.yaml.bak-v022）
+- 验证：离线加载 0.5s（102）/ 0.8s（249）
+- 新装用户：安装后首次使用 STT 会自动走懒安装（阿里云 PyPI 镜像可达）；如需完全离线，参照上文预置模型目录
 
 ## ⚠️ 注意事项
-- STT/TTS 服务商在官方仪表盘「设置」中配置（默认 edge-tts 免费语音；STT 默认 provider 链含本地 faster-whisper）。
+- STT/TTS 服务商在官方仪表盘「设置」中配置（默认 edge-tts 免费语音；STT 默认本地 faster-whisper base）。
 - 语音输入需浏览器授权麦克风（HTTPS 或 localhost 环境）。
 - 安全网关默认开启；如确有合法破坏性操作需求，可在语音设置中关闭。
 - 浏览器自动播放策略：自动朗读仅在用户已交互的会话中生效（首次需手动点一次播放）。
