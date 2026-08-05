@@ -31,10 +31,6 @@ UV_BIN="${DATA_DIR}/bin"
 APP_DIR="${TRIM_APPDEST}"
 PROMPTS_SRC="${APP_DIR}/config/prompts"
 
-# Hermes Agent v0.20.0 起官方停止 PyPI wheel 分发（setup.py 构建守卫），
-# 本包内置完整源码目录，安装时走 editable 安装（build_editable 不触发守卫）。
-HERMES_SRC="${APP_DIR}/hermes-src"
-
 export HOME="${DATA_DIR}"
 
 # uv 缓存目录放到 DATA_DIR 下，确保和 venv 同一文件系统，hardlink 可用
@@ -206,13 +202,6 @@ ensure_node() {
 # 从 wheel 中提取 hermes_cli/tui_dist/entry.js（对话 TUI 增强，非致命）
 # ---------------------------------------------------------------------------
 ensure_tui_bundle() {
-    # v0.20.0+ 源码模式：TUI bundle 已预构建在 hermes-src/ui-tui/dist/entry.js，
-    # monitor.js 启动时会自动 symlink 到 ${DATA_DIR}/tui/dist/；无需再从 wheel 提取。
-    if [ -f "${HERMES_SRC}/ui-tui/dist/entry.js" ]; then
-        log_msg "tui_dist available in hermes-src (prebuilt): ${HERMES_SRC}/ui-tui/dist/entry.js"
-        return 0
-    fi
-
     # 动态定位 hermes_cli 目录（不硬编码 python 版本）
     local HERMES_CLI_DIR
     HERMES_CLI_DIR=$("${VENV_DIR}/bin/python3" -c "import hermes_cli,os;print(os.path.dirname(hermes_cli.__file__))" 2>/dev/null)
@@ -368,29 +357,10 @@ if [ "${SKIP_INSTALL}" = "false" ]; then
         log_msg "venv created"
     fi
 
-    if [ -f "${HERMES_SRC}/pyproject.toml" ]; then
-        # 内置源码模式（v0.20.0+）：editable 安装是官方支持的源码分发路径
-        # （setup.py 构建守卫只拦截 bdist_wheel/sdist，不拦截 build_editable）
-        log_msg ">>> 正在从内置源码 editable 安装 hermes-agent[all]，依赖较多请耐心等待 ..."
-        UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
-            "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
-            2>>"${LOG_FILE}"
-
-        if [ ! -f "${HERMES}" ]; then
-            # editable 安装失败 → 清理旧版 wheel 安装残留后重试一次
-            log_msg ">>> 首次安装失败，清理旧版残留后重试 ..."
-            rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
-            UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
-                "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
-                2>>"${LOG_FILE}"
-        fi
-    else
-        # 兜底：无内置源码（旧包/热补丁场景）→ 退回 PyPI wheel 安装
-        log_msg "WARNING: hermes-src 不存在（${HERMES_SRC}），退回 PyPI wheel 安装 hermes-agent[all]==${HERMES_VERSION}"
-        UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
-            "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all,voice]==${HERMES_VERSION}" \
-            2>>"${LOG_FILE}"
-    fi
+    log_msg ">>> 正在安装 hermes-agent[all]==${HERMES_VERSION}，依赖较多请耐心等待 ..."
+    UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+        "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
+        2>>"${LOG_FILE}"
 
     if [ ! -f "${HERMES}" ]; then
         toast_err "hermes-agent 安装失败: $(tail -5 "${LOG_FILE}" 2>/dev/null)"
