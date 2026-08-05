@@ -6,7 +6,9 @@
 
 Hermes Agent 是专为适配飞牛 NAS（fnOS）的 AI 助手应用，通过原生 `.fpk` 在应用中心部署。采用基于 **Node.js** 的 Monitor 服务进行进程管理，提供基于 Web 的控制面板用于配置和对话交互。
 
-> 本 fork 由 [veenyi](https://github.com/veenyi/fnos-hermes-agent) 维护，在 upstream Hermes Agent 0.19.0 基础上针对 fnOS 做了基座适配、Dashboard 汉化、移动端优化、通讯平台集成和稳定性修复。
+> 本 fork 由 [veenyi](https://github.com/veenyi/fnos-hermes-agent) 维护，在 upstream Hermes Agent 0.20.0（Herald Release，2026-08-03）基础上针对 fnOS 做了基座适配、Dashboard 汉化、移动端优化、通讯平台集成和稳定性修复。
+>
+> 自 v0.20.0 起官方停止 PyPI wheel 分发（setup.py 构建守卫），本包改为随 FPK 内置完整 Hermes 源码（`app/hermes-src`），安装时通过 `uv pip install -e "hermes-src[all]"` editable 方式部署，并预构建 dashboard 前端（`hermes_cli/web_dist`）与 TUI bundle（`ui-tui/dist/entry.js`）。
 
 ## 功能特性
 
@@ -124,6 +126,15 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 
 ## 版本迭代
 
+
+### v0.22.x（Studio 系列）
+
+- **v0.22.1** — Studio P0：① **WebChat 语音对话**（v2026.8.3 语音能力落地）：麦克风录音→STT 转写→自动发送；助手回复服务端流式 TTS（`speak-stream`，int16 PCM 逐句播放、点击打断 barge-in）+ 整段 TTS 降级 + 浏览器兜底；自动朗读开关；语音设置弹窗（含试听）。② **Octop 风格欢迎页**：空会话 QUICK START 六宫格（总结文档/写邮件/解释代码/制定计划/翻译润色/头脑风暴）。③ **安全网关 tool_guard v1**：13 条危险命令拦截（rm -rf 根目录/dd 写盘/mkfs/关机/curl|sh/fork bomb 等）+ 身份证/手机号 PII 警告；`/api/studio/security` 开关（默认开启，持久化 data/studio/security.json）。完整记录见 `CHANGELOG_v0.22.1.md`。
+
+### v0.21.x
+
+- **v0.21.27** — Hermes 核心 0.19.0 → **0.20.0**（Herald Release）：官方停止 PyPI 分发，本包内置完整源码（`app/hermes-src`）editable 安装 + 预构建 dashboard 前端/TUI bundle；monitor 适配 cron `--deliver`、源码模式版本检查、`HERMES_WEB_DIST` 注入修复 dashboard 前端加载；WebUI 修复模型切换首页不显示（概览「当前模型」卡片、`/status` Provider·模型、模型按钮兜底）。完整记录见 `CHANGELOG_v0.21.27.md`。
+- **v0.21.26** — 学习轨迹从二分图简化为力导向技能图、删除 20 个预设、清理冗余文件。
 
 ### v0.20.x
 

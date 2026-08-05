@@ -78,6 +78,22 @@ jobs:
       - name: Create dist directory
         run: mkdir -p dist
 
+      # 7.5 预构建 Hermes 前端资源（web_dist + TUI bundle）
+      # hermes 0.20.0 起源码发行：hermes_cli/web_dist 与 ui-tui/dist/entry.js 被上游
+      # .gitignore 忽略、不随仓库提交，必须在打包前现场构建（NAS 上运行时 npm 构建不可靠）。
+      # 构建完成后清理 node_modules，避免把几百 MB 依赖打进 FPK。
+      - name: Prebuild hermes web_dist and TUI bundle
+        run: |
+          cd app/hermes-src
+          npm install --workspace web --no-audit --no-fund
+          npm install --workspace ui-tui --no-audit --no-fund
+          npm run build --workspace web
+          npm run build --workspace ui-tui
+          rm -rf node_modules web/node_modules ui-tui/node_modules apps/shared/node_modules ui-tui/packages/hermes-ink/node_modules
+          echo "--- built artifacts ---"
+          ls -la hermes_cli/web_dist | head -5
+          ls -la ui-tui/dist
+
       # 8. 打包应用
       - name: Build FPK
         id: build

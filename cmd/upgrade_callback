@@ -24,6 +24,10 @@ HERMES="${VENV_DIR}/bin/hermes"
 APP_DIR="${TRIM_APPDEST}"
 UV_BIN="${DATA_DIR}/bin"
 
+# Hermes Agent v0.20.0 起官方停止 PyPI wheel 分发（setup.py 构建守卫），
+# 本包内置完整源码目录，升级时走 editable 安装（build_editable 不触发守卫）。
+HERMES_SRC="${APP_DIR}/hermes-src"
+
 export HOME="${DATA_DIR}"
 
 # uv 缓存目录放到 DATA_DIR 下，确保和 venv 同一文件系统，hardlink 可用
@@ -177,18 +181,28 @@ if [ ! -d "${VENV_DIR}/bin" ] || [ ! -x "${VENV_DIR}/bin/python3" ]; then
     log_msg "venv created"
 fi
 
-log_msg ">>> 正在安装 hermes-agent[all]==${HERMES_VERSION}，依赖较多请耐心等待 ..."
-UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
-    "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
-    2>>"${LOG_FILE}" || true
+# 安装/覆盖安装 hermes-agent：优先内置源码 editable 安装，无源码时退回 PyPI wheel
+install_hermes() {
+    if [ -f "${HERMES_SRC}/pyproject.toml" ]; then
+        log_msg ">>> 正在从内置源码 editable 安装 hermes-agent[all]，依赖较多请耐心等待 ..."
+        UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+            "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all]" \
+            2>>"${LOG_FILE}" || true
+    else
+        log_msg "WARNING: hermes-src 不存在（${HERMES_SRC}），退回 PyPI wheel 安装 hermes-agent[all]==${HERMES_VERSION}"
+        UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+            "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
+            2>>"${LOG_FILE}" || true
+    fi
+}
+
+install_hermes
 
 # 覆盖安装可能失败 → 清 hermes 相关的 site-packages 再试
 if [ ! -f "${HERMES}" ]; then
     log_msg ">>> 首次安装失败，清理后重试 ..."
     rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
-    UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
-        "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all]==${HERMES_VERSION}" \
-        2>>"${LOG_FILE}" || true
+    install_hermes
 
     if [ ! -f "${HERMES}" ]; then
         toast_err "hermes-agent 安装失败: $(tail -5 "${LOG_FILE}" 2>/dev/null)"

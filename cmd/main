@@ -73,7 +73,7 @@ stop_process() {
         pid=$(head -n 1 "${PID_FILE}" | tr -d '[:space:]')
         if kill -0 "${pid}" 2>/dev/null; then
             kill -TERM "${pid}"
-            for i in $(seq 1 10); do
+            for i in $(seq 1 3); do
                 sleep 1
                 kill -0 "${pid}" 2>/dev/null || { log_msg "Stopped"; break; }
             done
