@@ -245,26 +245,6 @@
     .msg-act-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg1);color:var(--text2);font-size:11px;cursor:pointer;transition:all .15s}
     .msg-act-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
     .msg-act-btn.speaking{border-color:var(--warning);color:var(--warning);background:rgba(245,158,11,.08)}
-    /* ── 语音对话 + 欢迎页（v0.22 Studio） ── */
-    .tool-btn.recording{border-color:var(--red,#ef4444)!important;color:var(--red,#ef4444)!important;background:rgba(239,68,68,.1)!important;animation:mic-pulse 1.2s ease-in-out infinite}
-    @keyframes mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.35)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
-    .welcome-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;padding:28px 16px;gap:22px}
-    .welcome-hero{text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
-    .welcome-avatar{width:64px;height:64px;border-radius:20px;background:var(--accent-bg);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
-    .welcome-title{font-size:26px;font-weight:700;color:var(--text1);letter-spacing:.5px}
-    .welcome-sub{font-size:13px;color:var(--text3);margin-top:8px}
-    .wq-grid{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px;max-width:620px;width:100%}
-    @media (max-width:640px){.wq-grid{grid-template-columns:repeat(2,1fr)}}
-    .wq-card{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--card);cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;text-align:left}
-    .wq-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.08)}
-    .wq-ico{font-size:22px;line-height:1}
-    .wq-name{font-size:13px;font-weight:600;color:var(--text1)}
-    .wq-hint{font-size:11px;color:var(--text3);line-height:1.45}
-    .vs-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px dashed var(--border)}
-    .vs-row:last-child{border-bottom:none}
-    .vs-info{font-size:13px;color:var(--text1)}
-    .vs-desc{font-size:11px;color:var(--text3);margin-top:3px;line-height:1.5}
-    .vs-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);margin-top:2px;cursor:pointer}
     .msg-act-btn svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
     /* 引用消息样式 */
     .quote-block{border-left:3px solid var(--accent);background:var(--bg2);padding:8px 12px;margin-bottom:8px;border-radius:0 8px 8px 0;font-size:12px;color:var(--text2);max-height:80px;overflow:hidden;position:relative}
@@ -278,16 +258,14 @@
     /* Fork 标记 */
     .fork-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--accent);background:var(--accent-bg);padding:2px 8px;border-radius:10px;margin-top:4px}
     /* 圆桌讨论 */
-    .rt-agent-pick{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
-    .rt-agent-chip{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;transition:all .15s}
-    .rt-agent-chip:hover{border-color:var(--accent);background:var(--accent-bg)}
+    .rt-agent-pick{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+    .rt-agent-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg1);cursor:pointer;font-size:13px;transition:all .15s}
+    .rt-agent-chip:hover{border-color:var(--accent)}
     .rt-agent-chip.selected{border-color:var(--accent);background:var(--accent-bg);color:var(--accent);font-weight:600}
     .rt-agent-chip .rt-emoji{font-size:16px}
-    .rt-round-config{display:flex;align-items:center;gap:10px;margin:0 0 6px}
-    .rt-round-config label{font-size:13px;font-weight:600;color:var(--text2);white-space:nowrap}
-    .rt-round-config input[type=number]{width:64px;padding:6px 10px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg1);color:var(--text);font-size:14px;text-align:center}
-    .rt-round-config input[type=number]:focus{border-color:var(--accent);outline:none}
-    .rt-round-config .rt-round-hint{font-size:11px;color:var(--text3)}
+    .rt-round-config{display:flex;align-items:center;gap:12px;margin:12px 0}
+    .rt-round-config label{font-size:13px;color:var(--text2)}
+    .rt-round-config select{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);color:var(--text1);font-size:13px}
     .msg.rt-agent{align-self:flex-start;max-width:88%}
     .msg.rt-agent .msg-bubble{border-left:3px solid var(--accent)}
     .rt-speaker{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px;font-weight:600;color:var(--accent)}
@@ -639,35 +617,11 @@
 .model-item.applied{background:var(--accent-bg);color:var(--accent);font-weight:600}
 .model-check{display:flex;align-items:center;cursor:pointer}
 .model-check input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
-    .cron-tpl-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;max-height:230px;overflow-y:auto;padding:2px}
-    .cron-tpl-card{display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--card);cursor:pointer;transition:all .15s;text-align:left}
-    .cron-tpl-card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 3px 10px rgba(0,0,0,.08)}
-    .cron-tpl-icon{font-size:20px;line-height:1}
+    .cron-tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:160px;overflow-y:auto}
+    .cron-tpl-item{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);cursor:pointer;transition:all .15s}
+    .cron-tpl-item:hover{border-color:var(--accent);background:var(--accent-bg)}
     .cron-tpl-name{font-size:12px;font-weight:600;color:var(--text)}
-    .cron-tpl-desc{font-size:10.5px;color:var(--text3);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-    .cron-tpl-sched{font-size:10px;color:var(--accent);font-family:monospace;opacity:.75}
-    /* 聊天图片卡片堆叠 */
-    .img-stack{position:relative;margin-top:6px;cursor:zoom-in}
-    .img-stack-item{position:absolute;width:150px;height:150px;object-fit:cover;border-radius:var(--radius-md);border:2px solid var(--card);box-shadow:0 1px 6px rgba(0,0,0,.18);background:var(--bg2)}
-    /* 图片灯箱 */
-    #imgLightbox{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center}
-    #imgLightbox .lb-bg{position:absolute;inset:0;background:rgba(0,0,0,.88);cursor:zoom-out}
-    #imgLightbox .lb-img{position:relative;z-index:2;max-width:92vw;max-height:88vh;object-fit:contain;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.5)}
-    #imgLightbox .lb-btn{position:absolute;z-index:3;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;background:rgba(255,255,255,.12);color:#fff;border-radius:50%;backdrop-filter:blur(4px);transition:background .15s}
-    #imgLightbox .lb-btn:hover{background:rgba(255,255,255,.28)}
-    #imgLightbox .lb-close{top:16px;right:16px;width:38px;height:38px;font-size:16px}
-    #imgLightbox .lb-prev{left:16px;top:50%;transform:translateY(-50%);width:44px;height:44px;font-size:24px}
-    #imgLightbox .lb-next{right:16px;top:50%;transform:translateY(-50%);width:44px;height:44px;font-size:24px}
-    #imgLightbox .lb-count{position:absolute;z-index:3;bottom:18px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;background:rgba(0,0,0,.55);padding:4px 14px;border-radius:14px;font-family:ui-monospace,monospace}
-    /* 定时任务投递通道行 */
-    .cron-deliver-row{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg1);margin-bottom:6px}
-    .cron-deliver-row select,.cron-deliver-row input{padding:6px 8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border);font-size:12px}
-    .cron-deliver-row .cron-deliver-msg{flex:1;min-width:180px}
-    .cron-deliver-del{background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:4px 6px}
-    .cron-tabs{display:flex;gap:6px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:8px}
-    .cron-tab{flex:1;padding:7px 0;border:none;border-radius:8px;background:transparent;color:var(--text3);font-size:13px;cursor:pointer;transition:all .15s}
-    .cron-tab.active{background:var(--accent);color:#fff;font-weight:600}
-    .cron-form-group{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+    .cron-tpl-sched{font-size:10px;color:var(--text3);font-family:monospace}
 .model-item.disabled{opacity:.45}
 .model-item .model-id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
 .model-item .model-badges{display:flex;align-items:center;gap:4px;flex-shrink:0}
@@ -1003,38 +957,6 @@
 .attach-chip .x{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);font-size:14px;line-height:1;flex-shrink:0;margin-left:2px}
 .attach-chip .x:hover{background:var(--red-bg);color:var(--red)}
 
-/* ── 专家页（v2 独立页：三页签 + 卡片/表格视图） ─────────────────────── */
-.exp-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-.exp-tabs{margin-bottom:0}
-.exp-pane{display:none}
-.exp-pane.active{display:block}
-.exp-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.exp-searchbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-.exp-input{flex:1;min-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg1);font-size:13px;color:var(--text);outline:none;font-family:inherit}
-.exp-input:focus{border-color:var(--accent)}
-.exp-scenes{display:flex;gap:6px;flex-wrap:wrap}
-.exp-scene-chip{padding:4px 10px;font-size:11px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
-.exp-scene-chip:hover{color:var(--text)}
-.exp-scene-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.exp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
-.exp-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s}
-.exp-card:hover{border-color:var(--accent)}
-.exp-card.active{border-color:var(--accent)}
-.exp-card-head{display:flex;align-items:center;gap:10px}
-.exp-card-avatar{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;background:var(--border)}
-.exp-card-title{font-size:14px;font-weight:600;line-height:1.3}
-.exp-card-scene{font-size:10px;color:var(--muted);margin-top:2px}
-.exp-card-desc{font-size:12px;color:var(--text);opacity:.85;line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.exp-card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
-.exp-badge{font-size:10px;padding:2px 6px;border-radius:4px;background:var(--border);color:var(--muted);white-space:nowrap}
-.exp-status{font-size:11px;font-weight:600}
-.exp-status.on{color:#22c55e}
-.exp-status.off{color:var(--muted)}
-.exp-card-actions{display:flex;gap:6px;flex-wrap:wrap}
-/* 技能目录多选 chips */
-.ps-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;font-size:12px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;user-select:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ps-chip:hover{border-color:var(--accent)}
-.ps-chip.sel{background:var(--accent);border-color:var(--accent);color:#fff}
 </style>
 <script src="scripts/marked.min.js"></script>
 <script src="scripts/purify.min.js"></script>
@@ -1046,7 +968,6 @@
   <nav class="global-sidebar">
     <button class="nav-btn" title="概览" onclick="switchPage('overview')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>概览</button>
     <button class="nav-btn active" title="对话" onclick="switchPage('chat')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>对话</button>
-    <button class="nav-btn" title="专家" onclick="switchPage('experts')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/><path d="M18 3l.9 2.1L21 6l-2.1.9L18 9l-.9-2.1L15 6l2.1-.9L18 3z"/></svg>专家</button>
     <button class="nav-btn" title="模型" onclick="switchPage('models')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>模型</button>
     <button class="nav-btn" title="扩展" onclick="switchPage('extensions')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>扩展</button>
     <button class="nav-btn" title="通讯" onclick="switchPage('comm')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.56 12.56 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.56 12.56 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>通讯</button>
@@ -1160,8 +1081,6 @@
                 <button class="tool-btn" data-tip="选择专家" onclick="openMini(this,'expert')" id="btnExpert"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
                 <button class="tool-btn" data-tip="快捷指令" onclick="openMini(this,'quick')" id="btnQuick"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></button>
                 <button class="tool-btn" data-tip="上传附件" onclick="attachFile()" id="btnAttach"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
-                <button class="tool-btn" data-tip="语音输入（录音转文字）" onclick="toggleVoiceRecord()" id="btnMic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="22"/></svg></button>
-                <button class="tool-btn" data-tip="语音设置" onclick="openVoiceSettings()" id="btnVoiceCfg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
               </div>
             </div>
           </div>
@@ -1217,47 +1136,6 @@
             </div>
           </aside>
         </main>
-
-        <!-- 专家页（v2 独立页：我的 / 内置 / 市场 三页签） -->
-        <section class="page" id="page-experts">
-          <div class="page-header"><h1>专家</h1></div>
-          <div class="page-body">
-            <div class="exp-topbar">
-              <div class="ch-filterbar exp-tabs" id="expTabs">
-                <button class="ch-filter active" onclick="expSwitchTab(this,'mine')">我的专家</button>
-                <button class="ch-filter" onclick="expSwitchTab(this,'builtin')">内置专家</button>
-                <button class="ch-filter" onclick="expSwitchTab(this,'market')">专家市场</button>
-              </div>
-              <div class="exp-actions">
-                <button class="ov-actbtn" onclick="openExpertCreate()">+ 从内置专家新建</button>
-                <button class="ov-actbtn" onclick="refreshExperts()">↻ 刷新</button>
-              </div>
-            </div>
-            <div class="exp-panes">
-              <div class="exp-pane active" id="exp-mine">
-                <div class="exp-searchbar">
-                  <input type="text" id="expMineSearch" class="exp-input" placeholder="搜索我的专家（名称 / 描述）…" oninput="renderMineExperts()">
-                  <div class="exp-scenes" id="expMineScenes"></div>
-                </div>
-                <div class="exp-grid" id="expMineGrid"><div class="empty-state">加载中…</div></div>
-              </div>
-              <div class="exp-pane" id="exp-builtin">
-                <div class="exp-searchbar">
-                  <input type="text" id="expBuiltinSearch" class="exp-input" placeholder="搜索内置专家（程序员 / 研究员 / 数据分析…）" oninput="renderBuiltinExperts()">
-                  <div class="exp-scenes" id="expBuiltinScenes"></div>
-                </div>
-                <div class="exp-grid" id="expBuiltinGrid"><div class="empty-state">加载中…</div></div>
-              </div>
-              <div class="exp-pane" id="exp-market">
-                <div class="exp-searchbar">
-                  <input type="text" id="expMarketSearch" class="exp-input" placeholder="搜索专家市场…" oninput="renderMarketExperts()">
-                  <div class="exp-scenes" id="expMarketScenes"></div>
-                </div>
-                <div class="exp-grid" id="expMarketGrid"><div class="empty-state">加载中…</div></div>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <!-- 概览页 -->
         <section class="page" id="page-overview">
@@ -1463,6 +1341,7 @@
   <button class="ch-filter" onclick="extSwitchTab(this,'skills')">技能</button>
   <button class="ch-filter" onclick="extSwitchTab(this,'workflow')">工作流</button>
   <button class="ch-filter" onclick="extSwitchTab(this,'memory')">记忆</button>
+  <button class="ch-filter" onclick="extSwitchTab(this,'agents')">智能体</button>
   <button class="ch-filter" onclick="extSwitchTab(this,'experts')">专家</button>
   <button class="ch-filter" onclick="extSwitchTab(this,'team')">团队</button>
   <button class="ch-filter" onclick="extSwitchTab(this,'mcp')">MCP</button>
@@ -1514,6 +1393,10 @@
   <div class="ext-pane" id="ext-memory">
     <div class="setting-row"><div><div class="label">启用长期记忆</div><div class="desc">跨会话保留关键上下文</div></div><div class="toggle" id="memToggle" onclick="toggleMemory()"></div></div>
     <div class="field"><label>记忆字符上限</label><input type="range" id="memLimit" min="500" max="8000" step="100" value="2200" oninput="updateMemLimit(this.value)"><span id="memLimitVal">2200</span></div>
+  </div>
+  <div class="ext-pane" id="ext-agents">
+    <div class="section-head"><h2>智能体 / 角色</h2><button class="ov-actbtn" onclick="openPersonaModal(null)">+ 添加角色</button></div>
+    <div class="persona-grid" id="personaGrid"></div>
   </div>
   <div class="ext-pane" id="ext-experts">
     <div class="selected-expert-bar" id="selectedExpertBar" style="display:none"></div>
@@ -6056,10 +5939,6 @@ var _cfg = { providers: [], active_provider: '', extensions: { toolsets:{}, mcp_
 var _sessions = [];
 var _services = { gateway:false, dashboard:false };
 var _chState = { defs:{}, channels:{}, current:null, filter:'all' };
-// QR 扫码流程会话令牌：每次打开/关闭渠道弹窗或启动新的扫码流程时递增，
-// 各渠道 chPoll* 轮询链捕获启动时的 seq，回调发现 seq 变化立即终止——
-// 修复「点过 TG/企微扫码后，进微信仍在调企微/TG 接口」的轮询串扰 bug。
-var _chQrSeq = 0;
 var _connState = { list:[] };
 var _msgState = { streaming:false, abortCtrl:null, ws:null };
 var _persona = 'default';
@@ -6339,32 +6218,10 @@ function switchTab(sid) {
   restoreDraft(sid);
   _syncModelBtn();
   if (body) {
-    var cached = _chatHTML[sid];
-    if (cached) {
-      // 命中内存快照：立即恢复渲染（0 延迟），后台静默拉取最新消息覆盖，避免显示过期内容
-      body.innerHTML = cached;
-      body.scrollTop = body.scrollHeight;
-      hideScrollBtn();
-      loadSessionMessages(sid, true);
-    } else {
-      body.innerHTML = '<div class="system-tip">加载中…</div>';
-      loadSessionMessages(sid);
-    }
+    // 始终从后端重新拉取消息（避免缓存导致两个 tab 显示同一内容）
+    body.innerHTML = '<div class="system-tip">加载中…</div>';
+    loadSessionMessages(sid);
   }
-}
-// 从 _cfg 中查找当前 active provider 的默认模型名（/status 与模型按钮兜底共用）
-function _getActiveModelName(){
-  var ap = _cfg.active_provider;
-  if(!ap) return '自动';
-  var p = (_cfg.providers||[]).find(function(p){ return (p.name||p.id)===ap; });
-  if(!p) return '自动';
-  var model = p.model || '';
-  if(model) return model;
-  var models = p.models || [];
-  var def = models.find(function(m){ return m.default===true; });
-  if(def) return def.id || def.name || '';
-  var en = models.find(function(m){ return m.enabled!==false; });
-  return en ? (en.id || en.name || '') : '自动';
 }
 function _syncModelBtn(){
   var bm=document.getElementById('btnModel'); if(!bm) return;
@@ -6380,20 +6237,7 @@ function _syncModelBtn(){
     badge.textContent=mName.length>8?mName.slice(0,8)+'…':mName;
     bm.appendChild(badge);
   } else {
-    // 无会话级选择时，兜底显示全局默认模型（修复：切换 Provider/模型后首页与按钮无反映）
-    var globalModel = _getActiveModelName();
-    var globalProv = _cfg.active_provider || '';
-    if(globalModel && globalModel !== '自动'){
-      bm.setAttribute('data-tip', (globalProv?globalProv+' · ':'')+globalModel);
-      bm.classList.add('active');
-      var label = globalProv ? globalProv.slice(0,4)+'…' : globalModel;
-      var badge2 = document.createElement('span');
-      badge2.className='model-badge';
-      badge2.textContent = label.length>8 ? label.slice(0,8)+'…' : label;
-      bm.appendChild(badge2);
-    } else {
-      bm.setAttribute('data-tip','选择模型'); bm.classList.remove('active');
-    }
+    bm.setAttribute('data-tip','选择模型'); bm.classList.remove('active');
   }
 }
 
@@ -6700,7 +6544,7 @@ function delSession(aid, sid, e){
       delete _sessionAgent[sid]; persistSessionAgent();
       var ti = _openTabs.indexOf(sid);
       if(ti!==-1){ _openTabs.splice(ti,1); persistTabs(); }
-      delete _tabDrafts[sid]; delete _tabStreaming[sid]; delete _chatHTML[sid];
+      delete _tabDrafts[sid]; delete _tabStreaming[sid];
       if(currentSession===sid) currentSession = _openTabs.length?_openTabs[0]:(_sessions.length?_sessions[0].id:'');
       renderSessionTabs(); renderRail(); updateHeader();
       if(currentSession) loadSessionMessages(currentSession);
@@ -6711,17 +6555,15 @@ function delSession(aid, sid, e){
 function newSession(){
   newTab();
 }
-function loadSessionMessages(sid, silent){
+function loadSessionMessages(sid){
   var body = document.getElementById('chatBody');
   if(!body) return;
-  if(silent){ var h = _chatHTML[sid]; if(h) body.innerHTML = h; }  // 静默刷新前确保已有内容（幂等兜底）
   fetch(apiUrl('/api/sessions/'+encodeURIComponent(sid)), { cache:'no-store', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
     .then(function(r){ if(!r.ok) throw new Error('load'); return r.json(); })
     .then(function(s){
       var msgs = s.messages || [];
-      if(!msgs.length){ body.innerHTML = welcomeHTML(); return; }
+      if(!msgs.length){ body.innerHTML = '<div class="system-tip">这是一个空会话，开始聊天吧～</div>'; return; }
       body.innerHTML = msgs.map(function(m){ return msgHTML(m); }).join('');
-      _chatHTML[sid] = body.innerHTML;  // 回写快照缓存，下次切换 0 延迟
       body.scrollTop = body.scrollHeight;
       hideScrollBtn();
     })
@@ -6746,7 +6588,7 @@ function splitContent(content){
 function msgHTML(m){
   var parts = splitContent(m.content);
   var text = parts.text, imgs = parts.images;
-  var imgHtml = imgStackHTML(imgs);
+  var imgHtml = imgs.map(function(u){ return '<img src="'+esc(u)+'" style="max-width:200px;max-height:200px;border-radius:var(--radius-md);display:block;margin-top:6px">'; }).join('');
   if(m.role === 'user'){
     return '<div class="msg user"><div class="msg-bubble">'+escapeHtml(text).replace(/\n/g,'<br>')+imgHtml+'</div><div class="msg-meta">你 · '+fmtDateTime(m.ts||m.created_at||Date.now())+'</div></div>';
   }
@@ -6759,76 +6601,6 @@ function msgHTML(m){
     '</div>';
   return '<div class="msg assistant" data-content="'+esc(text).replace(/"/g,'&quot;').replace(/\n/g,'&#10;')+'"><div class="msg-bubble">'+renderMarkdown(text)+imgHtml+toolsHtml+'</div>'+actionsHtml+'<div class="msg-meta">Hermes · '+fmtDateTime(m.ts||m.created_at||Date.now())+'</div></div>';
 }
-
-/* ── 聊天图片：卡片式堆叠 + 灯箱大图（点击任意卡片查看，←/→ 上下页切换，Esc 关闭）── */
-var _lbImgs = [], _lbIdx = 0;
-function chatImgSrc(u){
-  if(!u) return '';
-  if(/^(https?:|data:|blob:)/i.test(u)) return u;
-  return BASE + u; // 相对路径（/tmp /uploads /workspace /data）补 BASE 前缀
-}
-function imgStackHTML(imgs){
-  if(!imgs || !imgs.length) return '';
-  var list = imgs.map(chatImgSrc);
-  var arg = esc(JSON.stringify(list));
-  if(list.length === 1){
-    return '<img src="'+esc(list[0])+'" alt="图片" loading="lazy" style="max-width:220px;max-height:220px;border-radius:var(--radius-md);display:block;margin-top:6px;cursor:zoom-in;object-fit:cover" onclick="openImgLightbox(\''+arg+'\',0)">';
-  }
-  var n = Math.min(list.length, 5);
-  var off = 9;
-  var html = '<div class="img-stack" style="width:'+(150+(n-1)*off)+'px;height:'+(150+(n-1)*off)+'px" onclick="openImgLightbox(\''+arg+'\',0)" title="点击查看 '+list.length+' 张图片">';
-  for(var i=0;i<n;i++){
-    html += '<img class="img-stack-item" src="'+esc(list[i])+'" alt="图片'+(i+1)+'" loading="lazy" style="left:'+(i*off)+'px;top:'+(i*off)+'px;z-index:'+(i+1)+'">';
-  }
-  html += '<span style="position:absolute;left:'+((n-1)*off+156)+'px;top:'+((n-1)*off+60)+'px;font-size:11px;color:var(--text);background:var(--accent);border-radius:12px;padding:3px 10px;font-weight:600;z-index:'+(n+1)+'">'+list.length+' 张 ▸</span></div>';
-  return html;
-}
-function openImgLightbox(jsonList, idx){
-  var arr = [];
-  try { arr = JSON.parse(jsonList); } catch(e){ return; }
-  if(!arr.length) return;
-  _lbImgs = arr;
-  _lbIdx = Math.max(0, Math.min(idx||0, arr.length-1));
-  renderImgLightbox();
-}
-function renderImgLightbox(){
-  var o = document.getElementById('imgLightbox');
-  if(!o){
-    o = document.createElement('div');
-    o.id = 'imgLightbox';
-    o.innerHTML = '<div class="lb-bg" onclick="closeImgLightbox()"></div>' +
-      '<button class="lb-btn lb-close" onclick="closeImgLightbox()" title="关闭 (Esc)">✕</button>' +
-      '<button class="lb-btn lb-prev" onclick="imgLbNav(-1)" title="上一张 (←)">‹</button>' +
-      '<button class="lb-btn lb-next" onclick="imgLbNav(1)" title="下一张 (→)">›</button>' +
-      '<div class="lb-count"></div>' +
-      '<img class="lb-img" alt="大图预览">';
-    document.body.appendChild(o);
-  }
-  o.querySelector('.lb-img').src = _lbImgs[_lbIdx];
-  o.querySelector('.lb-count').textContent = (_lbIdx+1) + ' / ' + _lbImgs.length;
-  o.style.display = 'flex';
-  // 预载相邻图片，翻页不闪烁
-  [1,-1].forEach(function(d){
-    var i = _lbIdx + d;
-    if(i>=0 && i<_lbImgs.length){ var im = new Image(); im.src = _lbImgs[i]; }
-  });
-}
-function imgLbNav(d){
-  if(!_lbImgs.length) return;
-  _lbIdx = (_lbIdx + d + _lbImgs.length) % _lbImgs.length;
-  renderImgLightbox();
-}
-function closeImgLightbox(){
-  var o = document.getElementById('imgLightbox');
-  if(o) o.style.display = 'none';
-}
-document.addEventListener('keydown', function(e){
-  var o = document.getElementById('imgLightbox');
-  if(!o || o.style.display==='none') return;
-  if(e.key==='Escape') closeImgLightbox();
-  else if(e.key==='ArrowLeft'||e.key==='ArrowUp') imgLbNav(-1);
-  else if(e.key==='ArrowRight'||e.key==='ArrowDown') imgLbNav(1);
-});
 
 /* 工具调用映射（对齐 Hermes 消息网关规范：terminal=💻 / web=🔍 / execute_code=🐍 等） */
 var TOOL_EMOJI = {
@@ -7272,295 +7044,29 @@ function termSend(){
 
 /* ============================ 消息操作：语音播放 / 引用 / Fork ============================ */
 var _currentQuote = null;
-/* ═══════════════ 语音对话模块（v0.22 Studio：服务端 TTS/STT） ═══════════════
- * 能力：
- *  - speakMsg：服务端流式 TTS（WS /proxy/dashboard/api/audio/speak-stream，int16 PCM 播放，
- *    再次点击即 barge-in 打断）；流式 provider 不可用时降级整段 TTS（POST /api/audio/speak）；
- *    两者都失败回退浏览器 speechSynthesis。
- *  - 麦克风输入：getUserMedia → MediaRecorder(webm/opus) → base64 dataURL → POST
- *    /api/audio/transcribe → 文本自动填入并发送（可在语音设置关闭自动发送）。
- *  - 自动朗读：设置开启后助手回复完成自动播放（localStorage: fnos-voice-autoplay）。
- * 协议依据本地 hermes_cli/web_server.py：transcribe {data_url,mime_type}→{ok,transcript}；
- *  speak {text}→{ok,data_url}；speak-stream: client {"text"|"done"|"stop"} →
- *  server {"type":"start",sample_rate,channels} → 二进制 PCM 帧 → {"type":"end"} | {"type":"fallback"} */
-var _voice = { recording:false, recorder:null, chunks:[], stream:null, recTimer:null,
-               ws:null, ctx:null, src:null, playing:false, curBtn:null, pcmBuf:[], pcmRate:24000, pcmCh:1 };
-function voiceAudioUrl(p){ return apiUrl('/proxy/dashboard/api/audio' + p); }
-function voiceWSUrl(p){
-  var proto = location.protocol==='https:' ? 'wss:' : 'ws:';
-  return proto + '//' + location.host + apiUrl('/proxy/dashboard/api/audio' + p);
-}
-function voiceGetText(btn){
-  var msgEl = btn.closest('.msg');
-  if(!msgEl) return '';
-  var text = msgEl.getAttribute('data-content') || (msgEl.querySelector('.md-text') ? msgEl.querySelector('.md-text').textContent : '');
-  var tmp = document.createElement('textarea'); tmp.innerHTML = text; text = tmp.value;
-  return text;
-}
-function voiceBtnHtml(mode){
-  if(mode==='stop') return '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>停止';
-  return '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>播放';
-}
-function voiceStopAll(resetBtn){
-  var v = _voice;
-  if(v.ws){ try{ v.ws.send(JSON.stringify({stop:true})); }catch(e){} try{ v.ws.close(); }catch(e){} v.ws=null; }
-  if(v.src){ try{ v.src.stop(); }catch(e){} v.src=null; }
-  if(v.ctx && v.ctx.state==='running'){ try{ v.ctx.close(); }catch(e){} }
-  v.ctx=null; v.pcmBuf=[]; v.playing=false;
-  if(resetBtn!==false){
-    if(v.curBtn){ try{ v.curBtn.classList.remove('speaking'); v.curBtn.innerHTML=voiceBtnHtml('play'); }catch(e){} }
-    v.curBtn=null;
-  }
-}
-function voicePlayNext(){
-  var v = _voice;
-  if(v.playing) return;
-  var samples = v.pcmBuf.shift();
-  if(!samples || !samples.length) return;
-  try{
-    if(!v.ctx){ v.ctx = new (window.AudioContext||window.webkitAudioContext)(); }
-    if(v.ctx.state==='suspended'){ v.ctx.resume(); }
-    var buf = v.ctx.createBuffer(1, samples.length, v.pcmRate||24000);
-    var d = buf.getChannelData(0);
-    for(var i=0;i<samples.length;i++){ d[i]=samples[i]; }
-    var s = v.ctx.createBufferSource(); s.buffer=buf; s.connect(v.ctx.destination);
-    s.onended = function(){ if(v.src===s) v.src=null; v.playing=false; voicePlayNext(); };
-    v.src=s; v.playing=true; s.start();
-  }catch(e){ console.warn('[voice] play failed', e); v.playing=false; }
-}
+var _speakingBtn = null;
+
 function speakMsg(btn){
-  var v = _voice;
-  var text = voiceGetText(btn);
-  if(!text){ toast('无可播放内容'); return; }
-  if(v.curBtn === btn){ voiceStopAll(true); return; }   // 点击打断 = barge-in
-  voiceStopAll(false);
-  // 1) 服务端流式 TTS
-  try{
-    var ws = new WebSocket(voiceWSUrl('/speak-stream'));
-    v.ws = ws; v.pcmBuf=[]; v.pcmRate=24000; v.pcmCh=1; v.playing=false;
-    btn.classList.add('speaking'); btn.innerHTML=voiceBtnHtml('stop'); v.curBtn=btn;
-    var gotStart = false, finished = false;
-    function finishOk(){
-      if(v.ws===ws){ try{ ws.close(); }catch(e){} v.ws=null; }
-      if(finished) return; finished = true;
-      if(v.curBtn===btn){ btn.classList.remove('speaking'); btn.innerHTML=voiceBtnHtml('play'); v.curBtn=null; }
-    }
-    ws.onopen = function(){
-      ws.send(JSON.stringify({ text: text }));   // 整段下发，服务端按句切分逐句合成
-      ws.send(JSON.stringify({ done: true }));
-    };
-    ws.onmessage = function(ev){
-      if(typeof ev.data === 'string'){
-        try{
-          var j = JSON.parse(ev.data);
-          if(j.type==='start'){ gotStart=true; v.pcmRate=j.sample_rate||24000; v.pcmCh=j.channels||1; return; }
-          if(j.type==='end'){ finishOk(); return; }
-          if(j.type==='fallback'){ try{ ws.close(); }catch(e){} v.ws=null; speakMsgFallback(btn, text); return; }
-        }catch(e){}
-        return;
-      }
-      if(gotStart && ev.data && ev.data.byteLength){
-        var f = new Float32Array(ev.data.byteLength/2);
-        var dv = new DataView(ev.data);
-        for(var i=0;i<f.length;i++){ f[i]=dv.getInt16(i*2,true)/32768; }
-        v.pcmBuf.push(f);
-        voicePlayNext();
-      }
-    };
-    ws.onerror = function(){ try{ ws.close(); }catch(e){} v.ws=null; if(!finished) speakMsgFallback(btn, text); };
-    ws.onclose = function(){ if(v.ws===ws) v.ws=null; };
-    return;
-  }catch(e){ console.warn('[voice] stream unavailable', e); }
-  // 2) 整段 TTS 降级
-  speakMsgFallback(btn, text);
-}
-function speakMsgFallback(btn, text){
-  var v = _voice;
+  var msgEl = btn.closest('.msg');
+  var text = msgEl ? (msgEl.getAttribute('data-content') || msgEl.querySelector('.md-text').textContent) : '';
+  if(!text){ toast('无可播放内容','error'); return; }
+  // 解码 HTML 实体
+  var tmp = document.createElement('textarea'); tmp.innerHTML = text; text = tmp.value;
+  // 去除 Markdown 标记
   text = text.replace(/[#*`~\[\]()]/g,'').replace(/\n+/g,'。');
-  fetch(voiceAudioUrl('/speak'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ text: text }) })
-    .then(function(r){ if(!r.ok) throw new Error('speak '+r.status); return r.json(); })
-    .then(function(j){
-      if(!j.ok || !j.data_url) throw new Error(j.error||'TTS failed');
-      var au = new Audio(j.data_url);
-      var stopIt = function(){ try{ au.pause(); au.src=''; }catch(e){} voiceStopAll(true); btn.removeEventListener('click', stopIt); };
-      au.onended = function(){ btn.removeEventListener('click', stopIt); if(v.curBtn===btn){ btn.classList.remove('speaking'); btn.innerHTML=voiceBtnHtml('play'); v.curBtn=null; } };
-      btn.classList.add('speaking'); btn.innerHTML=voiceBtnHtml('stop'); v.curBtn=btn;
-      btn.addEventListener('click', stopIt);
-      au.play().catch(function(){ btn.removeEventListener('click', stopIt); if(v.curBtn===btn){ btn.classList.remove('speaking'); btn.innerHTML=voiceBtnHtml('play'); v.curBtn=null; } toast('语音播放失败：浏览器拦截自动播放，请点击播放按钮'); });
-    })
-    .catch(function(){
-      // 3) 浏览器 speechSynthesis 兜底
-      if(!window.speechSynthesis){ toast('语音播放不可用'); return; }
-      if(v.curBtn===btn){ v.curBtn=null; }
-      window.speechSynthesis.cancel();
-      var utter = new SpeechSynthesisUtterance(text);
-      utter.lang='zh-CN'; utter.rate=1.0;
-      utter.onend = function(){ btn.classList.remove('speaking'); btn.innerHTML=voiceBtnHtml('play'); };
-      utter.onerror = utter.onend;
-      btn.classList.add('speaking'); btn.innerHTML=voiceBtnHtml('stop');
-      window.speechSynthesis.speak(utter);
-    });
-}
-/* ── 麦克风语音输入（STT：录音 → transcribe → 填入/自动发送） ── */
-function toggleVoiceRecord(){
-  if(_voice.recording){ stopVoiceRecord(); } else { startVoiceRecord(); }
-}
-function micIconHtml(){
-  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="22"/></svg>';
-}
-function startVoiceRecord(){
-  var btn = document.getElementById('btnMic');
-  var v = _voice;
-  if(v.recording) return;
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('当前浏览器不支持录音'); return; }
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream){
-    v.stream = stream;
-    var mime = '';
-    try{
-      if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mime='audio/webm;codecs=opus';
-      else if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm')) mime='audio/webm';
-    }catch(e){}
-    try{ v.recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
-    catch(e){ v.recorder = new MediaRecorder(stream); }
-    v.chunks = [];
-    v.recorder.ondataavailable = function(ev){ if(ev.data && ev.data.size) v.chunks.push(ev.data); };
-    v.recorder.onstop = function(){
-      try{ stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
-      v.recording = false;
-      if(btn){ btn.classList.remove('recording'); btn.innerHTML = micIconHtml(); }
-      var blob = new Blob(v.chunks, { type: (v.recorder.mimeType||'audio/webm').split(';')[0] || 'audio/webm' });
-      v.chunks = [];
-      if(!blob.size){ toast('没有录到声音'); return; }
-      var reader = new FileReader();
-      reader.onload = function(){ transcribeVoice(reader.result, blob.type.split(';')[0] || 'audio/webm'); };
-      reader.readAsDataURL(blob);
-    };
-    v.recorder.start();
-    v.recording = true;
-    if(btn){ btn.classList.add('recording'); btn.innerHTML='<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'; }
-    toast('正在录音…再次点击麦克风停止');
-    v.recTimer = setTimeout(function(){ if(v.recording) stopVoiceRecord(); }, 60000);  // 60s 自动停止
-  }).catch(function(){ toast('无法访问麦克风（权限被拒绝或设备不可用）'); });
-}
-function stopVoiceRecord(){
-  var v = _voice;
-  if(v.recTimer){ clearTimeout(v.recTimer); v.recTimer=null; }
-  if(v.recorder && v.recorder.state !== 'inactive'){ try{ v.recorder.stop(); }catch(e){} }
-  else {
-    if(v.stream){ try{ v.stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){} }
-    v.recording = false;
-    var btn = document.getElementById('btnMic'); if(btn){ btn.classList.remove('recording'); btn.innerHTML = micIconHtml(); }
-  }
-}
-function transcribeVoice(dataUrl, mime){
-  var btn = document.getElementById('btnMic');
-  toast('语音识别中…');
-  fetch(voiceAudioUrl('/transcribe'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ data_url: dataUrl, mime_type: mime }) })
-    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ if(!r.ok){ var e = new Error(j.error||('transcribe '+r.status)); e.j=j; throw e; } return j; }); })
-    .then(function(j){
-      if(btn){ btn.classList.remove('recording'); btn.innerHTML = micIconHtml(); }
-      var t = (j.transcript || '').trim();
-      if(!t){ toast('没有听清，请再说一次'); return; }
-      var ta = document.getElementById('chatInput');
-      if(ta){ ta.value = t; autoResize(ta); }
-      if(localStorage.getItem('fnos-voice-autosend') !== '0'){ sendChat(); }
-      else { toast('识别完成'); try{ ta.focus(); }catch(e){} }
-    })
-    .catch(function(err){
-      if(btn){ btn.classList.remove('recording'); btn.innerHTML = micIconHtml(); }
-      var msg = err && err.j && err.j.error ? err.j.error : (err && err.message ? err.message : '语音识别失败');
-      toast('语音识别失败：'+msg);
-    });
-}
-/* ── 语音设置 ── */
-function openVoiceSettings(){
-  var on = localStorage.getItem('fnos-voice-autoplay') !== '0';
-  var autosend = localStorage.getItem('fnos-voice-autosend') !== '0';
-  var html = '<div class="modal-overlay" id="voiceSetOverlay" onclick="if(event.target===this)closeVoiceSettings()">' +
-    '<div class="modal" style="max-width:440px">' +
-    '<div class="modal-head"><h3>🎙️ 语音设置</h3><button class="modal-close" onclick="closeVoiceSettings()">×</button></div>' +
-    '<div class="modal-body" style="padding:14px 16px">' +
-    '<div class="vs-row"><div><div class="vs-info">自动朗读回复</div><div class="vs-desc">助手回复完成后自动语音播放（流式 TTS，点击播放按钮可打断）</div></div>' +
-    '<input type="checkbox" id="vsAutoplay" '+(on?'checked':'')+'></div>' +
-    '<div class="vs-row"><div><div class="vs-info">语音输入自动发送</div><div class="vs-desc">识别完成后直接发送；关闭则只填入输入框</div></div>' +
-    '<input type="checkbox" id="vsAutosend" '+(autosend?'checked':'')+'></div>' +
-    '<div class="vs-row"><div><div class="vs-info">安全网关（tool_guard）</div><div class="vs-desc" id="vsGuardDesc">拦截危险命令（rm -rf /、dd 写盘、格式化、关机等）。加载中…</div></div>' +
-    '<input type="checkbox" id="vsGuard"></div>' +
-    '<div class="vs-row"><div><div class="vs-info">试听</div><div class="vs-desc">STT/TTS 服务商在官方仪表盘「设置」中配置（默认 edge-tts 免费语音）</div></div>' +
-    '<button class="ov-actbtn" onclick="voiceTest()">播放测试语音</button></div>' +
-    '</div>' +
-    '<div class="modal-foot" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">' +
-    '<button class="btn" onclick="closeVoiceSettings()">取消</button>' +
-    '<button class="btn primary" onclick="saveVoiceSettings()">保存</button>' +
-    '</div></div></div>';
-  var div = document.createElement('div'); div.innerHTML = html; document.body.appendChild(div.firstChild);
-  fetch(apiUrl('/api/studio/security'), { headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
-    .then(function(r){ return r.json(); }).then(function(j){
-      var cb = document.getElementById('vsGuard'); if(!cb) return;
-      cb.checked = j.enabled !== false;
-      var d = document.getElementById('vsGuardDesc'); if(d) d.textContent = '拦截危险命令（rm -rf /、dd 写盘、格式化、关机等）当前' + ((j.enabled===false)?'已关闭':'已开启') + '（共 '+((j.blockRules||13))+' 条规则）';
-    }).catch(function(){});
-}
-function saveVoiceSettings(){
-  localStorage.setItem('fnos-voice-autoplay', document.getElementById('vsAutoplay').checked?'1':'0');
-  localStorage.setItem('fnos-voice-autosend', document.getElementById('vsAutosend').checked?'1':'0');
-  var g = document.getElementById('vsGuard');
-  if(g){ fetch(apiUrl('/api/studio/security'), { method:'PUT', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ enabled: g.checked }) }).catch(function(){}); }
-  closeVoiceSettings();
-  toast('语音设置已保存');
-}
-function closeVoiceSettings(){ var el = document.getElementById('voiceSetOverlay'); if(el) el.remove(); }
-function voiceTest(){
-  fetch(voiceAudioUrl('/speak'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ text: '你好，我是你的 AI 小助手。这是一段语音测试。' }) })
-    .then(function(r){ if(!r.ok) throw new Error('speak '+r.status); return r.json(); })
-    .then(function(j){ if(!j.ok || !j.data_url) throw new Error(j.error||'TTS failed'); new Audio(j.data_url).play().catch(function(){}); })
-    .catch(function(err){ toast('试听失败：'+(err&&err.message?err.message:'')); });
-}
-/* ── 欢迎页（Octop 风 QUICK START 六宫格） ── */
-var WELCOME_QUICK = [
-  { id:'sum',   name:'总结文档',   ico:'📄', hint:'帮我总结这份文档：' },
-  { id:'email', name:'写邮件',     ico:'✉️', hint:'帮我写一封得体的邮件：' },
-  { id:'code',  name:'解释代码',   ico:'💻', hint:'帮我解释这段代码：' },
-  { id:'plan',  name:'制定计划',   ico:'📋', hint:'帮我制定一个计划：' },
-  { id:'trans', name:'翻译润色',   ico:'🌐', hint:'帮我翻译并润色这段文字：' },
-  { id:'brain', name:'头脑风暴',   ico:'💡', hint:'来一次头脑风暴，主题是：' }
-];
-function welcomeHTML(){
-  // 专家模式：当前活跃 profile 带快捷提问时，展示 Octop 风格个性化欢迎
-  var prof = null;
-  try { prof = _profiles.find(function(p){ return p.id === _persona; }) || null; } catch(e){}
-  var qp = (prof && Array.isArray(prof.quick_prompts) && prof.quick_prompts.length) ? prof.quick_prompts : null;
-  if(qp){
-    var chips = qp.slice(0,6).map(function(q){
-      var txt = String(q||'').trim(); if(!txt) return '';
-      var label = txt.length > 20 ? txt.slice(0,20)+'…' : txt;
-      return '<div class="wq-card" onclick="quickFill(\''+_jsStr(txt)+'\')" title="'+esc(txt)+'"><span class="wq-name">'+esc(label)+'</span></div>';
-    }).join('');
-    var sub = String(prof.prompt||'').slice(0,90);
-    return '<div class="welcome-wrap">' +
-      '<div class="welcome-hero">' +
-      '<div class="welcome-avatar">'+(prof.emoji||'🤖')+'</div>' +
-      '<div class="welcome-title">Hi! 我是 '+(prof.name||'AI 助手')+'</div>' +
-      '<div class="welcome-sub">'+(sub?esc(sub)+'…':'选一个快捷任务开始，或直接输入你的问题')+'</div>' +
-      '</div><div class="wq-grid">'+chips+'</div></div>';
-  }
-  var cards = WELCOME_QUICK.map(function(c){
-    return '<div class="wq-card" onclick="quickStartFill(\''+c.id+'\')"><span class="wq-ico">'+c.ico+'</span><span class="wq-name">'+c.name+'</span><span class="wq-hint">'+c.hint+'…</span></div>';
-  }).join('');
-  return '<div class="welcome-wrap">' +
-    '<div class="welcome-hero"><div class="welcome-title">Hi! 我是你的 AI 小助手</div>' +
-    '<div class="welcome-sub">选一个快捷任务开始，或直接输入你的问题</div></div>' +
-    '<div class="wq-grid">'+cards+'</div></div>';
-}
-function quickFill(text){
-  var ta = document.getElementById('chatInput');
-  if(ta){ ta.value = text; autoResize(ta); try{ ta.focus(); }catch(e){} }
-}
-function quickStartFill(id){
-  var c = WELCOME_QUICK.find(function(x){ return x.id===id; });
-  if(!c) return;
-  var ta = document.getElementById('chatInput');
-  if(ta){ ta.value = c.hint; autoResize(ta); try{ ta.focus(); }catch(e){} }
+  if(!window.speechSynthesis){ toast('浏览器不支持语音播放','error'); return; }
+  // 如果正在播放，停止
+  if(_speakingBtn === btn){ window.speechSynthesis.cancel(); btn.classList.remove('speaking'); btn.innerHTML='<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>播放'; _speakingBtn=null; return; }
+  window.speechSynthesis.cancel();
+  if(_speakingBtn){ _speakingBtn.classList.remove('speaking'); _speakingBtn.innerHTML='<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>播放'; }
+  var utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'zh-CN'; utter.rate = 1.0;
+  utter.onend = function(){ btn.classList.remove('speaking'); btn.innerHTML='<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>播放'; _speakingBtn=null; };
+  utter.onerror = utter.onend;
+  btn.classList.add('speaking');
+  btn.innerHTML='<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>停止';
+  _speakingBtn = btn;
+  window.speechSynthesis.speak(utter);
 }
 
 function quoteMsg(btn){
@@ -7625,14 +7131,13 @@ function openRoundtable(){
     '<div class="modal" style="max-width:500px">' +
     '<div class="modal-head"><h3>🎙️ 多 Agent 圆桌讨论</h3><button class="modal-close" onclick="closeRoundtable()">×</button></div>' +
     '<div class="modal-body" style="padding:16px">' +
-    '<p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.5">选择 2 个或以上的 Agent，它们将在同一对话中轮流发言、互相讨论，最终给出综合方案。</p>' +
-    '<div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text1)">参与讨论的 Agent（点击选择）</div>' +
+    '<p style="font-size:13px;color:var(--text2);margin-bottom:12px">选择 2 个或以上的 Agent，它们将在同一对话中轮流发言、互相讨论、最终给出综合方案。</p>' +
+    '<div style="font-size:13px;font-weight:600;margin-bottom:6px">参与讨论的 Agent（点击选择）</div>' +
     '<div class="rt-agent-pick" id="rtAgentPick">' +
     agents.map(function(p){ return '<div class="rt-agent-chip" data-id="'+esc(p.id)+'" onclick="this.classList.toggle(\'selected\')"><span class="rt-emoji">'+(p.emoji||'🤖')+'</span>'+esc(p.name||p.id)+'</div>'; }).join('') +
     '</div>' +
-    '<div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text1)">讨论轮数</div>' +
-    '<div class="rt-round-config"><label>轮数</label><input type="number" id="rtRounds" value="2" min="1" max="20" step="1"><span class="rt-round-hint">每位 Agent 每轮发言一次，可根据需要自由设定</span></div>' +
-    '<div style="font-size:12px;color:var(--text3);margin-top:4px;line-height:1.5">💡 每轮中各 Agent 会看到前序 Agent 的发言，并进行回应、补充或反驳。轮数越多讨论越深入。</div>' +
+    '<div class="rt-round-config"><label>讨论轮数：</label><select id="rtRounds"><option value="1">1 轮（各发言一次）</option><option value="2" selected>2 轮（深入讨论）</option><option value="3">3 轮（充分辩论）</option></select></div>' +
+    '<div style="font-size:12px;color:var(--text3);margin-top:8px">💡 提示：每轮中各 Agent 会看到其他 Agent 的发言，并基于此进行回应、补充或反驳。</div>' +
     '</div>' +
     '<div class="modal-foot" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">' +
     '<button class="btn" onclick="closeRoundtable()">取消</button>' +
@@ -7652,8 +7157,6 @@ function startRoundtable(){
     agents.push({ id:id, name:(p&&p.name)||id, emoji:(p&&p.emoji)||'🤖', prompt:(p&&p.prompt)||'', model:(p&&p.model)||'' });
   });
   var rounds = parseInt(document.getElementById('rtRounds').value) || 2;
-  if(rounds < 1) rounds = 1;
-  if(rounds > 20){ rounds = 20; toast('轮数已限制为最大 20 轮'); }
   closeRoundtable();
   // 创建新会话
   fetch(apiUrl('/api/sessions'), { method:'POST', headers:monitorToken?{'X-Monitor-Token':monitorToken}:{} })
@@ -8183,11 +7686,6 @@ function sendRaw(text){
           '<button class="msg-act-btn" onclick="quoteMsg(this)" title="引用回复"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>引用</button>' +
           '<button class="msg-act-btn" onclick="forkMsg(this)" title="Fork 新话题"><svg viewBox="0 0 24 24"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9"/><path d="M12 12v3"/></svg>Fork</button>';
         asst.insertBefore(actBar, asst.querySelector('.msg-meta'));
-        // 自动朗读（语音设置开关 fnos-voice-autoplay，默认开；未中断且有内容时触发）
-        if(!aborted && fullText && localStorage.getItem('fnos-voice-autoplay') !== '0'){
-          var _spkBtn = actBar.querySelector('.msg-act-btn');
-          if(_spkBtn){ setTimeout(function(){ try{ speakMsg(_spkBtn); }catch(e){} }, 350); }
-        }
         _chatHTML[sid] = body.innerHTML;  // 完成后同步缓存
         loadSessions();
       }
@@ -8282,13 +7780,7 @@ function streamChat(payload, cb){
     headers: { 'Content-Type':'application/json', 'X-Monitor-Token': monitorToken||'' },
     body: JSON.stringify(payload)
   }).then(function(r){
-    if(!r.ok){
-      // 403 = 安全网关拦截（tool_guard）→ 携带 blocked 标记走专门兜底
-      return r.json().catch(function(){ return {}; }).then(function(j){
-        if(j && j.blocked){ var e = new Error(j.error || '消息被安全网关拦截'); e.noFallback = true; throw e; }
-        throw new Error('ws-send ' + r.status);
-      });
-    }
+    if(!r.ok) throw new Error('ws-send ' + r.status);
     return r.json();
   }).then(function(){
     if(done) return;
@@ -8329,22 +7821,7 @@ function streamChat(payload, cb){
         finish(); cb.onDone(false);
       }
     };
-  }).catch(function(err){
-    // 安全网关拦截（tool_guard）：还原输入并提示，不降级 SSE 重发
-    if(err && err.noFallback){
-      try{
-        var _body=document.getElementById('chatBody');
-        var _ul=_body?_body.querySelector('.msg.user:last-child'):null;
-        if(_ul) _ul.remove();
-        var _restore = (typeof payload.message==='string') ? payload.message : ((payload.message && payload.message.text)||'');
-        if(_restore){
-          var ta=document.getElementById('chatInput');
-          if(ta){ ta.value=_restore; autoResize(ta); try{ ta.focus(); }catch(e){} }
-        }
-      }catch(e){}
-      toast(err.message || '消息被安全网关拦截');
-      return;
-    }
+  }).catch(function(){
     // ws-send 失败 → 直接走 SSE
     doFallback();
   });
@@ -9155,7 +8632,7 @@ function handleSlashCommand(cmd){
     var statusMsg = '当前状态：';
     statusMsg += 'Gateway ' + (_services.gateway?'运行中':'未启动') + '，';
     statusMsg += 'Dashboard ' + (_services.dashboard?'运行中':'未启动') + '；';
-    statusMsg += '当前模型 ' + (_cfg.active_provider||'自动') + ' · ' + _getActiveModelName() + '；';
+    statusMsg += '当前模型 ' + (_cfg.active_provider||'自动') + '；';
     statusMsg += '角色 ' + (_persona||'default') + '。';
     appendSystemMessage(statusMsg);
     return;
@@ -9191,7 +8668,6 @@ function switchPage(name){
   if(name==='overview') renderOverview();
   if(name==='models') renderProviders();
   if(name==='extensions') renderExtensions();
-  if(name==='experts') renderExpertsPage();
   if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); }
   if(name==='settings') renderSettings();
   if(name!=='chat') hideScrollBtn();   // 回到底部按钮仅用于聊天页（Issue #10）
@@ -9591,7 +9067,7 @@ function renderProviders(){
     var isActive = (_cfg.active_provider === pname);
     var isFallback = fallback.indexOf(pname) >= 0;
     var enabled = (p.models || []).filter(function(m){ return m.enabled!==false; });
-    var modelText = esc(p.model) || (enabled.length ? esc(enabled[0].id || enabled[0].name || '') : '未选择模型');
+    var modelText = enabled.length ? esc(enabled[0].id || enabled[0].name || '') : '未选择模型';
     var temp = p.temperature != null ? p.temperature : '-';
     var maxT = p.max_tokens != null ? p.max_tokens : '-';
     var key = p.api_key || p.api_key_masked || '';
@@ -9657,7 +9133,7 @@ function renderProviders(){
 function activateProvider(i){
   var p=_cfg.providers[i]; if(!p) return;
   _cfg.active_provider = p.name || p.id;
-  apiPost('/api/config', _cfg).then(function(){ renderProviders(); _syncModelBtn(); toast('已设为默认：'+(p.name||p.id)); }).catch(function(e){ toast('保存失败：'+e.message); });
+  apiPost('/api/config', _cfg).then(function(){ renderProviders(); toast('已设为默认：'+(p.name||p.id)); }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 function setFallbackProvider(i){
   var p=_cfg.providers[i]; if(!p) return;
@@ -10190,7 +9666,7 @@ function saveProvider(){
     if(r && r.error){ toast('保存失败：'+r.error); }
     else {
       toast('已保存 Provider，正在重启网关以应用配置…');
-      closeProviderModal(); renderProviders(); _syncModelBtn();
+      closeProviderModal(); renderProviders();
       // 保存后立即重启网关，使新配置（含 API key）对网关生效。
       // 本包网关端口已迁移到 8742、仪表盘到 9219，从根本上规避同机 hermes-studio 对其 8642 网关的 `--replace` 抢占
       // （跨用户进程无法被本包 kill 清除），避免干净重装/并存时被分流到无 provider 的网关。
@@ -10235,7 +9711,7 @@ function extSkillSubtab(el, key){
   if(key==='market'){ renderSkillMarket(); } else { renderSkills(key); }
 }
 function renderExtensions(){
-  renderToolsets(); renderSkills('local'); renderExperts(); renderTeam(); renderMemory(); renderWorkflow();
+  renderToolsets(); renderSkills('local'); renderPersonas(); renderExperts(); renderTeam(); renderMemory(); renderWorkflow();
 }
 function renderToolsets(){
   var el=document.getElementById('toolsetList'); if(!el) return;
@@ -10891,214 +10367,9 @@ function fetchProfiles(cb){
     if(cb) cb();
   }).catch(function(){ if(cb) cb(); });
 }
-// ── 预设智能体模板（内置，一键套用激活）────────────────────────────────────
-var PRESET_AGENT_TEMPLATES = [
-  { id:'fnos_operator', emoji:'🖥️', name:'飞牛操作员', desc:'NAS 运维专家：TRIM CLI、应用中心、存储/网络、容器、日志与备份恢复', prompt:'你是一位资深的飞牛 fnOS NAS 运维专家。精通 TRIM CLI（应用管理/日志/存储/网络/系统）、应用中心全流程（安装、升级、卸载、热补丁、回调脚本）、存储卷与共享文件夹、Docker 容器、系统日志排查、备份与恢复。回答时优先给出可直接执行的命令与步骤，注重数据安全并主动提示操作风险，遇到不确定的配置先说明风险再给方案。' },
-  { id:'coder', emoji:'💻', name:'程序员', desc:'全栈工程师：可运行代码优先，注重安全与可维护性', prompt:'你是一位资深全栈工程师。优先给出可直接运行的代码与命令，注重安全性、可维护性与生产实践；遇到模糊需求先给出最小可行方案再迭代。' },
-  { id:'researcher', emoji:'🔬', name:'研究员', desc:'严谨调研：基于证据、引用来源，区分事实与推测', prompt:'你是一位严谨的研究员。回答须基于证据、引用来源，并明确区分事实、推测与不确定信息；避免臆断。' },
-  { id:'writer', emoji:'✍️', name:'写作助手', desc:'专业写作：结构化中文表达，按场景调整语气篇幅', prompt:'你是一位专业的写作助手。擅长结构化、清晰、有感染力的中文表达，依据场景调整语气与篇幅。' },
-  { id:'analyst', emoji:'📊', name:'数据分析师', desc:'数据洞察：量化结论优先，给出可执行建议', prompt:'你是一位数据分析师。善于从数据 / 文件中提取洞察，优先给出量化结论与可执行建议。' }
-];
-function renderPresetAgents(){
-  var el=document.getElementById('presetAgentGrid'); if(!el) return;
-  el.innerHTML = PRESET_AGENT_TEMPLATES.map(function(t){
-    var exists = _profiles.some(function(p){ return p.id===t.id; });
-    var active = _profiles.some(function(p){ return p.id===t.id && (p.is_active || _persona===p.id); });
-    // 卡片用纵向 flex：描述区 flex:1 撑开、按钮区 margin-top:auto 贴底，保证各卡片按钮垂直位置一致
-    return '<div class="ext-card" style="border:1px solid var(--border);display:flex;flex-direction:column">'+
-      '<div class="top"><div class="icon" style="font-size:22px">'+t.emoji+'</div><div><div class="name">'+esc(t.name)+'</div><div class="status '+(active?'on':'off')+'">'+(exists?(active?'● 使用中':'已创建'):'未创建')+'</div></div></div>'+
-      '<div class="conn-desc" style="font-size:11px;opacity:.8;flex:1">'+esc(t.desc)+'</div>'+
-      '<div style="margin-top:10px"><button class="action sm primary" onclick="applyPresetAgent(\''+t.id+'\')">'+(active?'使用中':(exists?'一键激活':'一键创建并激活'))+'</button></div>'+
-      '</div>';
-  }).join('');
-}
-function applyPresetAgent(id){
-  var t = PRESET_AGENT_TEMPLATES.find(function(x){ return x.id===id; });
-  if(!t) return;
-  var existing = _profiles.find(function(p){ return p.id===t.id; });
-  if(existing){
-    selectPersona(t.id);
-    toast('已激活模板 Agent：'+t.name);
-    return;
-  }
-  toast('正在创建 Agent：'+t.name+'…');
-  apiPost('/api/profiles', { id:t.id, name:t.name, emoji:t.emoji, prompt:t.prompt }).then(function(r){
-    if(r && r.ok){
-      fetchProfiles(function(){ selectPersona(t.id); renderPresetAgents(); });
-      toast('模板已创建并激活：'+t.name+'（独立环境已就绪）');
-    } else toast('创建失败：'+(r&&r.error||'未知'));
-  }).catch(function(){ toast('创建失败：'+'网络错误'); });
-}
-/* ── 专家页（独立页，三页签：我的 / 内置 / 市场）────────────────────── */
-var EXPERT_SCENE={ mine:'all', builtin:'all', market:'all' };
-var MARKET_EXPERTS=[];
-var BUILTIN_EXPERTS=null;
-function _jsStr(s){ return String(s==null?'':s).replace(/'/g,"\\'"); }
-function _expertScene(e){ return e.scene||'通用'; }
-function _builtinExperts(){
-  if(BUILTIN_EXPERTS) return BUILTIN_EXPERTS;
-  // 内置专家：预设智能体模板（后续追加 Octop 转换的飞牛专家）
-  BUILTIN_EXPERTS = PRESET_AGENT_TEMPLATES.map(function(t){
-    return { id:t.id, emoji:t.emoji, name:t.name, desc:t.desc, prompt:t.prompt, scene:'通用', skills:[], quick_prompts:['你擅长什么？','帮我完成一项任务'] };
-  });
-  return BUILTIN_EXPERTS;
-}
-function expSwitchTab(el, key){
-  document.querySelectorAll('#expTabs .ch-filter').forEach(function(t){ t.classList.remove('active'); });
-  el.classList.add('active');
-  document.querySelectorAll('.exp-pane').forEach(function(p){ p.classList.remove('active'); });
-  var pane=document.getElementById('exp-'+key); if(pane) pane.classList.add('active');
-  if(key==='mine') renderMineExperts();
-  if(key==='builtin') renderBuiltinExperts();
-  if(key==='market') renderMarketExperts();
-}
-function renderExpertsPage(){
-  fetchProfiles(function(){ renderMineExperts(); renderBuiltinExperts(); renderMarketExperts(); });
-}
-function refreshExperts(){
-  window.__marketLoaded=false; window.__builtinLoaded=false; MARKET_EXPERTS=[];
-  fetchProfiles(function(){ renderMineExperts(); renderBuiltinExperts(); renderMarketExperts(); });
-  toast('专家列表已刷新');
-}
-function openExpertCreate(){
-  var t=document.querySelector('#expTabs .ch-filter[onclick*="builtin"]'); if(t) expSwitchTab(t,'builtin');
-  toast('从下方「内置专家」卡片一键创建即可生成独立 Agent');
-}
-function _renderExpertList(key, fullList, opts){
-  opts=opts||{};
-  var gridId={mine:'expMineGrid',builtin:'expBuiltinGrid',market:'expMarketGrid'}[key];
-  var scenesEl=document.getElementById({mine:'expMineScenes',builtin:'expBuiltinScenes',market:'expMarketScenes'}[key]);
-  var searchEl=opts.searchId?document.getElementById(opts.searchId):null;
-  var grid=document.getElementById(gridId); if(!grid) return;
-  // 场景筛选 chips
-  var scenes={}; fullList.forEach(function(e){ var s=_expertScene(e); scenes[s]=(scenes[s]||0)+1; });
-  var chipsHtml='<button class="exp-scene-chip'+(EXPERT_SCENE[key]==='all'?' active':'')+'" onclick="setExpScene(\''+key+'\',\'all\')">全部</button>';
-  Object.keys(scenes).forEach(function(s){
-    chipsHtml+='<button class="exp-scene-chip'+(EXPERT_SCENE[key]===s?' active':'')+'" onclick="setExpScene(\''+key+'\',\''+_jsStr(s)+'\')">'+esc(s)+'</button>';
-  });
-  if(scenesEl) scenesEl.innerHTML=chipsHtml;
-  // 搜索 + 场景过滤
-  var q=(searchEl?searchEl.value:'').trim().toLowerCase();
-  var list=fullList.filter(function(e){
-    if(EXPERT_SCENE[key]!=='all' && _expertScene(e)!==EXPERT_SCENE[key]) return false;
-    if(!q) return true;
-    var hay=(e.name||'')+' '+(e.desc||e.description||'')+' '+(e.prompt||'')+' '+(e.id||'');
-    return hay.toLowerCase().indexOf(q)>=0;
-  });
-  if(!list.length){ grid.innerHTML='<div class="empty-state">'+(fullList.length?'没有匹配的专家':'暂无数据')+'</div>'; return; }
-  var kind=opts.kind||key;
-  grid.innerHTML=list.map(function(e){ return _expertCardHtml(e,kind); }).join('');
-}
-function _expertCardHtml(e, kind){
-  if(kind==='mine'){
-    var p=e, active=p.is_active||(_persona===p.id);
-    var modelTag=p.model?'<span class="exp-badge">'+esc(p.model)+'</span>':'';
-    var skillTag=(p.skills&&p.skills.length)?'<span class="exp-badge">🛠 '+p.skills.length+' 技能</span>':'';
-    return '<div class="exp-card'+(active?' active':'')+'">'+
-      '<div class="exp-card-head"><div class="exp-card-avatar">'+(p.emoji||'🤖')+'</div>'+
-      '<div><div class="exp-card-title">'+esc(p.name||p.id)+'</div>'+
-      '<div class="exp-card-scene">'+esc(_expertScene(p))+' · <span class="exp-status '+(active?'on':'off')+'">'+(active?'● 使用中':'未使用')+'</span></div></div></div>'+
-      '<div class="exp-card-desc">'+esc((p.prompt||'').slice(0,120))+'</div>'+
-      '<div class="exp-card-foot"><div style="display:flex;gap:6px;flex-wrap:wrap">'+modelTag+skillTag+'</div>'+
-      '<div class="exp-card-actions">'+
-        '<button class="action sm" onclick="openPersonaModal(\''+_jsStr(p.id)+'\')">编辑</button>'+
-        '<button class="action sm primary" onclick="selectPersona(\''+_jsStr(p.id)+'\')">'+(active?'使用中':'使用')+'</button>'+
-      '</div></div></div>';
-  }
-  var exists=_profiles.some(function(p){ return p.id===e.id; });
-  var active=exists && _profiles.some(function(p){ return p.id===e.id && (p.is_active||_persona===p.id); });
-  if(kind==='builtin'){
-    return '<div class="exp-card'+(active?' active':'')+'">'+
-      '<div class="exp-card-head"><div class="exp-card-avatar">'+(e.emoji||'🧠')+'</div>'+
-      '<div><div class="exp-card-title">'+esc(e.name)+'</div>'+
-      '<div class="exp-card-scene">'+esc(_expertScene(e))+' · <span class="exp-status '+(active?'on':'off')+'">'+(active?'● 使用中':(exists?'已创建':'未创建'))+'</span></div></div></div>'+
-      '<div class="exp-card-desc">'+esc(e.desc||'')+'</div>'+
-      '<div class="exp-card-foot">'+
-        ((e.skills&&e.skills.length)?'<span class="exp-badge">🛠 '+e.skills.length+' 技能</span>':'<span></span>')+
-        '<div class="exp-card-actions"><button class="action sm primary" onclick="openExpertCreateForm(\'builtin\',\''+_jsStr(e.slug||e.id)+'\')">'+(active?'使用中':(exists?'激活':'以此创建'))+'</button></div></div></div>';
-  }
-  // market
-  var sc=e.skill_count!=null?e.skill_count:(e.skills?e.skills.length:0);
-  return '<div class="exp-card'+(active?' active':'')+'">'+
-    '<div class="exp-card-head"><div class="exp-card-avatar">'+(e.icon_name||e.emoji||'🌐')+'</div>'+
-    '<div><div class="exp-card-title">'+esc(e.name||e.slug||e.id)+'</div>'+
-    '<div class="exp-card-scene">'+esc(_expertScene(e))+' · '+(sc?'🛠 '+sc+' 技能':'')+'</div></div></div>'+
-    '<div class="exp-card-desc">'+esc(e.description||e.desc||'')+'</div>'+
-    '<div class="exp-card-foot">'+(e.source?'<span class="exp-badge">'+esc(e.source)+'</span>':'<span></span>')+
-    '<div class="exp-card-actions"><button class="action sm primary" onclick="openExpertCreateForm(\'market\',\''+_jsStr(e.slug||e.id)+'\')">'+(active?'使用中':(exists?'激活':'导入并创建'))+'</button></div></div></div>';
-}
-function renderMineExperts(){
-  var grid=document.getElementById('expMineGrid'); if(!grid) return;
-  if(!_profilesLoaded){ grid.innerHTML='<div class="empty-state">加载中…</div>'; return; }
-  _renderExpertList('mine', _profiles, { kind:'mine', searchId:'expMineSearch' });
-}
-function renderBuiltinExperts(){
-  var grid=document.getElementById('expBuiltinGrid'); if(!grid) return;
-  if(!_profilesLoaded){ fetchProfiles(function(){ renderBuiltinExperts(); }); grid.innerHTML='<div class="empty-state">加载中…</div>'; return; }
-  if(!window.__builtinLoaded){
-    grid.innerHTML='<div class="empty-state">加载中…</div>';
-    apiGet('/api/experts?scope=builtin').then(function(r){
-      window.__builtinLoaded=true;
-      window.BUILTIN_EXPERTS_ARR=(r&&Array.isArray(r.experts))?r.experts:_builtinExperts();
-      _renderExpertList('builtin', window.BUILTIN_EXPERTS_ARR, { kind:'builtin', searchId:'expBuiltinSearch' });
-    }).catch(function(){
-      window.__builtinLoaded=true;
-      window.BUILTIN_EXPERTS_ARR=_builtinExperts();
-      _renderExpertList('builtin', window.BUILTIN_EXPERTS_ARR, { kind:'builtin', searchId:'expBuiltinSearch' });
-    });
-    return;
-  }
-  _renderExpertList('builtin', window.BUILTIN_EXPERTS_ARR||_builtinExperts(), { kind:'builtin', searchId:'expBuiltinSearch' });
-}
-function renderMarketExperts(){
-  var grid=document.getElementById('expMarketGrid'); if(!grid) return;
-  if(!window.__marketLoaded){
-    grid.innerHTML='<div class="empty-state">加载中…</div>';
-    apiGet('/api/experts?scope=market').then(function(r){
-      window.__marketLoaded=true;
-      MARKET_EXPERTS=(r&&Array.isArray(r.experts))?r.experts:[];
-      if(MARKET_EXPERTS.length){ _renderExpertList('market', MARKET_EXPERTS, { kind:'market', searchId:'expMarketSearch' }); }
-      else grid.innerHTML='<div class="empty-state">专家市场暂不可用（离线）。已内置基础专家模板，可切换到「内置专家」页签一键创建。</div>';
-    }).catch(function(){
-      window.__marketLoaded=true;
-      grid.innerHTML='<div class="empty-state">专家市场暂不可用（离线）。已内置基础专家模板，可切换到「内置专家」页签一键创建。</div>';
-    });
-    return;
-  }
-  _renderExpertList('market', MARKET_EXPERTS, { kind:'market', searchId:'expMarketSearch' });
-}
-function openExpertCreateForm(kind, slug){
-  var e=null;
-  if(kind==='builtin'){ e=(window.BUILTIN_EXPERTS_ARR||_builtinExperts()).find(function(x){ return (x.id||x.slug)===slug; }); }
-  else { e=MARKET_EXPERTS.find(function(x){ return x.slug===slug||x.id===slug; }); }
-  if(!e){ toast('未找到该专家模板'); return; }
-  var pid=e.slug||e.id;
-  var existing=_profiles.find(function(p){ return p.id===pid; });
-  if(existing){ selectPersona(existing.id); toast('已激活专家：'+(e.name||existing.name||existing.id)); return; }
-  // Octop 风格：以模板预填创建表单，可调整名称/头像/场景/技能/快捷提问后再创建
-  openPersonaModal('', {
-    name: e.name||'',
-    emoji: e.emoji||'🤖',
-    prompt: e.prompt||'',
-    scene: e.scene||'通用',
-    skills: Array.isArray(e.skills)?e.skills.slice():[],
-    quick_prompts: Array.isArray(e.quick_prompts)?e.quick_prompts.slice():[]
-  });
-  toast('已载入「'+(e.name||slug)+'」模板，调整后点击创建即可生成并激活');
-}
-function importMarketExpert(slug){
-  var e=MARKET_EXPERTS.find(function(x){ return x.slug===slug||x.id===slug; });
-  var label=(e&&e.name)||slug;
-  toast('正在创建专家：'+label+'…');
-  apiPost('/api/experts/create', { slug:slug }).then(function(r){
-    if(r&&r.ok){ fetchProfiles(function(){ selectPersona(r.profile.id||slug); renderMineExperts(); renderBuiltinExperts(); }); toast('专家已创建并激活：'+(r.profile&&r.profile.name||label)+'（可进入对话使用）'); }
-    else toast('创建失败：'+(r&&r.error||'未知'));
-  }).catch(function(){ toast('创建失败：网络错误'); });
-}
 function renderPersonas(){
   var el=document.getElementById('personaGrid'); if(!el) return;
   if(!_profilesLoaded){ fetchProfiles(function(){ renderPersonas(); }); el.innerHTML='<div class="empty-state">加载中…</div>'; return; }
-  renderPresetAgents();
   el.innerHTML = _profiles.map(function(p){
     var active = p.is_active || (_persona===p.id);
     var canDelete = !p.is_default;
@@ -11106,7 +10377,7 @@ function renderPersonas(){
     var skillsCount = (p.skills && p.skills.length) ? p.skills.length : 0;
     var infoTags = '<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">';
     if(p.is_default) infoTags += '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--border);color:var(--muted)">主目录</span>';
-    infoTags += '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--border);color:var(--muted);cursor:pointer" title="点击配置该 Agent 的专属 API 密钥" onclick="event.stopPropagation();openPersonaEnvEditor(\''+esc(p.id)+'\',\''+esc(p.name||p.id)+'\')">'+(p.has_api_key?'✅ API已配置':'⚠️ 未配置API')+'</span>';
+    infoTags += '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--border);color:var(--muted)">'+(p.has_api_key?'✅ API已配置':'⚠️ 未配置API')+'</span>';
     if(skillsCount) infoTags += '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--border);color:var(--muted)">🛠 '+skillsCount+' 技能</span>';
     infoTags += '</div>';
     return '<div class="ext-card" style="border:'+(active?'1px solid var(--accent)':'1px solid var(--border)')+'">'+
@@ -11132,18 +10403,17 @@ function renderPersonas(){
     });
   }
 }
-function openPersonaModal(id, prefill){
+function openPersonaModal(id){
   try {
-    prefill = prefill||{};
     var m=document.getElementById('personaModal'); if(!m){ toast('模态未就绪'); return; }
     if (m.parentElement !== document.body) document.body.appendChild(m);
     m.style.display='flex';
     document.getElementById('personaEditId').value = id||'';
     document.getElementById('personaModalTitle').textContent = id? '编辑 Agent (Profile)' : '创建 Agent (Profile)';
     var p = id ? _profiles.find(function(x){ return x.id===id; }) : null;
-    document.getElementById('personaEmoji').value = p?(p.emoji||''):(prefill.emoji||'🤖');
-    document.getElementById('personaLabel').value = p?(p.name||''):(prefill.name||'');
-    document.getElementById('personaPrompt').value = p?(p.prompt||''):(prefill.prompt||'');
+    document.getElementById('personaEmoji').value = p?(p.emoji||''):'🤖';
+    document.getElementById('personaLabel').value = p?(p.name||''):'';
+    document.getElementById('personaPrompt').value = p?(p.prompt||''):'';
     document.getElementById('personaDeleteBtn').style.display = (id && p && !p.is_default) ? 'inline-block' : 'none';
     // 动态插入模型字段和克隆选项（如果尚未插入）
     var promptEl = document.getElementById('personaPrompt');
@@ -11164,87 +10434,17 @@ function openPersonaModal(id, prefill){
           '<option value="clone_all">完整克隆（配置 + 记忆 + 会话 + 技能）</option>'+
         '</select><div style="font-size:11px;color:var(--muted);margin-top:4px">克隆从当前默认 profile 复制配置，新 Agent 的会话和记忆独立</div></div>';
     }
-    // 技能目录多选（编辑或新建时可用；default 主目录除外）
-    if(!p || !p.is_default){
-      var curScene=(p&&p.scene)||prefill.scene||'通用';
-      var curQp=(p&&Array.isArray(p.quick_prompts)&&p.quick_prompts.length)?p.quick_prompts.slice():(Array.isArray(prefill.quick_prompts)?prefill.quick_prompts.slice():[]);
-      extraHtml += '<div class="field" style="margin-top:10px"><label>场景（用于分类筛选）</label>'+
-        '<input id="personaScene" value="'+esc(curScene)+'" placeholder="通用" style="width:100%;padding:8px;border-radius:6px;background:var(--bg1);color:var(--text);border:1px solid var(--border)">'+
-        '<div style="font-size:11px;color:var(--muted);margin-top:4px">可选：通用/开发/写作/运营/效率/金融/生活/学习/安全/运维</div></div>'+
-        '<div class="field" style="margin-top:10px"><label>快捷提问（每行一条，展示在对话欢迎页，最多 12 条）</label>'+
-        '<textarea id="personaQuickPrompts" rows="3" placeholder="例如：&#10;帮我总结这篇文档&#10;写一封工作邮件" style="width:100%;padding:8px;border-radius:6px;background:var(--bg1);color:var(--text);border:1px solid var(--border);resize:vertical">'+esc(curQp.join('\n'))+'</textarea></div>';
-      _personaSkillsSel = (p && p.skills && p.skills.length) ? p.skills.slice() : ((prefill.skills||[]).slice());
-      extraHtml += '<div class="field" style="margin-top:10px"><label>技能目录（点击选择该 Agent 使用的技能）</label>'+
-        '<div id="personaSkillsChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;max-height:130px;overflow:auto"></div>'+
-        '<div id="personaSkillsHint" style="font-size:11px;color:var(--muted);margin-top:4px"></div></div>';
-    }
     if(id && p && !p.is_default){
-      // 编辑时显示环境信息
+      // 编辑时显示技能列表和环境信息
+      var skillsHtml = (p.skills && p.skills.length) ? p.skills.map(function(s){ return '<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--border);margin:2px">'+esc(s)+'</span>'; }).join('') : '<span style="font-size:11px;color:var(--muted)">无独立技能（继承预置）</span>';
+      extraHtml += '<div class="field" style="margin-top:10px"><label>技能目录</label><div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:4px">'+skillsHtml+'</div></div>';
       extraHtml += '<div class="field" style="margin-top:8px"><label>环境状态</label><div style="font-size:11px;color:var(--muted);margin-top:4px">'+
-        'API 密钥：'+(p.has_api_key?'<span style="color:#4caf50">已配置</span>':'<span style="color:#ff9800">未配置</span>')+
+        'API 密钥：'+(p.has_api_key?'<span style="color:#4caf50">已配置</span>':'<span style="color:#ff9800">未配置（请在 .env 中添加）</span>')+
         (p.env_keys && p.env_keys.length ? ' · 环境变量：'+p.env_keys.length+' 个' : '')+
-        ' <button class="action sm" onclick="openPersonaEnvEditor(\''+esc(id)+'\',\''+esc(p.name||'')+'\')" style="margin-left:6px">'+(p.has_api_key?'修改':'配置')+' API 密钥</button>'+
-        '<div style="margin-top:4px;line-height:1.5">每个 Agent 是独立环境，可配置专属密钥；留空则回落到全局默认 .env 的密钥。</div>'+
         '</div></div>';
     }
     extraWrap.innerHTML = extraHtml;
-    if(!p || !p.is_default) loadPersonaSkills(false);
   } catch(e){ toast('打开角色编辑失败：'+e.message); }
-}
-// ── 技能目录多选：从已安装技能中选择（数据源 /proxy/dashboard/api/skills）─
-var _personaSkillsSel=[];
-var _personaAllSkills=null; // [{name,description,enabled}] 已安装技能缓存
-function loadPersonaSkills(force){
-  if(_personaAllSkills && !force){ _renderPersonaSkillsChips(); return; }
-  var box=document.getElementById('personaSkillsChips');
-  if(!box) return;
-  box.innerHTML='<span style="font-size:11px;color:var(--muted)">加载已安装技能…</span>';
-  fetch(apiUrl('/proxy/dashboard/api/skills'), { cache:'no-store', headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .then(function(list){
-      _personaAllSkills=Array.isArray(list)?list:[];
-      _renderPersonaSkillsChips();
-    })
-    .catch(function(){ _personaAllSkills=[]; _renderPersonaSkillsChips(); });
-}
-function _personaSkillName(s){ return (typeof s==='string')?s:(s&&s.name?String(s.name):''); }
-function _renderPersonaSkillsChips(){
-  var box=document.getElementById('personaSkillsChips'); if(!box) return;
-  var hint=document.getElementById('personaSkillsHint');
-  var avail={};
-  (_personaAllSkills||[]).forEach(function(s){ var n=_personaSkillName(s); if(n) avail[n]=s; });
-  var names=Object.keys(avail);
-  if(!names.length && !_personaSkillsSel.length){
-    if(hint) hint.textContent='未能获取已安装技能（请先启动仪表盘），可手动添加。';
-    box.innerHTML='<button class="action sm" onclick="addPersonaSkillPrompt()">+ 手动添加技能</button>';
-    return;
-  }
-  if(hint) hint.textContent='已选 '+_personaSkillsSel.length+' 个技能；不选则继承预置。';
-  var html='';
-  _personaSkillsSel.forEach(function(n){
-    if(avail[n]) return;
-    html+='<span class="ps-chip sel" title="已选（未在安装列表）" onclick="togglePersonaSkill(\''+_jsStr(n)+'\')">'+esc(n)+' ✕</span>';
-  });
-  names.forEach(function(n){
-    var on=_personaSkillsSel.indexOf(n)>=0;
-    var desc=String(avail[n].description||'').replace(/"/g,'&quot;').slice(0,60);
-    html+='<span class="ps-chip'+(on?' sel':'')+'" title="'+desc+'" onclick="togglePersonaSkill(\''+_jsStr(n)+'\')">'+esc(n)+(on?' ✓':'')+'</span>';
-  });
-  html+='<span style="align-self:center"><button class="action sm" onclick="addPersonaSkillPrompt()">+ 手动添加</button></span>';
-  box.innerHTML=html;
-}
-function togglePersonaSkill(n){
-  var i=_personaSkillsSel.indexOf(n);
-  if(i>=0) _personaSkillsSel.splice(i,1); else _personaSkillsSel.push(n);
-  _renderPersonaSkillsChips();
-}
-function addPersonaSkillPrompt(){
-  var n=prompt('输入技能名（与技能目录/市场中的名称一致，如 web_search）：');
-  if(!n) return;
-  n=n.trim();
-  if(!n) return;
-  if(_personaSkillsSel.indexOf(n)<0) _personaSkillsSel.push(n);
-  _renderPersonaSkillsChips();
 }
 function closePersonaModal(){ var m=document.getElementById('personaModal'); if(m) m.style.display='none'; }
 function savePersona(){
@@ -11254,19 +10454,13 @@ function savePersona(){
   var prompt=document.getElementById('personaPrompt').value;
   var modelEl=document.getElementById('personaModel');
   var model=modelEl?modelEl.value.trim():'';
-  var sceneEl=document.getElementById('personaScene');
-  var scene=sceneEl?sceneEl.value.trim():'';
-  var qpEl=document.getElementById('personaQuickPrompts');
-  var qp=(qpEl?qpEl.value:'').split('\n').map(function(s){ return s.trim(); }).filter(Boolean).slice(0,12);
   if(!label){ toast('请填写 Agent 名称'); return; }
   if(id){
     // 更新已有 profile（SOUL.md + config + metadata）
-    var payload = { name:label, emoji:emoji, prompt:prompt, scene: scene||'通用' };
+    var payload = { name:label, emoji:emoji, prompt:prompt };
     if(model) payload.model = model;
-    if(qp.length) payload.quick_prompts = qp; else payload.quick_prompts = [];
-    if(_personaSkillsSel && _personaSkillsSel.length) payload.skills = _personaSkillsSel.slice();
     api('/api/profiles/'+encodeURIComponent(id), 'PUT', payload).then(function(r){
-      if(r&&r.ok){ toast('已保存 Agent：'+label); closePersonaModal(); fetchProfiles(function(){ renderPersonas(); renderMineExperts(); }); }
+      if(r&&r.ok){ toast('已保存 Agent：'+label); closePersonaModal(); fetchProfiles(function(){ renderPersonas(); }); }
       else toast('保存失败：'+(r&&r.error||'未知'));
     }).catch(function(){ toast('保存失败'); });
   } else {
@@ -11276,14 +10470,11 @@ function savePersona(){
     var cloneMode=cloneEl?cloneEl.value:'blank';
     var payload = { id:newId, name:label, emoji:emoji, prompt:prompt };
     if(model) payload.model = model;
-    if(scene) payload.scene = scene;
-    if(qp.length) payload.quick_prompts = qp;
-    if(_personaSkillsSel && _personaSkillsSel.length) payload.skills = _personaSkillsSel.slice();
     if(cloneMode==='clone') payload.clone = true;
     if(cloneMode==='clone_all') payload.clone_all = true;
     toast('正在创建 Agent…（hermes profile create）');
     apiPost('/api/profiles', payload).then(function(r){
-      if(r&&r.ok){ toast('已创建 Agent：'+label+'，正在激活…'); closePersonaModal(); fetchProfiles(function(){ renderPersonas(); renderMineExperts(); selectPersona(newId); }); }
+      if(r&&r.ok){ toast('已创建 Agent：'+label+'（独立环境已就绪）'); closePersonaModal(); fetchProfiles(function(){ renderPersonas(); }); }
       else toast('创建失败：'+(r&&r.error||'未知'));
     });
   }
@@ -11299,126 +10490,6 @@ function deletePersona(id){
       else toast('删除失败：'+(r&&r.error||'未知'));
     }).catch(function(){ toast('删除失败'); });
 }
-// ── 每个 Agent 的专属 API 密钥配置（独立 .env）──────────────────────────
-var _envProfileId = null;
-var _envProfileName = '';
-// 模型名 → 推荐 API 密钥（按前缀匹配，供 API 密钥面板联动提示）
-var MODEL_KEY_RULES = [
-  { re: /deepseek/i, key: 'DEEPSEEK_API_KEY', label: 'DeepSeek' },
-  { re: /glm|zhipu|chatglm/i, key: 'GLM_API_KEY', label: '智谱 GLM' },
-  { re: /moonshot|kimi/i, key: 'MOONSHOT_API_KEY', label: 'Moonshot Kimi' },
-  { re: /minimax/i, key: 'MINIMAX_API_KEY', label: 'MiniMax' },
-  { re: /qwen/i, key: 'QWEN_API_KEY', label: '通义千问 Qwen' },
-  { re: /gpt|openai|o[0-9]/i, key: 'OPENAI_API_KEY', label: 'OpenAI' },
-  { re: /claude|anthropic/i, key: 'ANTHROPIC_API_KEY', label: 'Anthropic Claude' },
-  { re: /gemini/i, key: 'GEMINI_API_KEY', label: 'Google Gemini' },
-  { re: /grok|xai/i, key: 'XAI_API_KEY', label: 'xAI Grok' },
-  { re: /ollama/i, key: 'OLLAMA_BASE_URL', label: 'Ollama' },
-];
-function modelKeyRule(modelId){
-  var m = String(modelId||'');
-  for(var i=0;i<MODEL_KEY_RULES.length;i++){
-    if(MODEL_KEY_RULES[i].re.test(m)) return MODEL_KEY_RULES[i];
-  }
-  return null;
-}
-function openPersonaEnvEditor(id, name){
-  _envProfileId = id; _envProfileName = name || id;
-  var prof = null;
-  try { prof = _profiles.find(function(x){ return x.id===id; }); } catch(e){}
-  var curModel = (prof && prof.model) ? String(prof.model).trim() : '';
-  var rule = modelKeyRule(curModel);
-  var m = document.getElementById('personaEnvModal');
-  if(!m){
-    m = document.createElement('div');
-    m.id = 'personaEnvModal';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9999';
-    m.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:min(560px,92vw);max-height:84vh;display:flex;flex-direction:column">'+
-      '<div id="envModalTitle" style="padding:14px 16px;font-weight:600;border-bottom:1px solid var(--border)">🔑 配置 API 密钥</div>'+
-      '<div id="envModalBody" style="padding:14px 16px;overflow:auto;flex:1"></div>'+
-      '<div id="envModalFoot" style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">'+
-        '<button class="action" onclick="closePersonaEnvEditor()">取消</button>'+
-        '<button class="action primary" onclick="savePersonaEnv()">保存并重启网关</button>'+
-      '</div></div>';
-    document.body.appendChild(m);
-  }
-  document.getElementById('envModalTitle').textContent = '🔑 '+name+' 的 API 密钥';
-  var body = document.getElementById('envModalBody');
-  body.innerHTML = '<div class="conn-hint" style="font-size:12px;margin-bottom:10px;line-height:1.6">每个 Agent 是独立环境，可配置专属密钥（写入该 Agent 的 .env，保存后网关自动重启生效）。<br>已有密钥仅显示前 4 位；输入新值覆盖，清空输入框并保存 = 删除该密钥（留空密钥时回落到全局默认 .env）。</div>';
-  // 当前模型联动提示：直接定位该模型所需的 API 密钥
-  if(curModel){
-    body.innerHTML += '<div style="font-size:11px;margin-bottom:10px;padding:7px 9px;border-radius:6px;background:'+(rule?'var(--accent-bg)':'var(--bg1)')+';border:1px solid '+(rule?'var(--accent)':'var(--border)')+';line-height:1.6">'+
-      '当前模型：<b>'+esc(curModel)+'</b>'+(rule ? ' → 对应密钥 <b style="color:var(--accent)">'+esc(rule.key)+'</b>（下方 ★ 高亮行，填入该服务商密钥即可）' : '，未匹配到常用密钥，请在下方「自定义变量」添加对应服务商密钥')+'</div>';
-  }
-  body.innerHTML += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">常用密钥</div>';
-  var commonKeys = ['OPENAI_API_KEY','ANTHROPIC_API_KEY','KIMI_API_KEY','MOONSHOT_API_KEY','MINIMAX_API_KEY','QWEN_API_KEY','DEEPSEEK_API_KEY','GLM_API_KEY','ZHIPU_API_KEY','XAI_API_KEY','GEMINI_API_KEY','OLLAMA_BASE_URL'];
-  var known = {}; commonKeys.forEach(function(k){ known[k]=1; });
-  body.innerHTML += '<div id="envCommonWrap" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">'+commonKeys.map(function(k){ return envKeyRowHtml(k, '', rule && rule.key===k); }).join('')+'</div>';
-  body.innerHTML += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">自定义变量 <button class="action sm" onclick="addEnvCustomRow()">+ 添加</button></div>';
-  body.innerHTML += '<div id="envCustomWrap" style="display:flex;flex-direction:column;gap:8px"></div>';
-  // 读取当前值（脱敏）填入 placeholder
-  apiGet('/api/profiles/'+encodeURIComponent(id)+'/env').then(function(res){
-    if(!res || res.error) return;
-    Object.keys(res.env||{}).forEach(function(k){
-      if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) return; // 过滤非法键名（如误入的 "model: xxx"），避免假键混入
-      var inp = document.getElementById('env_inp_'+k);
-      if(inp){ inp.placeholder = res.env[k]; }
-      else {
-        // 自定义键已有值：追加一行
-        addEnvCustomRow(k, res.env[k]);
-      }
-    });
-  }).catch(function(){});
-  m.style.display = 'flex';
-}
-function envKeyRowHtml(key, placeholder, hl){
-  var border = hl ? 'border:1.5px solid var(--accent);background:var(--accent-bg)' : 'border:1px solid var(--border);background:var(--bg1)';
-  return '<div style="display:flex;gap:8px;align-items:center'+(hl?';background:var(--accent-bg);border-radius:6px;padding:4px 6px;margin:-4px -6px':'')+'">'+
-    '<label style="width:180px;font-size:11px;color:'+(hl?'var(--accent)':'var(--muted)')+';flex-shrink:0;font-weight:'+(hl?'600':'400')+'">'+esc(key)+(hl?' ★':'')+'</label>'+
-    '<input type="password" id="env_inp_'+esc(key)+'" class="env-inp" placeholder="'+(placeholder||'未配置')+'" style="flex:1;padding:7px 10px;border-radius:6px;color:var(--text);'+border+'"></div>';
-}
-function addEnvCustomRow(key, placeholder){
-  var wrap = document.getElementById('envCustomWrap'); if(!wrap) return;
-  var k = key || ''; var ph = placeholder || '';
-  var row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:8px;align-items:center';
-  row.innerHTML = '<input type="text" class="env-custom-key" placeholder="变量名（如 MY_API_KEY）" value="'+esc(k)+'" style="width:180px;padding:7px 10px;border-radius:6px;background:var(--bg1);color:var(--text);border:1px solid var(--border);flex-shrink:0;font-size:12px">'+
-    '<input type="password" class="env-inp" placeholder="'+(ph||'值')+'" style="flex:1;padding:7px 10px;border-radius:6px;background:var(--bg1);color:var(--text);border:1px solid var(--border);font-size:12px">'+
-    '<button class="action sm danger" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>';
-  wrap.appendChild(row);
-}
-function closePersonaEnvEditor(){ var m=document.getElementById('personaEnvModal'); if(m) m.style.display='none'; }
-function savePersonaEnv(){
-  var env = {};
-  var skipped = 0;
-  // 常用键区
-  document.querySelectorAll('#envCommonWrap .env-inp').forEach(function(inp){
-    var key = inp.id.replace('env_inp_','');
-    var val = inp.value.trim();
-    if(!val){ if(inp.placeholder && inp.placeholder !== '未配置' && inp.placeholder !== '值') env[key] = ''; else skipped++; return; }
-    if(val === inp.placeholder) { skipped++; return; } // 未修改
-    env[key] = val;
-  });
-  // 自定义键区：仅提交键名非空的行；值空且 placeholder 有原值 → 删除
-  document.querySelectorAll('#envCustomWrap .env-custom-key').forEach(function(kInp, i){
-    var key = kInp.value.trim();
-    if(!key) return;
-    var vInp = kInp.parentElement.querySelector('.env-inp');
-    var val = vInp ? vInp.value.trim() : '';
-    if(val){ env[key] = val; }
-    else if(vInp && vInp.placeholder && vInp.placeholder !== '值'){ env[key] = ''; }
-  });
-  var keys = Object.keys(env);
-  if(!keys.length){ toast('没有需要保存的变更'); return; }
-  toast('正在保存 '+keys.length+' 个密钥…');
-  api('/api/profiles/'+encodeURIComponent(_envProfileId)+'/env', 'PUT', { env: env }).then(function(r){
-    if(r && r.ok){
-      toast('已保存，网关正在重启生效');
-      closePersonaEnvEditor();
-      fetchProfiles(function(){ renderPersonas(); });
-    } else toast('保存失败：'+(r&&r.error||'未知'));
-  }).catch(function(){ toast('保存失败：网络错误'); });
-}
 function selectPersona(id){
   _persona = id;
   var p = _profiles.find(function(x){ return x.id===id; });
@@ -11426,9 +10497,6 @@ function selectPersona(id){
   _cfg.extensions.persona = id;
   if(window.chatState) chatState.persona = id;
   try { localStorage.setItem('hermes_persona', id); } catch(e){}
-  // 切换 Agent 后若对话区为空，立即重渲染个性化欢迎页（快捷提问随专家变化）
-  var chatBody=document.getElementById('chatBody');
-  if(chatBody && !chatBody.querySelector('.msg')){ try{ chatBody.innerHTML = welcomeHTML(); }catch(e){} }
   _selectedExpert = null;
   try { localStorage.removeItem('hermes_selected_expert'); } catch(e){}
   renderSelectedExpertBar();
@@ -11713,52 +10781,25 @@ function renderCronJobs(){
   apiGet('/api/cron-jobs').then(function(res){
     if(!res || !res.ok){ el.innerHTML='<div class="empty-state">加载失败</div>'; return; }
     _cronJobs = res.jobs || [];
-    var cronWebhooks = res.webhooks || {};
     if(!_cronJobs.length){ el.innerHTML='<div class="empty-state">尚无定时任务。点右上角「+ 创建任务」开始配置。</div>'; return; }
-    var delIcons = { local:'💾', origin:'💬', weixin:'💬', telegram:'✈️', discord:'🎮', feishu:'📘', dingtalk:'📱', wecom:'💼' };
     el.innerHTML = _cronJobs.map(function(j){
       var id = j.id || j.job_id || '';
       var name = j.name || j.prompt || '未命名任务';
       if(name.length > 60) name = name.slice(0,60) + '…';
       var schedule = j.schedule || j.cron || '';
       var paused = j.paused || j.status === 'paused';
+      var statusHtml = paused ? '<span style="color:#f59e0b">● 已暂停</span>' : '<span style="color:#22c55e">● 活跃</span>';
       var skills = j.skills || j.attached_skills || [];
       var deliver = j.deliver_to || j.delivery || 'local';
       var nextRun = j.next_run_at ? new Date(j.next_run_at).toLocaleString('zh-CN') : '';
       var lastRun = j.last_run_at ? new Date(j.last_run_at).toLocaleString('zh-CN') : '';
-      var lastStatus = j.last_status || '';
-      var lastError = j.last_error || '';
-      var accent = paused ? '#f59e0b' : '#22c55e';
-      // 状态 pill（参考 Octop CronJobCard：圆点 + 状态色）
-      var statusPill = '<span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;padding:2px 9px;border-radius:10px;color:'+accent+';background:'+accent+'1a;font-weight:600;letter-spacing:.2px">'+
-        '<span style="width:6px;height:6px;border-radius:50%;background:'+accent+'"></span>'+(paused?'已暂停':'活跃')+'</span>';
-      // Webhook 投递通道状态（monitor 轮询转发）
-      var hooks = (cronWebhooks[id] || []).filter(function(h){ return h && h.url; });
-      var hookHtml = '';
-      if(hooks.length){
-        hookHtml = hooks.map(function(h){
-          var hok = h.last_status === 'ok', herr = h.last_status === 'error';
-          var color = herr ? '#ef4444' : (hok ? '#22c55e' : 'var(--text3)');
-          var state = herr ? '失败' : (hok ? '已投递' : '等待');
-          return '<span style="font-size:11px;color:var(--text3)">🔗 '+esc(h.label || 'Webhook')+' <b style="color:'+color+'">'+state+'</b>'+
-            (herr && h.last_error ? ' <span title="'+esc(h.last_error)+'" style="cursor:help;color:#ef4444">⚠️</span>' : '')+'</span>';
-        }).join('<span style="color:var(--border)">|</span>');
-      }
-      return '<div class="mcp-card'+(paused?' disabled':'')+'" style="border-left:3px solid '+accent+'">' +
-        '<div class="mcp-card-head"><div class="mcp-name">⏰ '+esc(name)+'</div><div class="mcp-badges">'+statusPill+'</div></div>' +
-        '<div class="mcp-detail" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px">'+
-          '<code style="font-size:11px;background:var(--bg1);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:monospace">'+esc(schedule)+'</code>'+
-          '<span style="font-size:11px;color:var(--text3)">'+(delIcons[deliver]||'📨')+' 投递: '+esc(deliver)+'</span>'+
-        '</div>' +
-        (skills.length ? '<div class="mcp-tools-info" style="margin-top:4px">📚 技能: '+esc(skills.join(', '))+'</div>' : '') +
-        (hookHtml ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">'+hookHtml+'</div>' : '') +
-        '<div style="font-size:11px;color:var(--text3);display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">' +
-          (nextRun ? '<span>⏭ 下次: '+esc(nextRun)+'</span>' : '') +
-          (lastRun ? '<span>⏮ 上次: '+esc(lastRun)+'</span>' : '') +
-          (lastStatus ? '<span>结果: <b style="color:'+(lastStatus==='ok'?'#22c55e':(lastStatus==='error'?'#ef4444':'var(--text3)'))+'">'+esc(lastStatus)+'</b></span>' : '') +
-        '</div>' +
-        (lastStatus==='error' && lastError ? '<div style="font-size:11px;color:#ef4444;background:#ef44441a;border-radius:6px;padding:5px 9px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(lastError)+'">⚠️ '+esc(lastError)+'</div>' : '') +
-        '<div class="mcp-actions" style="margin-top:8px">' +
+      return '<div class="mcp-card'+(paused?' disabled':'')+'">' +
+        '<div class="mcp-card-head"><div class="mcp-name">⏰ '+esc(name)+'</div><div class="mcp-badges">'+statusHtml+'</div></div>' +
+        '<div class="mcp-detail">调度: '+esc(schedule)+' | 投递: '+esc(deliver)+'</div>' +
+        (skills.length ? '<div class="mcp-tools-info">📚 技能: '+esc(skills.join(', '))+'</div>' : '') +
+        (nextRun ? '<div style="font-size:11px;color:var(--text3)">下次执行: '+esc(nextRun)+'</div>' : '') +
+        (lastRun ? '<div style="font-size:11px;color:var(--text3)">上次执行: '+esc(lastRun)+'</div>' : '') +
+        '<div class="mcp-actions">' +
           (paused ? '<button class="ov-actbtn start" onclick="cronAction(\''+esc(id)+'\',\'resume\')">恢复</button>' : '<button class="ov-actbtn" onclick="cronAction(\''+esc(id)+'\',\'pause\')">暂停</button>') +
           '<button class="ov-actbtn" onclick="cronAction(\''+esc(id)+'\',\'run\')">立即执行</button>' +
           '<button class="ov-actbtn stop" onclick="cronAction(\''+esc(id)+'\',\'remove\')">删除</button>' +
@@ -11775,255 +10816,54 @@ function cronAction(jobId, action){
   }).catch(function(e){ toast('网络错误','error'); });
 }
 function openCronModal(){
-  _cronSched = null; _cronSchedTab = 'period'; // 每次打开重置调度器状态
-  window._cronDeliverList = [{channel:'local',url:'',message:''}];
   var templates = [
-    {icon:'📰', name:'每日 AI 新闻推送', desc:'科技/AI/财经要闻摘要', schedule:'0 8 * * *', prompt:'搜索今日科技、AI、财经领域的重要新闻，生成一份简洁的每日新闻摘要（5-10条），包含标题、一句话摘要和重要性评级。', deliver:['weixin']},
-    {icon:'📖', name:'每日 5 个英语单词', desc:'单词+释义+例句推送', schedule:'0 7 * * *', prompt:'挑选 5 个适合日常交流的英语单词，每个给出音标、中文释义、2 个实用例句，并生成一段用这 5 个词写的小短文。', deliver:[{channel:'webhook', url:'', message:'{output}'}]},
-    {icon:'🌙', name:'每日儿童睡前故事', desc:'生成温馨童话故事', schedule:'0 20 * * *', prompt:'写一个适合 3-8 岁儿童的睡前故事（600字以内），主题积极温暖，结尾附一句晚安祝福。', deliver:['weixin']},
-    {icon:'📋', name:'每周工作周报', desc:'回顾本周工作输出', schedule:'0 17 * * 5', prompt:'回顾本周所有会话记录，总结本周完成的主要工作、遇到的问题和下周计划，生成结构化周报。', deliver:['local']},
-    {icon:'🖥️', name:'NAS 健康检查', desc:'磁盘/内存/服务状态', schedule:'every 6h', prompt:'检查 NAS 系统状态：磁盘使用率、内存占用、CPU 温度、关键服务运行状态。如有异常立即告警。', deliver:['local']},
-    {icon:'🐙', name:'GitHub 仓库监控', desc:'Release/Issue/PR 动态', schedule:'every 2h', prompt:'检查关注的 GitHub 仓库是否有新的 Release、重要 Issue 或 PR。如有新动态生成摘要报告。', deliver:['telegram']},
-    {icon:'📄', name:'每日 AI 论文精选', desc:'arXiv 论文中文解读', schedule:'0 9 * * *', prompt:'搜索 arXiv 上最新的 AI/LLM 相关论文，筛选出 3-5 篇最有价值的，生成中文解读摘要。', deliver:['weixin']},
-    {icon:'🏛️', name:'历史上的今天', desc:'历史事件时间线推送', schedule:'0 8 * * *', prompt:'查询今天在历史上发生的重要事件（至少 5 条，覆盖科技、文化、社会），按时间线整理成简短的推送文案。', deliver:[{channel:'webhook', url:'', message:'{output}'}]},
-    {icon:'💾', name:'定时数据备份提醒', desc:'检查备份完成情况', schedule:'0 2 * * 0', prompt:'检查本周是否已完成重要数据备份，如未完成则生成备份操作指南并提醒用户执行。', deliver:['local']},
-    {icon:'📊', name:'竞品动态监控', desc:'竞品更新与分析简报', schedule:'0 10 * * 1,3,5', prompt:'搜索并分析主要竞品（AI Agent、NAS 应用）的最新动态、产品更新和市场变化，生成竞品分析简报。', deliver:['feishu']},
-    {icon:'🧾', name:'每月账单汇总', desc:'API 用量与费用估算', schedule:'0 10 1 * *', prompt:'汇总上个月的 API 调用量、Token 消耗、各模型使用占比，生成月度用量报告和费用估算。', deliver:['weixin']},
-    {icon:'🔐', name:'服务器安全扫描', desc:'异常登录/端口/证书', schedule:'0 3 * * *', prompt:'执行基础安全检查：异常登录记录、开放端口扫描、过期证书检查、系统更新状态。生成安全报告。', deliver:['local']}
+    {name:'每日新闻摘要', schedule:'0 8 * * *', prompt:'搜索今日科技、AI、财经领域的重要新闻，生成一份简洁的每日新闻摘要（5-10条），包含标题、一句话摘要和重要性评级。', deliver:'weixin'},
+    {name:'每周工作周报', schedule:'0 17 * * 5', prompt:'回顾本周所有会话记录，总结本周完成的主要工作、遇到的问题和下周计划，生成结构化周报。', deliver:'local'},
+    {name:'NAS 健康检查', schedule:'every 6h', prompt:'检查 NAS 系统状态：磁盘使用率、内存占用、CPU 温度、关键服务运行状态。如有异常立即告警。', deliver:'local'},
+    {name:'GitHub 仓库监控', schedule:'every 2h', prompt:'检查关注的 GitHub 仓库是否有新的 Release、重要 Issue 或 PR。如有新动态生成摘要报告。', deliver:'telegram'},
+    {name:'每日 AI 论文精选', schedule:'0 9 * * *', prompt:'搜索 arXiv 上最新的 AI/LLM 相关论文，筛选出 3-5 篇最有价值的，生成中文解读摘要。', deliver:'weixin'},
+    {name:'定时数据备份提醒', schedule:'0 2 * * 0', prompt:'检查本周是否已完成重要数据备份，如未完成则生成备份操作指南并提醒用户执行。', deliver:'local'},
+    {name:'竞品动态监控', schedule:'0 10 * * 1,3,5', prompt:'搜索并分析主要竞品（AI Agent、NAS 应用）的最新动态、产品更新和市场变化，生成竞品分析简报。', deliver:'feishu'},
+    {name:'每日学习进度跟踪', schedule:'0 21 * * *', prompt:'回顾今天的学习会话，总结学到的知识点、完成的练习和明天的学习目标，生成学习日志。', deliver:'local'},
+    {name:'服务器安全扫描', schedule:'0 3 * * *', prompt:'执行基础安全检查：异常登录记录、开放端口扫描、过期证书检查、系统更新状态。生成安全报告。', deliver:'local'},
+    {name:'每月账单汇总', schedule:'0 10 1 * *', prompt:'汇总上个月的 API 调用量、Token 消耗、各模型使用占比，生成月度用量报告和费用估算。', deliver:'weixin'}
   ];
-  var tplHtml = templates.map(function(t,i){
-    return '<div class="cron-tpl-card" onclick="applyCronTemplate('+i+')">' +
-      '<div class="cron-tpl-icon">'+t.icon+'</div>' +
-      '<div class="cron-tpl-name">'+esc(t.name)+'</div>' +
-      '<div class="cron-tpl-desc">'+esc(t.desc)+'</div>' +
-      '<div class="cron-tpl-sched">'+esc(t.schedule)+'</div>' +
-    '</div>';
-  }).join('');
+  var tplHtml = templates.map(function(t,i){ return '<div class="cron-tpl-item" onclick="applyCronTemplate('+i+')"><span class="cron-tpl-name">'+t.name+'</span><span class="cron-tpl-sched">'+t.schedule+'</span></div>'; }).join('');
   window._cronTemplates = templates;
   var html = '<div class="modal-overlay" id="cronModalOverlay" onclick="if(event.target===this)closeCronModal()">' +
-    '<div class="modal" style="max-width:660px;max-height:88vh;overflow-y:auto">' +
-    '<div class="modal-head"><h3>添加自动化任务</h3><button class="modal-close" onclick="closeCronModal()">×</button></div>' +
+    '<div class="modal" style="max-width:560px;max-height:85vh;overflow-y:auto">' +
+    '<div class="modal-head"><h3>创建定时任务</h3><button class="modal-close" onclick="closeCronModal()">×</button></div>' +
     '<div class="modal-body">' +
-      '<div style="background:var(--accent-bg);color:var(--accent);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.7;margin-bottom:12px">🧩 支持<b>多通道投递</b>：可同时推送到微信 / Telegram / 钉钉 / 企业微信等多个通道，每个通道独立定制消息；还支持 <b>Webhook POST</b>（企业微信机器人、钉钉机器人），消息模板用 <code>{output}</code> 引用任务输出。</div>' +
-      '<div class="field"><label>📌 模板（点击一键填充）</label><div class="cron-tpl-grid">'+tplHtml+'</div></div>' +
-      '<div class="field cron-form-group"><label>任务名称（可选）</label><input type="text" id="cronName" placeholder="例如：每日 AI 新闻推送"></div>' +
-      '<div class="field cron-form-group"><label>执行频率 *</label><div id="cronSchedWrap"></div></div>' +
-      '<div class="field cron-form-group"><label>提示词 *</label><textarea id="cronPrompt" rows="4" placeholder="代理每次运行时应执行什么操作？"></textarea></div>' +
-      '<div class="field cron-form-group"><label>投递到（可添加多个通道，每个通道独立消息）</label><div id="cronDeliverWrap"></div><button type="button" class="action sm" onclick="cronAddDeliver()">＋ 添加投递通道</button></div>' +
-      '<div class="field cron-form-group"><label>技能（可选，逗号分隔）</label><input type="text" id="cronSkills" placeholder="例如 blogwatcher, find-nearby"></div>' +
-      '<div class="field cron-form-group"><label>重复次数（可选，留空=无限）</label><input type="number" id="cronRepeat" placeholder="留空表示无限重复" min="1"></div>' +
+      '<div class="field"><label>💡 快速模板（点击填充）</label><div class="cron-tpl-grid">'+tplHtml+'</div></div>' +
+      '<div class="field"><label>任务名称（可选）</label><input type="text" id="cronName" placeholder="例如：每日总结"></div>' +
+      '<div class="field"><label>调度表达式 *</label><input type="text" id="cronSchedule" placeholder="例如 every 30m、0 9 * * *、2h"><div class="desc" style="font-size:11px;color:var(--text3);margin-top:4px">支持: 30m(一次性) | every 2h(重复) | 0 9 * * *(Cron) | ISO时间戳</div></div>' +
+      '<div class="field"><label>提示词 *</label><textarea id="cronPrompt" rows="4" placeholder="代理每次运行时应执行什么操作？"></textarea></div>' +
+      '<div class="field"><label>投递目标</label><select id="cronDeliver"><option value="local">本地（保存到文件）</option><option value="origin">原始会话</option><option value="weixin">微信</option><option value="telegram">Telegram</option><option value="discord">Discord</option><option value="feishu">飞书</option><option value="dingtalk">钉钉</option><option value="wecom">企业微信</option></select></div>' +
+      '<div class="field"><label>技能（可选，逗号分隔）</label><input type="text" id="cronSkills" placeholder="例如 blogwatcher, find-nearby"></div>' +
+      '<div class="field"><label>重复次数（可选，留空=无限）</label><input type="number" id="cronRepeat" placeholder="留空表示无限重复" min="1"></div>' +
     '</div>' +
-    '<div class="modal-foot"><button class="action" onclick="closeCronModal()">取消</button><button class="action primary" onclick="createCronJob()">创建任务</button></div>' +
+    '<div class="modal-foot"><button class="action" onclick="closeCronModal()">取消</button><button class="action primary" onclick="createCronJob()">创建</button></div>' +
     '</div></div>';
   document.body.insertAdjacentHTML('beforeend', html);
-  renderCronSched();
-  renderCronDelivers();
-}
-// ── 可视化调度构建器（WorkBuddy 风格：频率 Tab = 周期 / 按间隔 / 单次 + 实时预览）──
-var _cronSched = null;
-var _cronSchedTab = 'period';
-function cronSchedState(){
-  if(!_cronSched) _cronSched = { mode:'interval', intervalValue:2, intervalUnit:'hours', timeOfDay:'09:00', weekdays:[1,2,3,4,5], dayOfMonth:1, onceAt:'', custom:'' };
-  return _cronSched;
-}
-function buildScheduleString(){
-  var s = cronSchedState();
-  if(s.mode==='interval'){
-    var um = { minutes:'m', hours:'h', days:'d' };
-    return 'every ' + s.intervalValue + (um[s.intervalUnit]||'h');
-  }
-  var hm = (s.timeOfDay||'09:00').split(':');
-  var hh = parseInt(hm[0])||0, mm = parseInt(hm[1])||0;
-  if(s.mode==='daily') return mm + ' ' + hh + ' * * *';
-  if(s.mode==='weekly') return mm + ' ' + hh + ' * * ' + (s.weekdays.length ? s.weekdays.join(',') : '*');
-  if(s.mode==='monthly') return mm + ' ' + hh + ' ' + s.dayOfMonth + ' * *';
-  if(s.mode==='once') return s.onceAt;
-  return s.custom;
-}
-function cronSchedPreview(){
-  var s = cronSchedState();
-  if(s.mode==='interval') return '每 '+s.intervalValue+' '+({minutes:'分钟',hours:'小时',days:'天'}[s.intervalUnit]||s.intervalUnit)+'执行一次';
-  if(s.mode==='daily') return '每天 '+s.timeOfDay+' 执行';
-  if(s.mode==='weekly') return '每周 '+(s.weekdays.length ? s.weekdays.map(function(d){ return ['日','一','二','三','四','五','六'][d]; }).join('、') : '（未选，视为每天）')+' '+s.timeOfDay+' 执行';
-  if(s.mode==='monthly') return '每月 '+s.dayOfMonth+' 日 '+s.timeOfDay+' 执行';
-  if(s.mode==='once') return '一次性：'+(s.onceAt||'（请选择时间）');
-  return '自定义：'+(s.custom||'（未填写）');
-}
-function cronSchedTabOf(mode){ return (mode==='interval')?'interval':(mode==='once')?'once':'period'; }
-function cronSchedTab(tab){
-  var s = cronSchedState();
-  if(tab==='interval') s.mode='interval';
-  else if(tab==='once') s.mode='once';
-  else if(s.mode==='interval'||s.mode==='once') s.mode='daily';
-  renderCronSched();
-}
-function renderCronSched(){
-  var wrap = document.getElementById('cronSchedWrap'); if(!wrap) return;
-  var s = cronSchedState();
-  _cronSchedTab = cronSchedTabOf(s.mode);
-  var html = '<div class="cron-tabs">' +
-    [['period','🔄 周期'],['interval','⏱ 按间隔'],['once','🎯 单次']].map(function(t){
-      return '<button type="button" class="cron-tab'+(t[0]===_cronSchedTab?' active':'')+'" onclick="cronSchedTab(\''+t[0]+'\')">'+t[1]+'</button>';
-    }).join('') + '</div>';
-  if(_cronSchedTab==='interval'){
-    html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">每 <input type="number" id="cronIvVal" min="1" max="9999" value="'+s.intervalValue+'" style="width:70px" onchange="cronSchedPatch({intervalValue:parseInt(this.value)||1})"> '+
-      '<select id="cronIvUnit" onchange="cronSchedPatch({intervalUnit:this.value})" style="padding:6px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)">'+
-      '<option value="minutes"'+(s.intervalUnit==='minutes'?' selected':'')+'>分钟</option>'+
-      '<option value="hours"'+(s.intervalUnit==='hours'?' selected':'')+'>小时</option>'+
-      '<option value="days"'+(s.intervalUnit==='days'?' selected':'')+'>天</option>'+
-      '</select> 执行一次</div>';
-  } else if(_cronSchedTab==='once'){
-    html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">执行时间 <input type="datetime-local" id="cronOnceAt" value="'+s.onceAt+'" onchange="cronSchedPatch({onceAt:this.value})" style="padding:6px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)"></div>';
-  } else {
-    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
-    [['daily','📅 每天'],['weekly','🗓 每周'],['monthly','📆 每月'],['custom','✍️ 自定义']].forEach(function(m){
-      html += '<button type="button" class="action sm '+(s.mode===m[0]?'primary':'')+'" onclick="cronSchedMode(\''+m[0]+'\')">'+m[1]+'</button>';
-    });
-    html += '</div>';
-    if(s.mode==='daily'){
-      html += '<div style="display:flex;gap:8px;align-items:center">每天 <input type="time" id="cronTime" value="'+s.timeOfDay+'" onchange="cronSchedPatch({timeOfDay:this.value||\'09:00\'})" style="padding:6px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)"> 执行</div>';
-    } else if(s.mode==='weekly'){
-      html += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">';
-      ['日','一','二','三','四','五','六'].forEach(function(dn,i){
-        var on = s.weekdays.indexOf(i)>=0;
-        html += '<button type="button" class="action sm '+(on?'primary':'')+'" style="min-width:34px" onclick="cronSchedToggleWeekday('+i+')">'+dn+'</button>';
-      });
-      html += '</div><div style="display:flex;gap:8px;align-items:center">时间 <input type="time" id="cronTime" value="'+s.timeOfDay+'" onchange="cronSchedPatch({timeOfDay:this.value||\'09:00\'})" style="padding:6px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)"></div>';
-    } else if(s.mode==='monthly'){
-      html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">每月 <input type="number" id="cronDom" min="1" max="31" value="'+s.dayOfMonth+'" style="width:70px" onchange="cronSchedPatch({dayOfMonth:parseInt(this.value)||1})"> 日 <input type="time" id="cronTime" value="'+s.timeOfDay+'" onchange="cronSchedPatch({timeOfDay:this.value||\'09:00\'})" style="padding:6px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)"> 执行</div>';
-    } else {
-      html += '<input type="text" id="cronCustom" value="'+esc(s.custom)+'" placeholder="例如 0 9 * * *、every 30m、2026-08-05T10:00" onchange="cronSchedPatch({custom:this.value})" style="width:100%;padding:8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)">';
-    }
-  }
-  html += '<div style="margin-top:8px;font-size:12px;color:var(--accent);background:var(--accent-bg);border-radius:6px;padding:6px 10px;line-height:1.5">'+cronSchedPreview()+'<br><code style="font-size:11px;opacity:.8">'+esc(buildScheduleString())+'</code></div>';
-  wrap.innerHTML = html;
-}
-function cronSchedMode(mode){ var s=cronSchedState(); s.mode = mode; _cronSchedTab = cronSchedTabOf(mode); renderCronSched(); }
-function cronSchedPatch(patch){ var s = cronSchedState(); for(var k in patch) s[k] = patch[k]; renderCronSched(); }
-function cronSchedToggleWeekday(d){ var s = cronSchedState(); var i = s.weekdays.indexOf(d); if(i>=0) s.weekdays.splice(i,1); else s.weekdays.push(d); renderCronSched(); }
-function cronSchedFromString(str){
-  // 从已有调度字符串解析出构建器状态（模板点击时调用）
-  var s = cronSchedState(); str = (str||'').trim(); s.custom = str;
-  var m = str.match(/^every\s+(\d+)\s*([mhd])$/i);
-  if(m){ s.mode='interval'; s.intervalValue=parseInt(m[1])||1; s.intervalUnit=({m:'minutes',h:'hours',d:'days'}[m[2].toLowerCase()]||'hours'); return; }
-  if(str.indexOf('T')>=0 || /^\d{4}-\d{2}-\d{2}/.test(str)){ s.mode='once'; s.onceAt=str.length>=16?str.slice(0,16):str; return; }
-  var parts = str.split(/\s+/);
-  if(parts.length>=5 && parts.slice(0,5).every(function(p){ return /^[\d\*\-,/]+$/.test(p); })){
-    // cron → 尝试识别为 daily/weekly/monthly
-    var mm=parts[0], hh=parts[1], dom=parts[2], mon=parts[3], dow=parts[4];
-    if(dom==='*' && mon==='*' && dow==='*' && /^\d+$/.test(hh) && /^\d+$/.test(mm)){
-      s.mode='daily'; s.timeOfDay=(hh.length<2?'0':'')+hh+':'+(mm.length<2?'0':'')+mm;
-    } else if(dom==='*' && mon==='*' && /^[\d,]+$/.test(dow) && !dow.includes('-')){
-      s.mode='weekly'; s.timeOfDay=(hh.length<2?'0':'')+hh+':'+(mm.length<2?'0':'')+mm;
-      s.weekdays = dow.split(',').map(function(x){return parseInt(x);}).filter(function(x){return x>=0&&x<=6;});
-    } else if(dow==='*' && mon==='*' && /^\d+$/.test(dom)){
-      s.mode='monthly'; s.timeOfDay=(hh.length<2?'0':'')+hh+':'+(mm.length<2?'0':'')+mm; s.dayOfMonth=parseInt(dom)||1;
-    } else { s.mode='custom'; }
-    return;
-  }
-  s.mode='custom';
-}
-// ── 多通道投递（内置通道 + Webhook 机器人：企业微信/钉钉）──
-var CRON_DELIVER_CHANNELS = [
-  { id:'local',    label:'本地保存',       icon:'💾' },
-  { id:'origin',   label:'原始会话',       icon:'💬' },
-  { id:'weixin',   label:'微信',           icon:'💚' },
-  { id:'telegram', label:'Telegram',       icon:'✈️' },
-  { id:'dingtalk', label:'钉钉',           icon:'🐜' },
-  { id:'wecom',    label:'企业微信',       icon:'🏢' },
-  { id:'feishu',   label:'飞书',           icon:'📘' },
-  { id:'discord',  label:'Discord',        icon:'🎮' },
-  { id:'webhook',  label:'Webhook 机器人', icon:'🔗' }
-];
-function cronDeliverRowHTML(row, i){
-  var opts = CRON_DELIVER_CHANNELS.map(function(c){
-    return '<option value="'+c.id+'"'+(row.channel===c.id?' selected':'')+'>'+c.icon+' '+esc(c.label)+'</option>';
-  }).join('');
-  var h = '<div class="cron-deliver-row">' +
-    '<select onchange="cronDeliverChanged('+i+')">'+opts+'</select>';
-  if(row.channel==='webhook'){
-    h += '<input type="text" style="flex:1;min-width:200px" placeholder="Webhook 地址（企业微信机器人 / 钉钉机器人，以 http(s):// 开头）" value="'+esc(row.url||'')+'" oninput="cronDeliverInput('+i+',\'url\',this.value)">' +
-      '<input type="text" class="cron-deliver-msg" placeholder="消息模板：{output} = 任务输出全文（留空默认输出全文）" value="'+esc(row.message||'')+'" oninput="cronDeliverInput('+i+',\'message\',this.value)">';
-  }
-  h += '<button type="button" class="cron-deliver-del" title="移除该通道" onclick="cronDeliverRemove('+i+')">×</button></div>';
-  return h;
-}
-function renderCronDelivers(){
-  var wrap = document.getElementById('cronDeliverWrap'); if(!wrap) return;
-  if(!window._cronDeliverList) window._cronDeliverList = [{channel:'local',url:'',message:''}];
-  wrap.innerHTML = window._cronDeliverList.map(cronDeliverRowHTML).join('');
-}
-function cronAddDeliver(){
-  if(!window._cronDeliverList) window._cronDeliverList = [];
-  window._cronDeliverList.push({channel:'local',url:'',message:''});
-  renderCronDelivers();
-}
-function cronDeliverRemove(i){
-  var list = window._cronDeliverList || [];
-  list.splice(i,1);
-  if(!list.length) list.push({channel:'local',url:'',message:''});
-  renderCronDelivers();
-}
-function cronDeliverChanged(i){
-  var list = window._cronDeliverList || [];
-  var rows = document.querySelectorAll('#cronDeliverWrap .cron-deliver-row');
-  if(rows[i]){
-    list[i].channel = rows[i].querySelector('select').value;
-    var inputs = rows[i].querySelectorAll('input');
-    if(inputs.length>=1) list[i].url = inputs[0].value;
-    if(inputs.length>=2) list[i].message = inputs[1].value;
-  }
-  renderCronDelivers();
-}
-function cronDeliverInput(i, field, val){
-  var list = window._cronDeliverList || [];
-  if(list[i]) list[i][field] = val;
 }
 function applyCronTemplate(i){
   var t = window._cronTemplates[i]; if(!t) return;
   document.getElementById('cronName').value = t.name;
+  document.getElementById('cronSchedule').value = t.schedule;
   document.getElementById('cronPrompt').value = t.prompt;
-  window._cronDeliverList = (t.deliver||['local']).map(function(d){
-    if(typeof d === 'string') return { channel:d, url:'', message:'' };
-    return { channel:d.channel||'local', url:d.url||'', message:d.message||'' };
-  });
-  renderCronDelivers();
-  cronSchedFromString(t.schedule);
-  renderCronSched();
+  document.getElementById('cronDeliver').value = t.deliver || 'local';
   toast('✅ 已填充模板：'+t.name);
 }
 function closeCronModal(){ var o=document.getElementById('cronModalOverlay'); if(o) o.remove(); }
 function createCronJob(){
   var prompt = document.getElementById('cronPrompt').value.trim();
-  var schedule = buildScheduleString().trim();
+  var schedule = document.getElementById('cronSchedule').value.trim();
   if(!prompt){ toast('请输入提示词','error'); return; }
-  if(!schedule){ toast('请输入调度方式','error'); return; }
-  if(_cronSched && _cronSched.mode==='once' && !_cronSched.onceAt){ toast('请选择一次性执行的时间','error'); return; }
+  if(!schedule){ toast('请输入调度表达式','error'); return; }
   var payload = { prompt: prompt, schedule: schedule };
   var name = document.getElementById('cronName').value.trim();
   if(name) payload.name = name;
-  // 多通道投递：内置通道 + Webhook（企微/钉钉机器人，独立消息模板）
-  var deliveries = [], firstBuiltin = null, errMsg = null;
-  var rows = document.querySelectorAll('#cronDeliverWrap .cron-deliver-row');
-  for(var ri=0;ri<rows.length;ri++){
-    var row = rows[ri];
-    var sel = row.querySelector('select'); if(!sel) continue;
-    var ch = sel.value;
-    if(ch==='webhook'){
-      var inputs = row.querySelectorAll('input');
-      var url = (inputs[0]?inputs[0].value:'').trim();
-      if(!/^https?:\/\//i.test(url)){ errMsg = 'Webhook 投递需填写以 http(s):// 开头的机器人地址'; break; }
-      var msg = (inputs[1]?inputs[1].value:'').trim();
-      deliveries.push({ channel:'webhook', url:url, message:msg||'{output}', label:url.replace(/^https?:\/\//i,'').slice(0,40) });
-    } else {
-      if(!firstBuiltin) firstBuiltin = ch;
-      deliveries.push({ channel:ch });
-    }
-  }
-  if(errMsg){ toast(errMsg,'error'); return; }
-  if(!deliveries.length) deliveries.push({ channel:'local' });
-  payload.deliveries = deliveries;
-  payload.deliver_to = firstBuiltin || 'local';
+  payload.deliver_to = document.getElementById('cronDeliver').value;
   var skillsRaw = document.getElementById('cronSkills').value.trim();
   if(skillsRaw) payload.skills = skillsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean);
   var repeat = document.getElementById('cronRepeat').value.trim();
@@ -12031,7 +10871,7 @@ function createCronJob(){
   fetch(apiUrl('/api/cron-jobs'), { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
     .then(function(res){
-      if(res.ok){ toast('✅ 定时任务已创建'+(res.webhooks_attached?('，已关联 '+res.webhooks_attached+' 个 Webhook 投递'):'')); closeCronModal(); renderCronJobs(); }
+      if(res.ok){ toast('✅ 定时任务已创建'); closeCronModal(); renderCronJobs(); }
       else toast(res.error||'创建失败','error');
     }).catch(function(e){ toast('网络错误: '+e.message,'error'); });
 }
@@ -12581,7 +11421,6 @@ function setChFilter(el, filter){
 }
 var _currentChId=null;
 function openChannelModal(id){
-  _chQrSeq++; // 打开新弹窗：终止上一个渠道残留的 QR 轮询链
   _currentChId=id;
   var def=_chState.defs[id];
   var c=_chState.channels[id]||{};
@@ -12621,39 +11460,19 @@ function openChannelModal(id){
   // ── Octop 风格增强配置：绑定角色 / 模型 / 技能 ──
   html += '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">';
   html += '<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--accent)">🎭 角色与能力配置</div>';
-  // 绑定 Profile：按 id 去重（防同一角色重复出现），打开弹窗时异步刷新一次
-  // 保证新建的 Agent（如预设模板创建的 coder/fnos_operator）能出现在下拉里
+  // 绑定 Profile
   var curProfile = (c.config && c.config.profile) || 'default';
-  var profList = (_profiles.length ? _profiles : [{id:'default',name:'默认助手'}]);
-  var seenProf = {}; profList = profList.filter(function(p){ if(seenProf[p.id]) return false; seenProf[p.id]=true; return true; });
-  if(!profList.some(function(p){ return p.id==='default'; })) profList.unshift({id:'default',name:'默认助手',emoji:'🤖'});
   html += '<div class="field"><label>绑定角色 (Profile)</label><select id="ch_profile" style="width:100%;padding:8px;border-radius:6px;background:var(--card);color:var(--text);border:1px solid var(--border)">';
-  profList.forEach(function(p){
+  (_profiles.length ? _profiles : [{id:'default',name:'默认助手'}]).forEach(function(p){
     html += '<option value="'+esc(p.id)+'"'+(curProfile===p.id?' selected':'')+'>'+esc(p.emoji||'')+' '+esc(p.name||p.id)+'</option>';
   });
   html += '</select><div class="conn-hint" style="font-size:11px;margin-top:4px">该通道收到的消息将使用此角色的系统提示和配置</div></div>';
-  // 异步刷新 profiles 并重建下拉（保留当前选中值，去重）
-  apiGet('/api/profiles').then(function(res){
-    if(res && res.ok && res.profiles){
-      _profiles = res.profiles; _profilesLoaded = true;
-      renderPersonas(); renderPresetAgents();
-      var sel = document.getElementById('ch_profile');
-      if(!sel) return;
-      var keep = sel.value || curProfile;
-      var pl = res.profiles.length ? res.profiles : [{id:'default',name:'默认助手'}];
-      var sp = {}; pl = pl.filter(function(p){ if(sp[p.id]) return false; sp[p.id]=true; return true; });
-      if(!pl.some(function(p){ return p.id==='default'; })) pl.unshift({id:'default',name:'默认助手',emoji:'🤖'});
-      sel.innerHTML = pl.map(function(p){ return '<option value="'+esc(p.id)+'">'+esc(p.emoji||'')+' '+esc(p.name||p.id)+'</option>'; }).join('');
-      sel.value = pl.some(function(p){ return p.id===keep; }) ? keep : 'default';
-    }
-  }).catch(function(){});
   // 模型选择
   var curModel = (c.config && c.config.model) || '';
   html += '<div class="field"><label>模型选择（留空=跟随角色配置）</label><select id="ch_model" style="width:100%;padding:8px;border-radius:6px;background:var(--bg1);color:var(--text);border:1px solid var(--border)">'+buildModelOptionsHtml(curModel, '跟随角色配置')+'</select></div>';
   // 技能多选
   var curSkills = (c.config && c.config.skills) || [];
   if(typeof curSkills === 'string') curSkills = curSkills ? curSkills.split(',') : [];
-  if(!Array.isArray(curSkills)) curSkills = [];
   html += '<div class="field"><label>启用技能（多选，留空=全部）</label><div id="ch_skills_wrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">';
   var knownSkills = ['web_search','code_execution','file_manager','terminal','browser','vision','memory','delegation'];
   knownSkills.forEach(function(sk){
@@ -12681,20 +11500,7 @@ function openChannelModal(id){
     document.getElementById('chModalBody').innerHTML=html;
   }
   var foot=document.getElementById('chModalFoot');
-  var hasConfig = !!(c && (c.configured || (c.credentials||[]).some(function(x){ return x.value; })));
-  if(foot) foot.innerHTML='<button class="ov-actbtn danger" id="chClearBtn" onclick="clearChannel()" style="'+(hasConfig?'':'display:none')+'">清空配置</button><button class="ov-actbtn" onclick="testChannel()">测试</button><button class="ov-actbtn start" onclick="saveChannel()">保存</button>';
-}
-function clearChannel(){
-  var id=_currentChId; var def=_chState.defs[id]; if(!id||!def) return;
-  if(!confirm('确定清空「'+def.name+'」的全部配置？\n\n将删除已保存的凭证、账号信息和通道设置（含角色绑定、模型、技能、系统提示），网关将自动重启。\n清空后可重新扫码或手动配置。')) return;
-  apiPost('/api/channels/'+id+'/clear', {}).then(function(r){
-    if(r && r.error){ toast('清空失败：'+r.error); return; }
-    apiGet('/api/channels').then(function(res2){
-      _chState.channels = (res2 && res2.channels) || _chState.channels;
-      renderChannels(); closeChannelModal();
-      toast('已清空 '+def.name+' 配置，网关正在重启生效。');
-    });
-  }).catch(function(e){ toast('清空失败：'+e.message); });
+  if(foot) foot.innerHTML='<button class="ov-actbtn" onclick="testChannel()">测试</button><button class="ov-actbtn start" onclick="saveChannel()">保存</button>';
 }
 function chShowManualFields(){
   var wrap=document.getElementById('chManualWrap'); if(wrap) wrap.style.display='block';
@@ -12702,7 +11508,7 @@ function chShowManualFields(){
   var hint=document.querySelector('#chModalBody .qr-choice > .conn-hint'); if(hint) hint.style.display='none';
 }
 function chToggle(path){ var el=document.getElementById('cht_'+path); if(el) el.classList.toggle('on'); }
-function closeChannelModal(){ _chQrSeq++; var m=document.getElementById('channelModal'); if(m) m.style.display='none'; _currentChId=null; }
+function closeChannelModal(){ var m=document.getElementById('channelModal'); if(m) m.style.display='none'; _currentChId=null; }
 function testChannel(){
   var id=_currentChId; if(!id){ toast('请先打开一个渠道'); return; }
   var def=_chState.defs[id]; if(!def){ toast('无渠道定义'); return; }
@@ -12734,17 +11540,17 @@ function saveChannel(){
   (def.behavior||[]).forEach(function(b){ var bid='chb_'+b.path.replace(/\./g,'_'); var el=document.getElementById(bid); var v=el?el.value:''; if(v&&v.trim()!=='') config[b.path]=b.list?v.split(',').map(function(s){return s.trim();}).filter(Boolean):v.trim(); });
   // Octop 风格通用行为开关
   ['show_thinking','show_tool_hints'].forEach(function(key){ var el=document.getElementById('cht_'+key); config[key]=!!(el&&el.classList.contains('on')); });
-  // Octop 增强：角色/模型/技能/系统提示（始终发送，空值=清空覆盖）
+  // Octop 增强：角色/模型/技能/系统提示
   var chProfile=document.getElementById('ch_profile'); if(chProfile) config.profile=chProfile.value;
-  var chModel=document.getElementById('ch_model'); config.model=chModel?chModel.value.trim():'';
-  var skillCbs=document.querySelectorAll('.ch-skill-cb:checked'); config.skills=Array.from(skillCbs).map(function(cb){ return cb.value; });
-  var chSysPrompt=document.getElementById('ch_system_prompt'); config.system_prompt=chSysPrompt?chSysPrompt.value.trim():'';
+  var chModel=document.getElementById('ch_model'); if(chModel&&chModel.value.trim()) config.model=chModel.value.trim();
+  var skillCbs=document.querySelectorAll('.ch-skill-cb:checked'); if(skillCbs.length) config.skills=Array.from(skillCbs).map(function(cb){ return cb.value; });
+  var chSysPrompt=document.getElementById('ch_system_prompt'); if(chSysPrompt&&chSysPrompt.value.trim()) config.system_prompt=chSysPrompt.value.trim();
   apiPost('/api/channels/'+id, { credentials:credentials, toggles:toggles, config:config }).then(function(r){
     if(r && r.error){ toast('保存失败：'+r.error); return; }
     apiGet('/api/channels').then(function(res2){
       _chState.channels = (res2 && res2.channels) || _chState.channels;
       renderChannels(); closeChannelModal();
-      toast('已保存 '+def.name+' 配置，网关正在重启生效。');
+      toast('已保存 '+def.name+' 配置，请到「概览」重启网关生效。');
     });
   }).catch(function(e){ toast('保存失败：'+e.message); });
 }
@@ -12778,29 +11584,25 @@ function chRenderQr(deep, canvasId){
 function chShowQrSuccess(name){
   var body=document.getElementById('chModalBody'); var foot=document.getElementById('chModalFoot');
   if(foot) foot.innerHTML='';
-  if(body) body.innerHTML='<div style="text-align:center;padding:18px 8px"><div style="font-size:42px;line-height:1">✅</div><div style="font-weight:600;margin-top:8px">'+esc(name)+' 已成功关联</div><div class="conn-hint" style="margin-top:8px">凭证已写入本机，网关正在自动重启生效（约 10 秒后可用）。</div><button class="action primary" style="margin-top:14px" onclick="closeChannelModal()">完成</button></div>';
+  if(body) body.innerHTML='<div style="text-align:center;padding:18px 8px"><div style="font-size:42px;line-height:1">✅</div><div style="font-weight:600;margin-top:8px">'+esc(name)+' 已成功关联</div><div class="conn-hint" style="margin-top:8px">凭证已写入本机，需重启网关以生效。</div><button class="action primary" style="margin-top:14px" onclick="closeChannelModal();switchPage(\'overview\');restartServices()">前往概览并重启网关</button></div>';
 }
 function chStartTelegramQr(){
-  var seq=++_chQrSeq;
   var body=document.getElementById('chModalBody'); body.innerHTML='<div class="conn-hint">正在生成 Telegram 配对二维码…</div>';
   apiGet('/api/channels/telegram/qr').then(function(res){
-    if(seq!==_chQrSeq) return;
     if(!res || res.error) throw new Error(res&&res.error||'获取二维码失败');
     var deep=res.qr_payload||res.deep_link||'';
     if(!deep){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法生成二维码</div>'; return; }
     body.innerHTML='<div class="conn-hint">用 Telegram 扫描下方二维码创建机器人。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="tgQR" width="220" height="220" style="width:220px;height:220px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="tgQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码创建…</div><div id="tgAllowWrap" style="display:none;margin-top:12px"><input id="tgAllowed" type="text" placeholder="允许的 Telegram 用户 ID（逗号分隔）" style="width:100%"></div>';
     chRenderQr(deep, 'tgQR');
-    chPollTelegramQr(res.pairing_id, seq);
-  }).catch(function(e){ if(seq!==_chQrSeq) return; body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
+    chPollTelegramQr(res.pairing_id);
+  }).catch(function(e){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
 }
-function chPollTelegramQr(pid, seq){
-  if(seq===undefined) seq=_chQrSeq;
+function chPollTelegramQr(pid){
   api('/api/channels/telegram/qr/status?pairing_id='+encodeURIComponent(pid),'GET').then(function(res){
-    if(seq!==_chQrSeq) return;
     var stEl=document.getElementById('tgQrStatus');
     if(!res || res.error){ if(stEl) stEl.textContent=(res&&res.error)||'轮询失败'; return; }
     var st=res.status;
-    if(st==='waiting'){ if(stEl) stEl.textContent='等待在 Telegram 中点击「Create Bot」…'; setTimeout(function(){ if(seq===_chQrSeq) chPollTelegramQr(pid, seq); }, 2500); }
+    if(st==='waiting'){ if(stEl) stEl.textContent='等待在 Telegram 中点击「Create Bot」…'; setTimeout(function(){ chPollTelegramQr(pid); }, 2500); }
     else if(st==='ready'){ if(stEl) stEl.textContent='✅ 机器人已创建：'+(res.bot_username||'')+'，请填写允许的用户 ID 后点击「完成」。'; var w=document.getElementById('tgAllowWrap'); if(w) w.style.display='block'; var inp=document.getElementById('tgAllowed'); if(inp&&res.owner_user_id) inp.value=res.owner_user_id; var foot=document.getElementById('chModalFoot'); if(foot) foot.innerHTML='<div style="margin-right:auto;font-size:11px;color:var(--text3)">凭证仅保存在本机</div><button class="action primary" onclick="chApplyTelegramQr(\''+esc(pid)+'\')">完成</button>'; }
     else if(st==='confirmed'){ chShowQrSuccess('Telegram'); }
   }).catch(function(e){ var stEl=document.getElementById('tgQrStatus'); if(stEl) stEl.textContent='轮询出错：'+(e.message||e); });
@@ -12813,27 +11615,23 @@ function chApplyTelegramQr(pid){
   }).catch(function(e){ alert('保存失败：'+(e.message||e)); });
 }
 function chStartWhatsAppQr(){
-  var seq=++_chQrSeq;
   var body=document.getElementById('chModalBody');
   body.innerHTML='<div class="conn-hint">WhatsApp 通过本地桥接扫码配对，消息在本地处理。</div><div id="waQrZone" style="text-align:center;margin-top:8px"><div class="conn-hint">正在启动桥接并生成二维码…</div></div>';
   api('/api/channels/whatsapp/qr?mode=self-chat','GET').then(function(res){
-    if(seq!==_chQrSeq) return;
     if(!res || res.error) throw new Error(res.error||'启动失败');
     if(res.status==='connected'){ chApplyWhatsAppQr(res.pairing_id); return; }
     var waDeep=res.qr_payload||res.deep_link||'';
     if(!waDeep){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">二维码生成失败</div>'; return; }
     body.innerHTML='<div class="conn-hint">用 WhatsApp 扫描上方二维码 → 设置 → 关联设备。</div><div style="display:flex;justify-content:center;padding:8px"><canvas id="waQR" width="240" height="240" style="width:240px;height:240px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="waQrStatus" style="font-size:13px;color:var(--text3)">等待在 WhatsApp 中确认…</div>';
     chRenderQr(waDeep, 'waQR');
-    chPollWhatsAppQr(res.pairing_id, seq);
-  }).catch(function(e){ if(seq!==_chQrSeq) return; body.innerHTML='<div class="conn-hint" style="color:var(--red)">启动失败：'+(e.message||e)+'</div>'; });
+    chPollWhatsAppQr(res.pairing_id);
+  }).catch(function(e){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">启动失败：'+(e.message||e)+'</div>'; });
 }
-function chPollWhatsAppQr(pid, seq){
-  if(seq===undefined) seq=_chQrSeq;
+function chPollWhatsAppQr(pid){
   api('/api/channels/whatsapp/qr/status?pairing_id='+encodeURIComponent(pid),'GET').then(function(res){
-    if(seq!==_chQrSeq) return;
     if(!res || res.error){ var z=document.getElementById('waQrZone'); if(z) z.innerHTML='<div class="conn-hint" style="color:var(--red)">'+(res&&res.error||'配对失败')+'</div>'; return; }
     var st=res.status; var stEl=document.getElementById('waQrStatus');
-    if(st==='starting'||st==='waiting'){ if(stEl) stEl.textContent=(st==='starting')?'正在等待二维码…':'等待在 WhatsApp 中确认…'; var newQr=res.qr_payload||res.deep_link||''; if(newQr&&st==='waiting'){ var c=document.getElementById('waQR'); if(c) drawQR(c, newQr); } setTimeout(function(){ if(seq===_chQrSeq) chPollWhatsAppQr(pid, seq); }, 2000); }
+    if(st==='starting'||st==='waiting'){ if(stEl) stEl.textContent=(st==='starting')?'正在等待二维码…':'等待在 WhatsApp 中确认…'; var newQr=res.qr_payload||res.deep_link||''; if(newQr&&st==='waiting'){ var c=document.getElementById('waQR'); if(c) drawQR(c, newQr); } setTimeout(function(){ chPollWhatsAppQr(pid); }, 2000); }
     else if(st==='connected'){ if(stEl) stEl.textContent='✅ 已连接：'+(res.account_name||'')+'，正在保存…'; chApplyWhatsAppQr(pid); }
     else if(st==='expired'||st==='error'){ var z2=document.getElementById('waQrZone'); if(z2) z2.innerHTML='<div class="conn-hint" style="color:var(--red)">'+(res.error||'配对失败或二维码已过期。')+'</div><button class="action" style="margin-top:10px" onclick="chStartWhatsAppQr()">重新获取二维码</button>'; }
   }).catch(function(e){ var stEl=document.getElementById('waQrStatus'); if(stEl) stEl.textContent='轮询出错：'+(e.message||e); });
@@ -12845,64 +11643,46 @@ function chApplyWhatsAppQr(pid){
   }).catch(function(e){ alert('保存失败：'+(e.message||e)); });
 }
 function chStartWeixinQr(){
-  var seq=++_chQrSeq;
   var body=document.getElementById('chModalBody'); body.innerHTML='<div class="conn-hint">正在获取微信登录二维码…</div>';
   apiGet('/api/channels/weixin/qr').then(function(res){
-    if(seq!==_chQrSeq) return;
     if(!res || res.error) throw new Error(res.error||'获取二维码失败');
     var deep=res.qrcode_url||res.qrcode_img||'';
     if(!deep && res.qrcode) deep='https://ilinkai.weixin.qq.com/ilink/bot/scan?qrcode='+encodeURIComponent(res.qrcode);
     if(!deep){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">二维码生成失败</div>'; return; }
     body.innerHTML='<div class="conn-hint">请用微信扫描下方二维码完成登录（腾讯 iLink 官方接口）。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="wxQR" width="200" height="200" style="width:200px;height:200px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="wxQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码…</div>';
     chRenderQr(deep, 'wxQR');
-    chPollWeixinQr(res.qrcode, seq);
-  }).catch(function(e){ if(seq!==_chQrSeq) return; body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
+    chPollWeixinQr(res.qrcode);
+  }).catch(function(e){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
 }
-function chPollWeixinQr(qrcode, seq){
-  if(seq===undefined) seq=_chQrSeq;
+function chPollWeixinQr(qrcode){
   api('/api/channels/weixin/qr/status?qrcode='+encodeURIComponent(qrcode),'GET').then(function(res){
-    if(seq!==_chQrSeq) return;
     if(!res || res.error) throw new Error(res.error||'poll failed');
     var st=res.status;
     var stEl=document.getElementById('wxQrStatus');
-    if(st==='wait'){ setTimeout(function(){ if(seq===_chQrSeq) chPollWeixinQr(qrcode, seq); }, 3000); }
-    else if(st==='scaned'){ if(stEl) stEl.textContent='已扫码，请在微信中确认登录…'; setTimeout(function(){ if(seq===_chQrSeq) chPollWeixinQr(qrcode, seq); }, 3000); }
+    if(st==='wait'){ setTimeout(function(){ chPollWeixinQr(qrcode); }, 3000); }
+    else if(st==='scaned'){ if(stEl) stEl.textContent='已扫码，请在微信中确认登录…'; setTimeout(function(){ chPollWeixinQr(qrcode); }, 3000); }
     else if(st==='expired'){ var body=document.getElementById('chModalBody'); if(body) body.innerHTML='<div class="conn-hint">二维码已过期，请重新获取。</div><button class="action" style="margin-top:10px" onclick="chStartWeixinQr()">重新获取二维码</button>'; }
     else if(st==='confirmed'){ if(stEl) stEl.textContent='登录成功，正在保存凭证…'; apiPost('/api/channels/weixin',{ credentials:{ WEIXIN_TOKEN:res.token||'', WEIXIN_ACCOUNT_ID:res.account_id||'', WEIXIN_BASE_URL:res.base_url||'' } }).then(function(){ apiGet('/api/channels').then(function(r2){ _chState.channels=(r2&&r2.channels)||_chState.channels; renderChannels(); chShowQrSuccess('微信'); }); }); }
   }).catch(function(e){ var stEl=document.getElementById('wxQrStatus'); if(stEl) stEl.textContent='轮询出错：'+(e.message||e); });
 }
-/* 企业微信扫码登录：腾讯官方 AI 机器人扫码接口（与 Octop 一致），
-   无需预先填写 Corp ID——扫码授权后由服务端获取 bot_id + secret 自动保存。 */
+/* 企业微信扫码登录：服务端按已配置的 CorpID / AgentID / Secret 生成网页授权二维码，
+   用企业微信扫码授权自建应用（与 Octop 行为一致）。未配置凭证时提示先手动填写。 */
 function chStartWecomQr(){
-  var seq=++_chQrSeq;
   var body=document.getElementById('chModalBody'); body.innerHTML='<div class="conn-hint">正在生成企业微信授权二维码…</div>';
   apiGet('/api/channels/wecom/qr').then(function(res){
-    if(seq!==_chQrSeq) return;
     if(!res || res.error) throw new Error(res.error||'获取二维码失败');
-    var authUrl=res.qr_payload||res.qr_url||res.deep_link||'';
-    if(!authUrl){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法生成二维码</div>'; return; }
-    body.innerHTML='<div class="conn-hint">用企业微信「扫一扫」扫描下方二维码，在手机端确认创建 AI 机器人。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="wcQR" width="220" height="220" style="width:220px;height:220px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="wcQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待扫码授权…</div>';
-    chRenderQr(authUrl, 'wcQR');
-    chPollWecomQr(res.scode, seq);
-  }).catch(function(e){ if(seq!==_chQrSeq) return; body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
+    var deep=res.qr_payload||res.qr_url||res.deep_link||'';
+    if(!deep){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法生成二维码，请先在「手动输入」中填写 Corp ID / Agent ID / Secret。</div>'; return; }
+    body.innerHTML='<div class="conn-hint">用企业微信扫描下方二维码，授权自建应用（扫码后点「完成」启用）。</div><div style="display:flex;justify-content:center;padding:12px"><canvas id="wcQR" width="220" height="220" style="width:220px;height:220px;background:#fff;border-radius:var(--radius-md)"></canvas></div><div id="wcQrStatus" style="text-align:center;font-size:13px;color:var(--text3)">等待在企业微信中授权…</div>';
+    chRenderQr(deep, 'wcQR');
+    var foot=document.getElementById('chModalFoot'); if(foot) foot.innerHTML='<button class="action primary" onclick="chApplyWecomQr()">我已在企业微信中完成授权</button>';
+  }).catch(function(e){ body.innerHTML='<div class="conn-hint" style="color:var(--red)">无法获取二维码：'+(e.message||e)+'</div>'; });
 }
-function chPollWecomQr(scode, seq){
-  if(seq===undefined) seq=_chQrSeq;
-  api('/api/channels/wecom/qr/status?scode='+encodeURIComponent(scode),'GET').then(function(res){
-    if(seq!==_chQrSeq) return;
-    var stEl=document.getElementById('wcQrStatus');
-    if(!res || res.error){ if(stEl) stEl.textContent='轮询失败：'+((res&&res.error)||'未知错误'); return; }
-    var st=res.status;
-    if(st==='waiting'){ if(stEl) stEl.textContent='等待扫码确认…'; setTimeout(function(){ if(seq===_chQrSeq) chPollWecomQr(scode, seq); }, 3000); }
-    else if(st==='ready'){ if(stEl) stEl.textContent='✅ 授权成功：Bot '+(res.bot_id||'')+'，点击「完成」启用。'; var foot=document.getElementById('chModalFoot'); if(foot) foot.innerHTML='<div style="margin-right:auto;font-size:11px;color:var(--text3)">凭证仅保存在本机</div><button class="action primary" onclick="chApplyWecomQr(\''+esc(scode)+'\')">完成</button>'; }
-    else if(st==='expired'||st==='error'){ var z=document.getElementById('chModalBody'); if(z) z.innerHTML='<div class="conn-hint" style="color:var(--red)">'+(res.error||'扫码失败或二维码已过期。')+'</div><button class="action" style="margin-top:10px" onclick="chStartWecomQr()">重新获取二维码</button>'; }
-  }).catch(function(e){ if(seq!==_chQrSeq) return; var stEl=document.getElementById('wcQrStatus'); if(stEl) stEl.textContent='轮询出错：'+(e.message||e); });
-}
-function chApplyWecomQr(scode){
-  apiPost('/api/channels/wecom/qr/apply', { scode: scode }).then(function(res){
+function chApplyWecomQr(){
+  apiPost('/api/channels/wecom', { enabled:true }).then(function(res){
     if(res && res.error) throw new Error(res.error);
     apiGet('/api/channels').then(function(r2){ _chState.channels=(r2&&r2.channels)||_chState.channels; renderChannels(); chShowQrSuccess('企业微信'); });
-  }).catch(function(e){ alert('保存失败：'+(e.message||e)); });
+  }).catch(function(e){ alert('启用失败：'+(e.message||e)); });
 }
 /* ============================ 更新 ============================ */
 // 注意：btn 只接受显式传入的 event；切勿读全局 event —— switchPage('updates') 自动调用本函数时
@@ -13062,15 +11842,14 @@ document.addEventListener('DOMContentLoaded', function(){
   };
   // 拉取 token 后加载所有真实数据
   fetchToken().then(function(){
-    // 并行发起：profiles / 通道会话不依赖 _cfg，与 loadConfig 同时进行，避免串行请求链拖慢首屏
-    fetchProfiles();  // 初始化加载 profiles（智能体/角色）
-    fetchChannelSessions();  // 初始化加载通道会话（微信等）
-    setInterval(fetchChannelSessions, 30000);  // 每30秒刷新通道会话
     loadConfig().then(function(){
       renderProviders();
       renderExtensions();
       renderConnectors();
       renderChannels();
+      fetchProfiles();  // 初始化加载 profiles（智能体/角色）
+      fetchChannelSessions();  // 初始化加载通道会话（微信等）
+      setInterval(fetchChannelSessions, 30000);  // 每30秒刷新通道会话
       renderWorkflowBar();
       renderTeamBar();
       // 团队模式恢复：刷新页面后保持 team 分组为当前活动分组，新会话自动归入
