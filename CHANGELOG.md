@@ -23,6 +23,7 @@
 ## 说明
 
 - 254 服务本身未死（monitor/gateway/dashboard 均 healthy），「Gateway 连接失败」为 redirect 并发导致的 turn 失败
+- **254 深层根因**：254 存在**两个 gateway 抢 8742 端口**——s6 监督的旧版独立安装（`/opt/hermes`，8/5 启动，无自愈修复）+ monitor 管理的（含修复）。用户对话实际打到旧版 gateway → 失败复现。处理：停 s6 监督进程 + 杀旧 gateway + monitor 的 gateway 独占 8742（pid 确认）；/etc 无持久服务定义，重启不会复活
 - 彻底治本（redirect 前通知网关取消前 turn）作为后续优化方向
 
 ## 验证
