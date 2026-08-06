@@ -1,4 +1,39 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.85)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.86)
+
+---
+
+
+
+# v0.21.86 — 知识整合（Hermes 方案融合）：fpk 开箱即用的记忆/知识/技能三层闭环
+
+> 需求：Hermes 自己的知识/记忆/技能要与知识库串联，需要手段级技能；按 Hermes（254 生成）的「项目经验与记忆知识整合方案」融合进 fpk，新 NAS 首装开箱即用。
+
+## 现状诊断（方案核心）
+
+Hermes 三套存储各写各的没桥接：`memories/`（memory 工具，Agent 可读但 Dashboard 知识系统看不到）、`knowledge/`（Obsidian 格式，Dashboard 可见但 Agent 读不到）、`skills/`（Agent 可用）。**根因**：三层之间无桥接。
+
+## 实现（init 持久化 + 单向镜像 + 手段级技能）
+
+1. **`init/` 首次安装初始化模板**（随 fpk 进 target 层）：
+   - `init/init.sh`：copy_if_new 部署 knowledge 模板（README + 项目/ 8 条经验知识 + 00-memories-auto 占位）、memories 模板（MEMORY.md + USER.md）、镜像脚本、knowledge-sync 技能；注册 hermes-agent 用户 crontab（每 30 分钟）；部署后立即跑一次镜像
+   - 内容来自 254 已生成验证的真实模板（8 条：经验规则/版本演进史/开发规范/用户档案/升级方案等）
+2. **`cmd/install_callback` + `cmd/upgrade_callback`**：末尾调用 init.sh（升级补缺，copy_if_new 不覆盖已有内容）
+3. **`monitor.js` 启动兜底**：启动时执行 mirror.py（memories → knowledge 单向镜像，配合 crontab）
+4. **`mirror.py` 参数化**：HERMES_DATA_DIR 环境变量适配多机（102/249/254）
+5. **`skills/knowledge-sync/SKILL.md`**（手段级技能）：对话中"记下来/沉淀"→ 写 knowledge/ → Dashboard 秒见；memory 工具写 memories/ → 对话自动读；crontab 每 30 分钟镜像 → 永不断档
+
+## 闭环（断一层不影响另外两层）
+
+用户"记下来" → knowledge-sync skill → knowledge/ 秒见；AI memory 工具 → memories/ → 对话自动读；每 30 分钟 crontab → memories 镜像到 knowledge/项目/00-memories-auto/
+
+## 验证（249 真机，无损模拟安装）
+
+- 8 条知识 + 00-memories-auto 部署 ✓；crontab（hermes-agent，每 30 分钟）✓；mirror 执行 + 索引 ✓；skill/scripts 部署 ✓；init.sh RC=0
+- 包内含 init/（17 文件）；monitor/init.sh/mirror.py 语法通过
+
+## 发布状态
+
+**待用户显式确认后发布**（GitHub push + Release + 分享直链；WebDAV 已随打包同步）。
 
 ---
 

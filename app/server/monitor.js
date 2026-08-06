@@ -194,6 +194,16 @@ Agent 的项目笔记、用户偏好与环境信息。对话中说「记住…�
   } catch (e) { log(`[seed] 种子写入失败: ${e.message}`); }
 }
 _seedKnowledgeAndMemory();
+
+// 知识镜像兜底（Hermes 知识整合方案）：mirror.py 存在则启动时执行一次
+// （memories → knowledge 单向镜像；配合 crontab 每 30 分钟 + 安装/升级 init.sh 部署）
+try {
+  const _mirrorPy = `${DATA_DIR}/scripts/knowledge-sync/mirror.py`;
+  if (existsSync(_mirrorPy)) {
+    execSync(`HERMES_DATA_DIR=${DATA_DIR} python3 ${_mirrorPy} >> ${DATA_DIR}/logs/knowledge-mirror.log 2>&1`, { timeout: 60000 });
+    log(`[kb] 知识镜像兜底完成（memories → knowledge）`);
+  }
+} catch (e) { log(`[kb] 知识镜像兜底失败: ${e.message}`); }
 // 热更新/完整更新写入 manifest 后调用，令运行中的进程立即上报新版本号，
 // 避免「更新完成但概览页仍显示旧版本」的问题。
 function reloadAppVersion() {
