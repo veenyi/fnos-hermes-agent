@@ -1844,6 +1844,8 @@
               <div class="setting-row"><div><div class="label">记住上次选择的模型</div><div class="desc">新建会话时默认使用上次模型</div></div><div class="toggle" data-key="remember_model"></div></div>
               <div class="setting-row"><div><div class="label">启用消息音效</div><div class="desc">收到新消息时播放提示音</div></div><div class="toggle on" data-key="message_sound"></div></div>
               <div class="setting-row"><div><div class="label">折叠空会话分组</div><div class="desc">左侧没有会话的专家自动收起</div></div><div class="toggle" data-key="collapse_empty"></div></div>
+              <div class="setting-row"><div><div class="label">工具调用区始终折叠</div><div class="desc">对话中工具调用记录保持折叠（不随执行自动展开），点「展开」可手动查看</div></div><div class="toggle on" data-key="tools_collapse"></div></div>
+              <div class="setting-row"><div><div class="label">隐藏工具调用区</div><div class="desc">回复中完全不显示工具调用记录，界面更清爽（不影响工具实际执行）</div></div><div class="toggle" data-key="tools_hidden"></div></div>
               <div class="setting-row"><div><div class="label">Markdown 格式输出</div><div class="desc">助手回复以 Markdown / GFM 渲染（网关强制保持启用）</div></div><div class="toggle on" data-key="markdown_enabled" onclick="toast('Markdown 格式输出已由网关强制保持启用，无法关闭')"></div></div>
             </div>
           </div>
@@ -7187,6 +7189,7 @@ function toolCardHTML(tp){
 /* 历史/流式的工具集合统一包成「紧凑摘要条 + 可展开列表」（Issue #8） */
 function toolCallsHTML(tools){
   if(!tools || !tools.length) return '';
+  if((PV.Store.load().chat || {}).tools_hidden) return '';   // 设置：隐藏工具调用区
   return '<div class="tool-calls" data-collapsed="true"><div class="tool-summary" onclick="toggleToolCalls(this.parentNode)">'+
     '<span class="tc-ico">🛠</span><span class="tc-text">已调用 '+tools.length+' 个工具</span><span class="tc-toggle">展开 ▾</span></div>'+
     '<div class="tool-list">'+tools.map(toolCardHTML).join('')+'</div></div>';
@@ -8775,7 +8778,9 @@ function sendRaw(text){
   condenseChatBody();
 
   var asst = document.createElement('div'); asst.className='msg assistant';
-  asst.innerHTML = '<div class="msg-bubble"><div class="md-text"><span class="cursor-blink">|</span></div><div class="chat-info"></div><div class="tool-calls" data-collapsed="true"><div class="tool-summary" onclick="toggleToolCalls(this.parentNode)"><span class="tc-ico">🛠</span><span class="tc-text">工具调用</span><span class="tc-toggle">展开 ▾</span></div><div class="tool-list"></div></div></div><div class="msg-meta">Hermes · '+fmtDateTime(Date.now())+'</div>';
+  var _tcHidden = (PV.Store.load().chat || {}).tools_hidden;
+  var _tcStyle = _tcHidden ? ' style="display:none"' : '';
+  asst.innerHTML = '<div class="msg-bubble"><div class="md-text"><span class="cursor-blink">|</span></div><div class="chat-info"></div><div class="tool-calls" data-collapsed="true"'+_tcStyle+'><div class="tool-summary" onclick="toggleToolCalls(this.parentNode)"><span class="tc-ico">🛠</span><span class="tc-text">工具调用</span><span class="tc-toggle">展开 ▾</span></div><div class="tool-list"></div></div></div><div class="msg-meta">Hermes · '+fmtDateTime(Date.now())+'</div>';
   body.appendChild(asst); body.scrollTop=body.scrollHeight;
   var mdEl = asst.querySelector('.md-text');
   var toolBox = asst.querySelector('.tool-calls');
@@ -8934,7 +8939,10 @@ function sendRaw(text){
         card.innerHTML = html;
         updateToolSummary();
         // 流式进行中（有运行中的工具）保持展开；全部完成后折叠
-        if(running) toolBox.setAttribute('data-collapsed','false');
+        // 尊重设置：tools_collapse 开启时始终折叠，tools_hidden 开启时保持隐藏
+        var _chat = (PV.Store.load().chat) || {};
+        if(running && !_chat.tools_collapse && !_chat.tools_hidden) toolBox.setAttribute('data-collapsed','false');
+        if(_chat.tools_hidden) toolBox.style.display='none';
         body.scrollTop=body.scrollHeight;
         _chatHTML[sid] = body.innerHTML;
       },
