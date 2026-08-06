@@ -1,4 +1,32 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.73)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.74)
+
+---
+
+
+
+# v0.21.74 — 知识库（Obsidian 风格 vault：文件树 + 笔记阅读/编辑 + 反向链接）
+
+> 用户需求：左侧新增「知识库」菜单，所有 Hermes 学习到的内容、使用过的技能沉淀到 Obsidian 风格的独立页面，可浏览、可编辑，让 AI 越用越聪明。
+
+## 实现
+
+1. **后端**（monitor.js）：
+   - 知识库 vault：根目录优先 `OBSIDIAN_VAULT_PATH` 环境变量，默认 `DATA_DIR/knowledge`（Obsidian 兼容：.md + frontmatter + `[[wikilink]]`）
+   - API：`GET /api/kb/tree`（递归文件树）、`GET /api/kb/read`、`POST /api/kb/write`（写/保存，自动补 .md）、`POST /api/kb/new`（新建笔记，frontmatter 模板带 created/tags）；写操作入 writePaths 令牌保护
+2. **前端**（index.html）：
+   - 左侧菜单新增「📚 知识库」入口
+   - 知识库页两栏：左文件树（目录展开/收起、当前笔记高亮）+ 右笔记区（标题/路径/编辑/删除，frontmatter 属性展示，markdown 渲染，`[[wikilink]]` 转内部链接点击跳转，底部「反向链接」自动搜索引用当前笔记的其它笔记）
+   - 新建笔记支持路径（如「概念/Agent」自动建目录）
+3. **串联 AI**：102/249 的 `.env` 配置 `OBSIDIAN_VAULT_PATH=DATA_DIR/knowledge` —— Hermes 内置 Obsidian 技能（bundled）读写同一 vault，AI 学习沉淀与 UI 浏览编辑打通
+
+## 验证
+
+- 102/249：kb/tree、kb/new（frontmatter 正确）、kb/write、kb/read（中文路径 URL 编码正常）、kb/delete 全链路通过
+- monitor.js 语法 + index.html 脚本检查通过；monitor 重启后服务 healthy；WebDAV 已同步
+
+## 后续
+
+自动沉淀机制（技能使用/专家学习自动写入知识库）为下一迭代——当前已支持手动创建/编辑 + AI 通过 Obsidian 技能写入。
 
 ---
 
