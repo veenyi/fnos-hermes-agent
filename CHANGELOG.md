@@ -1,4 +1,22 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.82)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.83)
+
+---
+
+
+
+# v0.21.83 — 定时任务：投递字段显示错乱修复 + 新增编辑功能
+
+> 用户反馈：①定时任务卡片显示 `[object Object]` 错乱信息；②定时任务需要编辑按钮，允许编辑已创建任务。
+
+## 修复与新增（ui/index.html）
+
+1. **投递字段错乱修复**：`deliver_to`/`delivery` 为对象（如 `{channel:'weixin'}`）时直接渲染成 `[object Object]`——改为兼容提取 `channel/name/type/kind`，字符串/对象/null 全部正确处理
+2. **任务编辑功能**：任务卡片新增「编辑」按钮 → 打开编辑弹窗（预填名称/提示词/调度/技能/重复次数/投递通道）→「保存修改」先删除旧任务再按新配置创建（hermes cron 无 update 命令，删旧建新实现编辑），完成后列表刷新
+
+## 验证
+
+- deliver 提取单测 6/6 PASS（字符串/对象 channel/对象 name/null/undefined/无 [object Object]）；index.html 脚本语法通过
+- 102/249 已热更；WebDAV 已同步（v0.21.83.fpk）
 
 ---
 
