@@ -1806,6 +1806,7 @@
     <div class="update-ver">当前 <strong id="appCurrent">--</strong> · 最新 <strong id="appLatest">--</strong></div>
     <button class="ov-actbtn" onclick="checkAppUpdate(event)">检查更新</button>
     <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">下载安装包 (.fpk)</button>
+    <button class="ov-actbtn start" id="appAutoBtn" style="display:none" onclick="autoAppUpdate()" title="下载最新 FPK 并用 appcenter-cli 直接安装升级">⚡ 自动更新</button>
   </div>
 </div>
 <div class="update-gh"><a class="gh-button" href="https://github.com/veenyi/fnos-hermes-agent/releases/latest" target="_blank">GitHub 下载页 →</a></div>
@@ -14290,14 +14291,37 @@ function checkAppUpdate(evt){
       if(data.updateAvailable){
         lat.textContent='v'+data.latest;
         var btn3=document.getElementById('appUpdateBtn'); if(btn3) btn3.style.display='inline-flex';
-        toast('发现新版本：v'+data.latest+'，可点击「下载安装包」从 GitHub 获取');
+        var ab=document.getElementById('appAutoBtn'); if(ab) ab.style.display='inline-flex';
+        toast('发现新版本：v'+data.latest+'，可「自动更新」或「下载安装包」');
       } else {
         lat.textContent='已是最新';
         var btn4=document.getElementById('appUpdateBtn'); if(btn4) btn4.style.display='none';
+        var ab2=document.getElementById('appAutoBtn'); if(ab2) ab2.style.display='none';
         toast('Hermes Agent 应用已是最新');
       }
     }
   }).catch(function(){ toast('检查应用更新失败'); }).finally(function(){ if(btn){btn.disabled=false;btn.textContent='检查更新';} });
+}
+function autoAppUpdate(){
+  var info=window.__appUpdateInfo||{};
+  if(!info.download_url){ toast('未获取到安装包直链，请改用「下载安装包」'); return; }
+  if(!confirm('将自动下载 v'+(info.latest||'')+' 并调用 appcenter-cli 安装升级（约 1-3 分钟，期间应用会重启）。继续？')) return;
+  var ab=document.getElementById('appAutoBtn'); if(ab){ ab.disabled=true; ab.textContent='下载中…'; }
+  toast('开始自动更新：下载安装包中…');
+  fetch(apiUrl('/api/app/auto-update'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ url: info.download_url, version: info.latest }) })
+    .then(function(r){ return r.json().catch(function(){ return {}; }); })
+    .then(function(j){
+      if(j.ok){
+        toast('✅ 安装包已安装（v'+ (j.version||'') +'），应用正在重启…');
+        if(ab){ ab.disabled=true; ab.textContent='已安装'; }
+        setTimeout(function(){ location.reload(); }, 6000);
+      } else {
+        toast('自动更新失败：'+(j.error||'未知'),'error');
+        if(ab){ ab.disabled=false; ab.textContent='⚡ 自动更新'; }
+        toast('可改用「下载安装包」手动安装');
+      }
+    })
+    .catch(function(){ toast('自动更新请求失败（网络错误）','error'); if(ab){ ab.disabled=false; ab.textContent='⚡ 自动更新'; } });
 }
 function confirmAppUpdate(){
   // 完整安装：直接打开 GitHub 上最新 .fpk 安装包的下载地址（仓库公开，浏览器可直链下载），

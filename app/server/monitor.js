@@ -4364,6 +4364,44 @@ async function handleFetch(req) {
     return { data: published[0], status: r.status };
   }
 
+  // POST /api/app/auto-update → 自动更新：下载最新 FPK 并用 appcenter-cli 直接安装升级
+  if (path === "/api/app/auto-update" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      let url = String(body.url || "").trim();
+      let version = String(body.version || "");
+      if (!url) {
+        const pat = getGitHubPAT();
+        const headers = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
+        if (pat) headers["Authorization"] = `Bearer ${pat}`;
+        const { data } = await fetchLatestPublishedRelease(headers);
+        if (data && Array.isArray(data.assets)) {
+          const asset = data.assets.find(a => /\.fpk$/i.test(a.name || ""));
+          if (asset && asset.browser_download_url) { url = asset.browser_download_url; version = data.tag_name || ""; }
+        }
+      }
+      if (!url) return new Response(JSON.stringify({ ok: false, error: "未找到安装包下载地址（GitHub 可能限流，请稍后或改用网页下载）" }), { headers: jsonHeaders() });
+      log(`[app-update] 开始自动更新 ${version || ""}：${url}`);
+      // 下载 FPK（fetch 自动跟随 GitHub 资产重定向）
+      const dl = await fetch(url, { signal: AbortSignal.timeout(600000) });
+      if (!dl.ok) throw new Error(`安装包下载失败: HTTP ${dl.status}`);
+      const buf = Buffer.from(await dl.arrayBuffer());
+      if (!buf.length) throw new Error("安装包为空");
+      const fpkPath = `/tmp/hermes-agent-update.fpk`;
+      writeFileSync(fpkPath, buf);
+      log(`[app-update] FPK 已下载: ${(buf.length / 1048576).toFixed(1)}MB → ${fpkPath}`);
+      // 校验：确认是合法 fpk（gzip tar 头）
+      if (buf[0] !== 0x1f || buf[1] !== 0x8b) throw new Error("下载内容不是有效的 FPK 包（gzip）");
+      // 用 appcenter-cli 安装升级（sudo 免密白名单已配置 /etc/sudoers.d/hermes-appcenter）
+      const out = execSync(`sudo -n appcenter-cli install-fpk ${fpkPath} 2>&1`, { timeout: 600000, encoding: "utf8", env: { ...process.env, PATH: "/usr/local/bin:/usr/bin:/bin" } });
+      log(`[app-update] appcenter-cli 安装完成: ${String(out).slice(0, 300)}`);
+      return new Response(JSON.stringify({ ok: true, version, output: String(out).slice(-800) }), { headers: jsonHeaders() });
+    } catch (e) {
+      log(`[app-update] 自动更新失败: ${e.message}`);
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
   if (path === "/api/app/update/check") {
     try {
       const pat = getGitHubPAT();
