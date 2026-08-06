@@ -240,23 +240,23 @@ ensure_tui_bundle() {
         WHL="${TMP_DIR}/hermes_agent.whl"
         DL_OK=false
 
-        # --- 阿里云镜像 simple index ---
-        log_msg "querying aliyun simple index for hermes-agent wheel ..."
-        WHEEL_URL=$(curl -LsSf "https://pypi.tuna.tsinghua.edu.cn/simplehermes-agent/" 2>>"${LOG_FILE}" \
+        # --- 清华镜像 simple index（URL 注意 /simple/<pkg>/ 格式，此前缺斜杠导致 404） ---
+        log_msg "querying tsinghua simple index for hermes-agent wheel ..."
+        WHEEL_URL=$(curl -LsSf "https://pypi.tuna.tsinghua.edu.cn/simple/hermes-agent/" 2>>"${LOG_FILE}" \
             | grep -o 'href="[^"]*hermes_agent-'"${HERMES_VERSION}"'-py3-none-any[^"]*' \
             | head -1 \
-            | sed 's|^href="../../|https://mirrors.aliyun.com/pypi/|; s|#sha256=.*||')
+            | sed 's|^href="../../|https://pypi.tuna.tsinghua.edu.cn/|; s|#sha256=.*||')
 
         if [ -n "${WHEEL_URL}" ]; then
-            log_msg "wheel URL (aliyun): ${WHEEL_URL}"
+            log_msg "wheel URL (tsinghua): ${WHEEL_URL}"
             if curl -L --retry 3 --retry-delay 3 --connect-timeout 15 --progress-bar \
                  -o "${WHL}" "${WHEEL_URL}" 2>&1 && [ -s "${WHL}" ]; then
                 DL_OK=true
             else
-                log_msg "WARNING: aliyun wheel download failed"
+                log_msg "WARNING: tsinghua wheel download failed"
             fi
         else
-            log_msg "WARNING: aliyun simple index query returned no py3-none-any wheel"
+            log_msg "WARNING: tsinghua simple index query returned no py3-none-any wheel"
         fi
 
         # --- 兜底：官方 PyPI ---
@@ -377,10 +377,19 @@ if [ "${SKIP_INSTALL}" = "false" ]; then
             2>>"${LOG_FILE}"
 
         if [ ! -f "${HERMES}" ]; then
-            # editable 安装失败 → 清理旧版 wheel 安装残留后重试一次
-            log_msg ">>> 首次安装失败，清理旧版残留后重试 ..."
+            # editable 安装失败 → 清理旧版 wheel 安装残留后，换官方 PyPI 源重试一次
+            # （清华镜像对个别依赖可能 404，官方源兜底）
+            log_msg ">>> 首次安装失败（清华镜像），清理残留后换官方 PyPI 重试 ..."
             rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
-            UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple" \
+            UV_INDEX_URL="https://pypi.org/simple" \
+                "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
+                2>>"${LOG_FILE}"
+        fi
+        if [ ! -f "${HERMES}" ]; then
+            # 官方源也失败 → 再试阿里云镜像
+            log_msg ">>> 官方 PyPI 也失败，换阿里云镜像重试 ..."
+            rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
+            UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
                 "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
                 2>>"${LOG_FILE}"
         fi
