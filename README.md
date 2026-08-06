@@ -126,13 +126,35 @@ fnOS 桌面图标 → 应用启动脚本 → Monitor (Node.js, /var/apps/hermes-
 
 ## 版本迭代
 
+Hermes 0.20 升级与稳定性（v0.21.27–38）
 
-### v0.22.x（Studio 系列）
-
-- **v0.22.1** — Studio P0：① **WebChat 语音对话**（v2026.8.3 语音能力落地）：麦克风录音→STT 转写→自动发送；助手回复服务端流式 TTS（`speak-stream`，int16 PCM 逐句播放、点击打断 barge-in）+ 整段 TTS 降级 + 浏览器兜底；自动朗读开关；语音设置弹窗（含试听）。② **Octop 风格欢迎页**：空会话 QUICK START 六宫格（总结文档/写邮件/解释代码/制定计划/翻译润色/头脑风暴）。③ **安全网关 tool_guard v1**：13 条危险命令拦截（rm -rf 根目录/dd 写盘/mkfs/关机/curl|sh/fork bomb 等）+ 身份证/手机号 PII 警告；`/api/studio/security` 开关（默认开启，持久化 data/studio/security.json）。完整记录见 `CHANGELOG_v0.22.1.md`。
+Hermes 核心升级 0.20.0（内置源码 editable 安装 + 预构建 web_dist）
+根治「FPK 安装后模型配置丢失」（install_init 路径修复 + providers-state 兜底重建）
+profile 配置同步、网关停止/重启提速（10s→3s）
 
 ### v0.21.x
 
+音全链路（v0.21.59–65）
+
+麦克风 400 根治（whisper 模型完整化：vocabulary 缺失 1607 特殊 token → ModelScope 重下）
+中文识别强制（stt.local.language=zh）、TTS 中文音色 + 音色选择 UI
+语音对话模式（官方 Voice Mode 免手循环：说→回复→朗读→自动再录音）
+流式语音朗读（边生成边逐句朗读 clause-by-clause）
+Barge-in 说话打断（开口说话即打断朗读并自动听你说）
+
+移动端与 UI（v0.21.56–62）
+
+Octop 式两级折叠（会话树→菜单栏）、手机端按钮精简、折叠按钮合并
+100dvh 动态视口（Edge/Chrome 底部遮挡修复）
+隧道外网访问（v0.21.53–55）
+
+侧边栏「隧道」菜单：Cloudflare Tunnel（Quick 临时链接 / Named 固定域名、转发目标可配、二进制自动下载、二维码访问）
+修复 process.kill 信号简写全局失效（TERM/KILL→SIGTERM/SIGKILL）、cloudflared 下载镜像、URL 提取
+通道与集成（v0.21.45–52）
+
+通道角色路由（profile_routes + multiplex）、企微群聊策略、通道「测试」真实验证
+企微出站推送（hermes send wecom 分支 + WECOM_HOME_CHANNEL）
+多窗口/多端消息同步、消息折叠防卡、圆桌三连修复、FPK 体积裁剪 86M→37M
 - **v0.21.27** — Hermes 核心 0.19.0 → **0.20.0**（Herald Release）：官方停止 PyPI 分发，本包内置完整源码（`app/hermes-src`）editable 安装 + 预构建 dashboard 前端/TUI bundle；monitor 适配 cron `--deliver`、源码模式版本检查、`HERMES_WEB_DIST` 注入修复 dashboard 前端加载；WebUI 修复模型切换首页不显示（概览「当前模型」卡片、`/status` Provider·模型、模型按钮兜底）。完整记录见 `CHANGELOG_v0.21.27.md`。
 - **v0.21.26** — 学习轨迹从二分图简化为力导向技能图、删除 20 个预设、清理冗余文件。
 
