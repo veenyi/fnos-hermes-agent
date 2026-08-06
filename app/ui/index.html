@@ -8349,7 +8349,7 @@ function openNewSessionModal(){
     '<div class="modal-body">' +
     '<div class="field"><label>Agent / Profile</label><select id="nsAgent"><option value="default">默认主力助手</option></select></div>' +
     '<div class="field"><label>模型</label><select id="nsModel"><option value="">默认模型</option></select></div>' +
-    '<div class="field"><label>工作区文件夹</label><input type="text" id="nsWorkspace" list="wsDirsList" placeholder="留空使用默认工作区（可下拉选择或输入新名称）" value=""><datalist id="wsDirsList"></datalist></div>' +
+    '<div class="field"><label>工作区文件夹</label><div style="display:flex;gap:6px"><input type="text" id="nsWorkspace" placeholder="留空使用默认工作区（可浏览选择或输入新名称）" value="" style="flex:1"><button class="ov-actbtn" onclick="openWsPicker()" title="浏览选择工作区文件夹">📂 浏览</button></div></div>' +
     '</div>' +
     '<div class="modal-foot" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">' +
     '<button class="ov-actbtn" onclick="closeNewSessionModal()">取消</button>' +
@@ -8383,14 +8383,68 @@ function openNewSessionModal(){
       });
     }
   });
-  // 加载工作区目录（可选择已有工作区）
-  apiGet('/api/workspace/dirs').then(function(res){
-    if(res && res.ok && res.dirs && res.dirs.length){
-      var dl=document.getElementById('wsDirsList');
-      if(dl) dl.innerHTML = res.dirs.map(function(d){ return '<option value="'+esc(d)+'">'; }).join('');
-    }
+}
+/* ── 工作区目录选择器（浏览/新建，选择后回填工作区字段） ── */
+var _wsPicker = { cwd: 'workspace' };  // 相对 DATA_DIR 的当前目录（workspace = 工作区根）
+function openWsPicker(){
+  _wsPicker.cwd = 'workspace';
+  if(document.getElementById('wsPickerOverlay')) return;
+  var html = '<div class="modal-overlay" id="wsPickerOverlay" onclick="if(event.target===this)closeWsPicker()">' +
+    '<div class="modal" style="max-width:460px">' +
+    '<div class="modal-head"><h3>📂 选择工作区文件夹</h3><button class="modal-close" onclick="closeWsPicker()">\u00d7</button></div>' +
+    '<div class="modal-body" style="padding:12px 14px">' +
+    '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">' +
+    '<button class="ov-actbtn" onclick="wsPickerUp()" title="上级目录">⬆</button>' +
+    '<button class="ov-actbtn" onclick="wsPickerRefresh()" title="刷新">\u21bb</button>' +
+    '<button class="ov-actbtn" onclick="wsPickerNewDir()" title="在当前目录新建子文件夹">+目录</button>' +
+    '<span id="wsPickerPath" style="font-size:12px;color:var(--text2);flex:1;text-align:right;word-break:break-all"></span>' +
+    '</div>' +
+    '<div id="wsPickerList" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px"></div>' +
+    '</div>' +
+    '<div class="modal-foot" style="padding:10px 14px;display:flex;justify-content:flex-end;gap:8px">' +
+    '<button class="btn" onclick="closeWsPicker()">取消</button>' +
+    '<button class="btn primary" onclick="wsPickerSelect()">选择当前目录</button>' +
+    '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  wsPickerRefresh();
+}
+function wsPickerRefresh(){
+  apiGet('/api/files?path='+encodeURIComponent(_wsPicker.cwd)).then(function(res){
+    var pathEl=document.getElementById('wsPickerPath');
+    var listEl=document.getElementById('wsPickerList');
+    if(!res || !res.ok){ if(listEl) listEl.innerHTML='<div class="empty-state">加载失败</div>'; return; }
+    var rel = _wsPicker.cwd.replace(/^workspace\/?/,'') || '（工作区根目录）';
+    if(pathEl) pathEl.textContent = rel;
+    if(!listEl) return;
+    var dirs = (res.items||[]).filter(function(i){ return i.type==='dir'; });
+    if(!dirs.length){ listEl.innerHTML='<div class="empty-state">暂无子目录（可点「+目录」新建）</div>'; return; }
+    listEl.innerHTML = dirs.map(function(d){
+      return '<div class="ws-file-item" onclick="wsPickerOpen(\''+esc(d.name).replace(/'/g,"\\'")+'\')" style="cursor:pointer">' +
+        '<span class="ws-file-icon">📁</span><span class="ws-file-name">'+esc(d.name)+'</span></div>';
+    }).join('');
   });
 }
+function wsPickerOpen(name){ _wsPicker.cwd = _wsPicker.cwd.replace(/\/$/,'') + '/' + name; wsPickerRefresh(); }
+function wsPickerUp(){
+  var c = _wsPicker.cwd.replace(/\/$/,'');
+  if(c === 'workspace') return;
+  _wsPicker.cwd = c.substring(0, c.lastIndexOf('/')) || 'workspace';
+  wsPickerRefresh();
+}
+function wsPickerNewDir(){
+  var name=prompt('新建目录名：');
+  if(!name || !name.trim()) return;
+  fetch(apiUrl('/api/files/mkdir'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path: _wsPicker.cwd.replace(/\/$/,'') + '/' + name.trim()})})
+    .then(function(r){return r.json();}).then(function(res){ if(res.ok){ toast('✅ 目录已创建'); wsPickerRefresh(); } else toast(res.error||'创建失败','error'); });
+}
+function wsPickerSelect(){
+  var rel = _wsPicker.cwd.replace(/^workspace\/?/,'') || '';
+  var inp=document.getElementById('nsWorkspace');
+  if(inp){ inp.value = rel; }
+  closeWsPicker();
+  toast(rel ? ('已选择工作区：'+rel) : '已选择默认工作区（根目录）');
+}
+function closeWsPicker(){ var o=document.getElementById('wsPickerOverlay'); if(o) o.remove(); }
 function closeNewSessionModal(){ var o=document.getElementById('newSessionOverlay'); if(o) o.remove(); }
 function createNewSession(){
   var agent=document.getElementById('nsAgent').value;
