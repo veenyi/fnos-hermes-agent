@@ -41,8 +41,8 @@ export HOME="${DATA_DIR}"
 export UV_CACHE_DIR="${DATA_DIR}/.uv-cache"
 
 # PyPI 国内镜像（阿里云）— UV_INDEX_URL 给 uv pip install 用
-export PIP_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
-export UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
+export PIP_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+export UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
 
 # ---------------------------------------------------------------------------
 # curl 从阿里云 PyPI 镜像直接下载 uv wheel，unzip 提取二进制
@@ -67,7 +67,7 @@ ensure_uv() {
         log_msg ">>> 正在从 PyPI 镜像下载 uv (${ARCH}) ..."
 
         local WHEEL_URL
-        WHEEL_URL=$(curl -LsSf "https://mirrors.aliyun.com/pypi/simple/uv/" 2>>"${LOG_FILE}" \
+        WHEEL_URL=$(curl -LsSf "https://pypi.tuna.tsinghua.edu.cn/simpleuv/" 2>>"${LOG_FILE}" \
             | grep -o 'href="[^"]*py3-none-manylinux[^"]*' \
             | grep "${ARCH}" \
             | sed 's|^href="../../|https://mirrors.aliyun.com/pypi/|; s|#sha256=.*||' \
@@ -242,7 +242,7 @@ ensure_tui_bundle() {
 
         # --- 阿里云镜像 simple index ---
         log_msg "querying aliyun simple index for hermes-agent wheel ..."
-        WHEEL_URL=$(curl -LsSf "https://mirrors.aliyun.com/pypi/simple/hermes-agent/" 2>>"${LOG_FILE}" \
+        WHEEL_URL=$(curl -LsSf "https://pypi.tuna.tsinghua.edu.cn/simplehermes-agent/" 2>>"${LOG_FILE}" \
             | grep -o 'href="[^"]*hermes_agent-'"${HERMES_VERSION}"'-py3-none-any[^"]*' \
             | head -1 \
             | sed 's|^href="../../|https://mirrors.aliyun.com/pypi/|; s|#sha256=.*||')
@@ -372,7 +372,7 @@ if [ "${SKIP_INSTALL}" = "false" ]; then
         # 内置源码模式（v0.20.0+）：editable 安装是官方支持的源码分发路径
         # （setup.py 构建守卫只拦截 bdist_wheel/sdist，不拦截 build_editable）
         log_msg ">>> 正在从内置源码 editable 安装 hermes-agent[all]，依赖较多请耐心等待 ..."
-        UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+        UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple" \
             "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
             2>>"${LOG_FILE}"
 
@@ -380,14 +380,14 @@ if [ "${SKIP_INSTALL}" = "false" ]; then
             # editable 安装失败 → 清理旧版 wheel 安装残留后重试一次
             log_msg ">>> 首次安装失败，清理旧版残留后重试 ..."
             rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
-            UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+            UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple" \
                 "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
                 2>>"${LOG_FILE}"
         fi
     else
         # 兜底：无内置源码（旧包/热补丁场景）→ 退回 PyPI wheel 安装
         log_msg "WARNING: hermes-src 不存在（${HERMES_SRC}），退回 PyPI wheel 安装 hermes-agent[all]==${HERMES_VERSION}"
-        UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
+        UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple" \
             "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all,voice]==${HERMES_VERSION}" \
             2>>"${LOG_FILE}"
     fi

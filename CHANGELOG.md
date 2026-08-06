@@ -1,4 +1,29 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.77)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.78)
+
+---
+
+
+
+# v0.21.78 — 多项修复：自动朗读默认关 / 新建目录权限 / pip 清华源 / profile 中文名碰撞 / 通道会话提示
+
+> 用户反馈：①语音设置自动朗读要默认关闭；②新建会话目录选择器新建目录报权限不足；③群里反馈：通道会话 fetch 失败、创建 Agent 报 profile 已存在、安装 hermes-agent 报 PyPI 镜像 403；④用户自己遇到网关连接失败。
+
+## 修复
+
+1. **自动朗读默认关闭**（ui/index.html）：默认值从「非 0 即开」改为「仅 1 才开」——新用户默认不朗读；已手动开启的用户不受影响
+2. **新建目录权限**（monitor.js `/api/files/mkdir`）：相对路径拼 `WORKSPACE_ROOT`（与 GET/DELETE 一致），修复目录选择器「+目录」EACCES（此前相对路径写到 monitor 进程 cwd）
+3. **PyPI 镜像换清华**（install_callback + monitor.js）：阿里云镜像返回 403 Forbidden 阻断 hermes-agent 安装/升级 → 全部切换 `pypi.tuna.tsinghua.edu.cn`（更稳定）
+4. **profile 中文名碰撞**（monitor.js 创建 profile）：中文名被替换成纯下划线（「法律顾问」→「____」）撞上历史遗留 `______` profile 导致「已存在」误报 → id 全为下划线/为空时用时间戳保证唯一
+5. **通道会话提示友好化**（ui/index.html）：加载失败不再显示技术错误（Failed to fetch），改为「通道会话服务暂不可用（网关/仪表盘未就绪），请稍后刷新重试」
+
+## 网关连接失败排查结论
+
+- gateway 稳定（crash_loop=false、日志 0 ERROR），agent 日志正常；「请求失败: terminated」为**网关重启瞬间/网络抖动的连接中断**（非持续故障），重试即可
+- 建议：遇到时刷新重试；如频繁出现请提供具体时间点便于对照 gateway.log
+
+## 验证
+
+- mkdir 相对路径创建 + 清理实测通过；服务 healthy；WebDAV 已同步（v0.21.78.fpk）
 
 ---
 

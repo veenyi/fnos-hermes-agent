@@ -4209,7 +4209,7 @@ async function handleFetch(req) {
         // 兜底：阿里云镜像 simple index（无日期信息）
         if (latest === "unknown") {
           try {
-            const r2 = await fetch("https://mirrors.aliyun.com/pypi/simple/hermes-agent/", {
+            const r2 = await fetch("https://pypi.tuna.tsinghua.edu.cn/simplehermes-agent/", {
               signal: AbortSignal.timeout(10000),
             });
             const html = await r2.text();
@@ -4254,7 +4254,7 @@ async function handleFetch(req) {
 
     const env = {
       ...process.env,
-      UV_INDEX_URL: "https://mirrors.aliyun.com/pypi/simple/",
+      UV_INDEX_URL: "https://pypi.tuna.tsinghua.edu.cn/simple",
       UV_CACHE_DIR: `${DATA_DIR}/.uv-cache`,
       PATH: `${VENV_BIN}:/usr/local/bin:/usr/bin:/bin`,
     };
@@ -5334,7 +5334,11 @@ async function handleFetch(req) {
   if (path === "/api/profiles" && req.method === "POST") {
     try {
       const body = await req.json().catch(() => ({}));
-      const id = (body.id || body.name || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_") || ("agent_" + Date.now());
+      let _rawId = (body.id || body.name || "").trim();
+      let id = _rawId.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      // 中文/特殊字符名会被替换成纯下划线（如「法律顾问」→「____」），
+      // 会与历史遗留的下划线 profile 撞名导致「已存在」误报 → 用时间戳保证唯一
+      if (!id || /^_+$/.test(id)) id = "agent_" + Date.now().toString(36);
       const r = _createProfile(id, body);
       if (r.ok && Array.isArray(body.skills) && body.skills.length) {
         try { _writeProfileSkills(id, body.skills); } catch (e) { log(`[profiles] 写入 ${id} skills 失败: ${e.message}`); }
@@ -7717,8 +7721,9 @@ async function handleFetch(req) {
     try {
       const body = await req.json().catch(() => ({}));
       if (!body.path) return new Response(JSON.stringify({ ok: false, error: "缺少 path" }), { headers: jsonHeaders() });
-      mkdirSync(body.path, { recursive: true });
-      return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
+      const dirPath = String(body.path).startsWith("/") ? body.path : `${WORKSPACE_ROOT}/${body.path}`;
+      mkdirSync(dirPath, { recursive: true });
+      return new Response(JSON.stringify({ ok: true, path: dirPath }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
