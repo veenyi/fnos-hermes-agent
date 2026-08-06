@@ -8349,7 +8349,7 @@ function openNewSessionModal(){
     '<div class="modal-body">' +
     '<div class="field"><label>Agent / Profile</label><select id="nsAgent"><option value="default">默认主力助手</option></select></div>' +
     '<div class="field"><label>模型</label><select id="nsModel"><option value="">默认模型</option></select></div>' +
-    '<div class="field"><label>工作区文件夹</label><input type="text" id="nsWorkspace" placeholder="留空使用默认工作区" value=""></div>' +
+    '<div class="field"><label>工作区文件夹</label><input type="text" id="nsWorkspace" list="wsDirsList" placeholder="留空使用默认工作区（可下拉选择或输入新名称）" value=""><datalist id="wsDirsList"></datalist></div>' +
     '</div>' +
     '<div class="modal-foot" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">' +
     '<button class="ov-actbtn" onclick="closeNewSessionModal()">取消</button>' +
@@ -8381,6 +8381,13 @@ function openNewSessionModal(){
         });
         if(opts) sel.innerHTML += '<optgroup label="'+esc(provName)+'">'+opts+'</optgroup>';
       });
+    }
+  });
+  // 加载工作区目录（可选择已有工作区）
+  apiGet('/api/workspace/dirs').then(function(res){
+    if(res && res.ok && res.dirs && res.dirs.length){
+      var dl=document.getElementById('wsDirsList');
+      if(dl) dl.innerHTML = res.dirs.map(function(d){ return '<option value="'+esc(d)+'">'; }).join('');
     }
   });
 }
