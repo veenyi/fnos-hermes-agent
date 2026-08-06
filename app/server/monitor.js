@@ -3996,7 +3996,8 @@ async function handleFetch(req) {
   // 需要令牌的变更操作（仅写操作，GET 不需要 token）
   const writePaths = ["/api/start", "/api/stop", "/api/restart", "/api/dashboard/start", "/api/dashboard/stop", "/api/config", "/api/config/test", "/api/hermes/update", "/api/logs/clear", "/api/tunnel/start", "/api/tunnel/stop", "/api/voice/config"];
   const isWrite = ["POST", "PUT", "DELETE"].includes(req.method);
-  if (isWrite && writePaths.includes(path) && !checkToken(req)) {
+  const pathIsWrite = writePaths.includes(path) || /^\/api\/channels\/[^/]+\/toggle$/.test(path);
+  if (isWrite && pathIsWrite && !checkToken(req)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: jsonHeaders(),
@@ -6134,6 +6135,16 @@ async function handleFetch(req) {
     return yml;
   }
 
+  function _toggleChannel(id, enabled){
+    const cfg = _readPlatformConfig(id);
+    cfg.enabled = !!enabled;
+    cfg.updated_at = Date.now();
+    let yml = _setPlatformConfig(id, cfg);
+    _writeHermesConfig(yml);
+    log(`[channel] ${id} 已${enabled ? "启用" : "禁用"}（platforms.${id}.enabled=${enabled}），重启网关生效`);
+    _triggerGatewayRestart(`channel ${id} ${enabled ? "enable" : "disable"}`);
+    return { ok: true, id, enabled: !!enabled };
+  }
   function _listChannels(){
     const env = _readEnvFile();
     const out = {};
@@ -6146,6 +6157,7 @@ async function handleFetch(req) {
       if (id === "weixin") configured = !!_getEnvValue(env, "WEIXIN_TOKEN");
       out[id] = {
         id, name: def.name, icon: def.icon, configured, qrLogin: !!def.qrLogin, note: def.note || "",
+        enabled: (cfg && cfg.enabled !== false),
         last_configured_at: (cfg && cfg.updated_at) ? cfg.updated_at : null,
         credentials: (def.fields || []).filter(f => f.env).map(f => ({ env: f.env, path: f.path, label: f.label, value: _getEnvValue(env, f.env) || "" })),
         config: cfg
@@ -7646,6 +7658,18 @@ async function handleFetch(req) {
   if (path === "/api/channels" && req.method === "GET") {
     try {
       return new Response(JSON.stringify({ ok: true, channels: _listChannels(), defs: CHANNEL_DEFS }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
+  // POST /api/channels/:id/toggle → 启用/禁用渠道（platforms.<id>.enabled + 重启网关）
+  const toggleM = path.match(/^\/api\/channels\/([^/]+)\/toggle$/);
+  if (toggleM && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const r = _toggleChannel(toggleM[1], body.enabled !== false);
+      return new Response(JSON.stringify(r), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }

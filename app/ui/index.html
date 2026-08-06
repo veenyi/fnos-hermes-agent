@@ -13548,14 +13548,30 @@ function renderChannels(){
     el.innerHTML = ids.map(function(id){
       var def=defs[id]; var c=ch[id]||{}; var configured=!!c.configured;
       var badge=configured?'<span class="badge on">已配置</span>':'<span class="badge off">未配置</span>';
+      var toggleHtml = configured
+        ? '<div class="toggle-row" style="margin-top:8px"><label class="toggle '+(c.enabled!==false?'on':'')+'" onclick="event.stopPropagation();chChannelToggle(\''+id+'\')" title="启用/禁用该渠道"><span class="toggle-switch"></span></label><span class="toggle-lbl" style="font-size:12px">'+(c.enabled!==false?'已启用':'已禁用')+'</span></div>'
+        : '';
       var action=def.qrLogin?'<button class="action" onclick="event.stopPropagation();openChannelModal(\''+id+'\')">扫码登录</button>':'<button class="action" onclick="event.stopPropagation();openChannelModal(\''+id+'\')">配置</button>';
       var svgIcon = (window.PV && PV.ICONS && PV.ICONS[id]) ? PV.ICONS[id] : null;
       var iconHtml = svgIcon ? '<div class="icon svg-icon">'+svgIcon+'</div>' : '<div class="icon">'+(def.icon||'🔌')+'</div>';
       return '<div class="connector-card" onclick="openChannelModal(\''+id+'\')">'+
         '<div class="top">'+iconHtml+'<div><div class="name">'+esc(def.name)+' '+badge+'</div><div class="status">'+(def.note||'配置后可在该平台收发消息')+'</div></div></div>'+
-        action+'</div>';
+        toggleHtml+action+'</div>';
     }).join('') || '<div class="empty-state">该筛选下暂无频道。</div>';
   }).catch(function(){ toast('加载频道失败'); });
+}
+/* 渠道启停开关：写 platforms.<id>.enabled 并重启网关（网关启动时跳过 enabled=false 的渠道） */
+function chChannelToggle(id){
+  var c=(_chState.channels||{})[id]||{};
+  var next = (c.enabled===false);
+  toast((next?'正在启用':'正在禁用')+' '+id+'（重启网关生效）…');
+  fetch(apiUrl('/api/channels/'+id+'/toggle'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ enabled: next }) })
+    .then(function(r){ return r.json().catch(function(){ return {}; }); })
+    .then(function(j){
+      if(j.ok){ toast('✅ '+(j.enabled?'已启用':'已禁用')+' '+id); renderChannels(); }
+      else toast('操作失败：'+(j.error||'未知'),'error');
+    })
+    .catch(function(){ toast('网络错误','error'); });
 }
 function setChFilter(el, filter){
   _chFilter=filter;

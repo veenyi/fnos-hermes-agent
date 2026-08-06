@@ -1,4 +1,26 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.71)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.73)
+
+---
+
+
+
+# v0.21.72–73 — 通讯渠道独立启停开关（对齐原版 dashboard 的分别控制）
+
+> 用户需求：每个通讯平台要有单独开关，可以分别开启/关闭（像原版 dashboard 那样）。
+
+## 实现
+
+1. **后端**（monitor.js + custom_routes.js）：
+   - 机制确认：hermes 网关按 `platforms.<id>.enabled` 决定渠道启停（gateway 启动时跳过 enabled=false）
+   - 新增 `POST /api/channels/:id/toggle`（写 `platforms.<id>.enabled` + 重启网关生效，writePaths 令牌保护）
+   - `_listChannels` 输出增加 `enabled` 字段（默认启用）
+   - **排障关键**：`/api/channels` 实际由 `custom_routes.js` 的 `handleCustomRoute` 先拦截（monitor.js 的新代码从未执行！），custom_routes.js 的 `_listChannels` 同步加 `enabled` 字段——两处必须保持一致
+2. **前端**（index.html）：通讯卡片已配置渠道显示「已启用/已禁用」toggle 开关（点击切换，重启网关生效提示），未配置渠道保持「配置/扫码登录」按钮
+
+## 验证
+
+- 102/249：`/api/channels` 10/10 渠道含 enabled；toggle 全链路（禁用→写入 config.yaml enabled:false→恢复→healthy）通过
+- custom_routes.js 语法 + index.html 脚本检查通过；monitor 已重启、服务 healthy；WebDAV 已同步
 
 ---
 

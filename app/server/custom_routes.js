@@ -545,6 +545,7 @@ function _listChannels() {
     if (id === "weixin") configured = !!_getEnvValue(env, "WEIXIN_TOKEN");
     out[id] = {
       id, name: def.name, icon: def.icon, configured, qrLogin: !!def.qrLogin, note: def.note || "",
+      enabled: (cfg && cfg.enabled !== false),
       last_configured_at: (cfg && cfg.updated_at) ? cfg.updated_at : null,
       credentials: (def.fields || []).filter((f) => f.env).map((f) => ({ env: f.env, path: f.path, label: f.label, value: _getEnvValue(env, f.env) || "" })),
       config: cfg,
