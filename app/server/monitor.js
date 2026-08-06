@@ -9609,7 +9609,7 @@ async function handleFetch(req) {
         '<p>' + (isChat
           ? '官方 dashboard 的聊天页依赖 PTY 终端桥，在应用门户（8650 代理）下无法渲染。<br>请使用左侧「<b>对话</b>」——功能完整（流式对话、语音、纠偏、知识库）。'
           : '官方 dashboard 的系统页调用的接口（/api/system）在 Hermes 0.20 中不存在（上游缺陷）。<br>系统信息请使用左侧「<b>概览</b>」页，信息完整。') + '</p>' +
-        '<p style="margin-top:16px"><a href="' + (isChat ? '../' : '../') + '">返回应用 →</a></p>' +
+        '<p style="margin-top:16px"><a href="' + (BASE_PATH || "") + '/" onclick="var p=location.pathname.split(\'/proxy/\')[0]||\'\';this.href=p+\'/\';return true;">返回应用 →</a></p>' +
         '</div></body></html>',
         { headers: { "Content-Type": "text/html; charset=utf-8" } }
       );
