@@ -1,8 +1,27 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.67)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.68)
 
 ---
 
 
+
+# v0.21.68 — 新建会话模型下拉修复（[object Object] 显示）
+
+> 用户反馈：会话窗口右侧「新建会话」的模型下拉报错，选项显示 `[object Object]`。
+
+## 根因
+
+`openNewSessionModal` 加载模型时，`/api/config` 返回的 `providers[].models` 元素是**对象**（`{id, name, enabled}`），原代码 `esc(m)` 直接把对象字符串化为 `[object Object]`，下拉里出现 4 个相同错误项。
+
+## 修复（ui/index.html）
+
+新建会话模型加载改为与 `buildModelOptionsHtml` 一致的逻辑：提取 `m.id/m.name` 渲染选项，按 provider 分组（optgroup），过滤 `enabled:false` 的模型，provider 无 models 时用 `p.model` 兜底。
+
+## 验证
+
+- 逻辑单测 5/5 PASS：无 [object Object]、模型名正确、兜底生效、禁用模型过滤、optgroup 分组
+- index.html 语法检查通过；102/249 已热更（服务健康）
+
+---
 
 # v0.21.67 — 打包脚本修复：FPK 曾缺失运行资源（marked 库 + Dashboard 前端 assets）
 

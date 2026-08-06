@@ -8331,11 +8331,16 @@ function openNewSessionModal(){
     if(res && res.providers){
       var sel=document.getElementById('nsModel');
       res.providers.forEach(function(p){
-        if(p.models && p.models.length){
-          p.models.forEach(function(m){ sel.innerHTML+='<option value="'+esc(m)+'">'+esc(m)+'</option>'; });
-        } else if(p.model){
-          sel.innerHTML+='<option value="'+esc(p.model)+'">'+esc(p.model)+'</option>';
-        }
+        var provName = p.name || p.id;
+        var models = (p.models && p.models.length) ? p.models : [{ id:p.model||'auto', name:p.model||'auto', enabled:true }];
+        var opts='';
+        models.forEach(function(m){
+          if(m.enabled === false) return;
+          var modelId = m.id || m.name || 'auto';
+          var modelName = m.name || m.id || 'auto';
+          opts += '<option value="'+esc(modelId)+'">'+esc(modelName)+'</option>';
+        });
+        if(opts) sel.innerHTML += '<optgroup label="'+esc(provName)+'">'+opts+'</optgroup>';
       });
     }
   });
