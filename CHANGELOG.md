@@ -1,4 +1,54 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.65)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.67)
+
+---
+
+
+
+# v0.21.67 — 打包脚本修复：FPK 曾缺失运行资源（marked 库 + Dashboard 前端 assets）
+
+> 用户反馈：用最新 FPK 安装后 markdown 无格式、Dashboard 启动崩。解包定位：**安装包本身缺文件**——`app/ui/scripts/`（marked/purify/qrcode）与 `hermes-src/hermes_cli/web_dist/assets` 均未进包。
+
+## 根因（build-slim.sh）
+
+robocopy `/XD` 按**目录名**排除 `assets scripts`（本意排除 hermes-src 顶层开发目录），robocopy 按名匹配**所有层级**同名目录 → 误伤 `app/ui/scripts`（markdown 渲染库）与 `web_dist/assets`（dashboard 前端资源）。且 `/E` 增量复制不清除旧副本残留，`/XD` 正斜杠路径 robocopy 不识别导致排除静默失效。
+
+## 修复（build-slim.sh）
+
+1. `/XD` 仅排除 `.git`/`pkg`（不再按名排除）
+2. 复制后用 `rm -rf` 显式删除副本中 hermes-src 的开发/文档目录（tests/apps/website/docs/.github/assets/contributors/scripts）
+3. 打包前**断言运行资源必须在**（`ui/scripts/marked.min.js`、`web_dist/assets` 缺失即中止），防止再次打出残缺包
+
+## 验证（解包检查 v0.21.67）
+
+- ✅ `ui/scripts/`（marked 38K + purify 21K + qrcode 25K）
+- ✅ `web_dist/assets/`（前端 bundle 齐全）
+- ✅ hermes-src 开发目录全部排除（体积 43.9MB，含 web_dist 运行资源）
+- ✅ lifecycle_guard NUL 修复（v0.21.66）与 monitor 信号修复在位
+
+## 重要
+
+**v0.21.66 及更早的 slim 包有缺陷（缺上述资源），请使用 v0.21.67 安装。** 已用旧包安装的机器（如 249）需用 v0.21.67 覆盖安装或手动补齐资源。
+
+---
+
+
+
+# v0.21.66 — 249 Dashboard 启动崩溃（web_dist 缺失）+ terminal 工具 NUL 字节崩溃修复
+
+> 用户反馈（249 NAS）：更新到最新后 Dashboard 完全启动不起来；gateway 报 `tools.terminal_tool: terminal_tool exception`。
+
+## ① Dashboard 启动崩溃：web_dist/assets 缺失（249 运行时）
+
+`mount_spa` 挂载 `web_dist/assets` 时 `RuntimeError: Directory ... does not exist` → dashboard 启动即崩（crash 循环）。249 的 `hermes-src/hermes_cli/web_dist` 仅 600K（缺 assets/，同步不完整；完整版 3.1M）。修复：从本地包补全 web_dist（assets + fonts + index.html，chown hermes-agent），dashboard 恢复 READY（9219 监听）。
+
+## ② terminal 工具崩溃：lifecycle_guard 对 NUL 字节路径修复不完整（hermes 上游 bug）
+
+`terminal_tool` 执行命令时 lifecycle_guard 扫描引用脚本：上游 #76762 修复只在 `Path.resolve()` 捕获 `ValueError: embedded null byte`，但 `_read_referenced_script` 内 `os.open(path)` 对含 NUL 路径再次抛 ValueError（不在 except OSError 范围）→ 命令执行失败。修复（`cron/lifecycle_guard.py`）：`os.open` 的 except 增加 `ValueError`。249 单测 3/3 PASS（NUL 路径返回 (None,False)、含 NUL 命令正常返回、正常命令不受影响）。
+
+## 部署
+
+- 249（/vol3/）：web_dist 补全 + lifecycle_guard 修复 + gateway/dashboard 重启，全部 healthy（8650/8742/9219 监听）
+- 102（/vol1/）：lifecycle_guard 修复已上传（gateway 下次重启生效）
 
 ---
 
