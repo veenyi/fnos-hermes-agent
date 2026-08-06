@@ -8818,6 +8818,13 @@ function sendRaw(text){
     var sys = _personaPrompt || '';
     if(_activeSkills.length){ sys += '\n\n【已启用技能】请在本轮对话中优先使用以下技能：'+_activeSkills.join('、')+'。'; }
     sys = injectExpertSystem(sys, text);
+    // 连接器上下文：选中连接器时引导 AI 优先使用其 MCP 工具（此前缺少注入，AI 不知道要调用连接器）
+    if(_selectedConnector){
+      var _cc = (PV.octopConnectors||[]).find(function(x){ return x.kind===_selectedConnector; });
+      if(_cc){
+        sys += '\n\n【已启用连接器：'+_cc.name+'】与本连接器相关的请求（如查询其数据/内容），请优先调用对应 MCP 工具（mcp__conn_'+_selectedConnector+'__*），不要用文件搜索/终端代替；工具执行失败再说明。';
+      }
+    }
     var payload = {
       session_id: sid,
       message: buildMessageContent(text, attachments),
