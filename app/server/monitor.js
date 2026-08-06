@@ -4419,24 +4419,20 @@ async function handleFetch(req) {
       }
       if (!url) return new Response(JSON.stringify({ ok: false, error: "未找到安装包下载地址（GitHub 可能限流，请稍后或改用网页下载）" }), { headers: jsonHeaders() });
       log(`[app-update] 开始自动更新 ${version || ""}：${url}`);
-      // 下载 FPK（fetch 自动跟随 GitHub 资产重定向）
-      // 多源下载：优先用户飞牛 WebDAV（国内直连快，每版 FPK 均同步），失败再 GitHub 兜底
-      const _wdBase = (process.env.HERMES_WD_BASE || "http://nas.aio.run:5244/dav/FnosAPP").replace(/\/+$/, "");
-      const _wdUser = process.env.HERMES_WD_USER || "tim";
-      const _wdPass = process.env.HERMES_WD_PASS || "";
+      // 下载源：优先 alist 分享直链（用户飞牛 5667/p/<分享码>/<文件>，公众下载通道免认证、国内快）
+      // —— WebDAV（5244）仅为发布推送通道，不用于公众下载
+      const _shareBase = (process.env.HERMES_SHARE_BASE || "https://nas.aio.run:5667").replace(/\/+$/, "");
+      const _shareCode = process.env.HERMES_SHARE_CODE || "82005ffed8df428bb3";
       const _verTag = String(version || "").replace(/^fnos-hermes-agent_v|^v/, "");
-      const _wdFile = _verTag ? `fnos-hermes-agent_v${_verTag}.fpk` : "";
+      const _shareFile = _verTag ? `fnos-hermes-agent_v${_verTag}.fpk` : "";
       let dl = null;
-      if (_wdFile && _wdPass) {
+      if (_shareFile) {
         try {
-          const wdUrl = `${_wdBase}/${_wdFile}`;
-          log(`[app-update] 尝试从 WebDAV 加速下载: ${wdUrl}`);
-          dl = await fetch(wdUrl, {
-            headers: { Authorization: "Basic " + Buffer.from(`${_wdUser}:${_wdPass}`).toString("base64") },
-            signal: AbortSignal.timeout(60000),
-          });
-          if (!dl.ok) { log(`[app-update] WebDAV 下载失败 HTTP ${dl.status}，切换 GitHub`); dl = null; }
-        } catch (e) { log(`[app-update] WebDAV 下载异常: ${e.message}，切换 GitHub`); dl = null; }
+          const shareUrl = `${_shareBase}/p/${_shareCode}/${_shareFile}`;
+          log(`[app-update] 尝试从 alist 分享直链下载: ${shareUrl}`);
+          dl = await fetch(shareUrl, { signal: AbortSignal.timeout(60000) });
+          if (!dl.ok) { log(`[app-update] 分享直链下载失败 HTTP ${dl.status}，切换 GitHub`); dl = null; }
+        } catch (e) { log(`[app-update] 分享直链下载异常: ${e.message}，切换 GitHub`); dl = null; }
       }
       if (!dl) {
         dl = await fetch(url, { signal: AbortSignal.timeout(600000) });
