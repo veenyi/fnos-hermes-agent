@@ -8640,6 +8640,14 @@ function sendChat(){
   ta.value=''; ta.style.height='auto';
   var btn=document.getElementById('sendBtn'); if(btn && !_msgState.streaming) btn.disabled=true;
   if(text.charAt(0)==='/'){ handleSlashCommand(text); return; }
+  // 「记住」指令：把用户要求记住的内容自动写入记忆 notes.md（自动沉淀）
+  var _rem = text.match(/(?:请记住|记住|记下来|记住：|记住:)\s*(.{3,})/);
+  if(_rem && _rem[1]){
+    var _remContent = '## 🧠 ' + fmtDateTime(Date.now()) + '\n' + _rem[1].trim();
+    fetch(apiUrl('/api/memory/append'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ file:'notes', content: _remContent }) })
+      .then(function(r){ return r.json(); }).then(function(j){ if(j.ok) toast('🧠 已记住：' + _rem[1].trim().slice(0,36)); })
+      .catch(function(){});
+  }
   // 圆桌讨论模式
   if(_rtState.active && currentSession===_rtState.sessionId){ rtSend(text); return; }
   // 流式回复中发送 = redirect 中途纠偏（网关 busy follow-up 自动调用 agent.redirect，保留当前工作状态）
@@ -8759,6 +8767,7 @@ function sendRaw(text){
   var toolSummary = asst.querySelector('.tool-summary');
   var infoEl = asst.querySelector('.chat-info');
   var fullText = '';
+  var _genToolUsed = [];   // 本轮使用的工具/技能（自动沉淀到知识库）
   var _genDeltaSeen = false;   // 首个内容块标记（状态条 thinking→generating 只切一次）
   var _genToolRunningIds = {}; // 运行中的工具集合：状态条与工具执行实时同步（调用中/写代码）
   var _genToolResumeTimer = null; // 工具全部结束后延迟恢复“思考/回复”状态，避免连发工具时闪烁
@@ -8840,6 +8849,7 @@ function sendRaw(text){
       onTool: function(tp){
         // 状态条与工具执行实时同步：按工具类型显示（Agent/写代码/搜索/浏览…），全部完成→恢复思考/回复
         _genLastEventTs = Date.now();
+        if(tp.tool && _genToolUsed.indexOf(tp.tool) < 0) _genToolUsed.push(tp.tool);   // 收集技能/工具（自动沉淀）
         var _running = !(tp.status==='done'||tp.status==='completed'||tp.status==='finish'||tp.status==='finished');
         var _tid = tp.toolCallId || tp.tool || 'tool';
         if(_running){
@@ -8958,6 +8968,11 @@ function sendRaw(text){
         _chatHTML[sid] = body.innerHTML;  // 完成后同步缓存
         condenseChatBody();
         loadSessions();
+        // 自动沉淀：本轮使用过的技能/工具写入知识库（技能使用/日期.md）
+        if(_genToolUsed && _genToolUsed.length){
+          var _toolsLine = '- ' + fmtDateTime(Date.now()) + ' 使用技能/工具：' + _genToolUsed.join('、');
+          fetch(apiUrl('/api/kb/settle'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ type:'skill', content: _toolsLine }) }).catch(function(){});
+        }
       }
     });
   }
