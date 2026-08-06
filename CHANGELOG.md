@@ -1,4 +1,40 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.79)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.80)
+
+---
+
+
+
+# v0.21.80 — 用量统计根治 + 内置专家/工作流编辑 + 居中统一 + 连接器提示
+
+> 用户反馈：①用量统计没数据了；②内置专家/工作流需允许编辑；③团队/工作流/定时文字居中不统一；④连接器功能不行；⑤桌面图标一大一小。
+
+## ① 用量统计根治（monitor.js /api/usage）
+
+根因：dashboard 的 analytics 依赖 **active profile 的 state.db**，而应用的 active profile 无 state.db（会话实际存在 `sessions/sessions.json`）→ dashboard 统计恒为 0（"用量突然没数据"）。修复：**主源改为直接统计应用自己的会话文件**（SESSIONS_DIR/*.json：总会话/总消息/按模型/按日），dashboard analytics 仅作可选补充（tokens）。实测恢复真实数据（2 会话/64 消息/按日分布）。
+
+## ② 内置专家允许编辑设定（专家页「内置专家」tab）
+
+- 卡片新增「编辑设定」按钮 → 编辑弹窗（名称/图标/简介/系统提示词/技能/快捷提问）
+- 保存到覆盖层 `PUT /api/experts/:slug`（`VAR_DIR/experts-overrides.json`），渲染时套用（不创建副本）
+- 确认：**工作流专家 269 在扩展页「专家」tab 与专家页「内置专家」tab 完全同源**（共用 AGENCY_PERSONAS）——在本页编辑即两边同步；内置精选 30 也支持编辑
+
+## ③ 工作流允许编辑（扩展页「工作流」tab）
+
+- 模板卡片新增「编辑」按钮 → 编辑名称/分类/描述 → 保存到 `extensions.workflow_templates_override` 覆盖层（卡片标注「已编辑」）
+- 应用后的 DAG 步骤编辑（原有）保持不变
+
+## ④ 文字居中统一
+
+`.wf-intro` 加 `text-align:center`——工作流/定时任务页说明与团队页空状态统一居中。
+
+## ⑤ 连接器提示（腾讯 IMA 等配置后 AI 用不到）
+
+- 保存成功提示改为「已保存，正在重启网关以加载连接器工具（约 5 秒后生效）」+ 6 秒后自动刷新
+- 根因排查：保存后网关重启为异步尽力而为（失败静默）+ **聊天若走直连 provider 则无工具**（连接器工具仅经网关 agent 路由可用）——建议对话模型使用「Hermes 网关」配置的 provider 才能调用连接器/MCP 工具
+
+## 验证
+
+- 用量接口返回真实数据（102）；专家覆盖 PUT/GET 闭环通过（测试已清理）；monitor.js 语法 + index.html 脚本通过；WebDAV 已同步
 
 ---
 
