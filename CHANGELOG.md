@@ -1,4 +1,24 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.74)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.75)
+
+---
+
+
+
+# v0.21.75 — Obsidian 技能内置固化（每台机器必有、删除自动恢复）
+
+> 用户指出：知识库依赖 Obsidian 技能，但 hermes 技能系统只发现 `$HERMES_HOME/skills`（+ config external_dirs），`hermes-src/skills` 的 bundled 技能**默认不可见**——不是每台机器都有这个技能，需要固化内置、无法删除。
+
+## 实现
+
+1. **技能固化部署**（monitor.js `_deployBuiltinSkills`，启动时执行）：内置技能清单 `["note-taking/obsidian"]`，从 `APP_DIR/hermes-src/skills` 复制到 `DATA_DIR/skills`（缺失才补、不覆盖用户已有/修改内容）——每台机器装上应用即有该技能，**即使被删除也会在下次启动自动恢复**
+2. **技能进包**：`skills/note-taking/obsidian/` 加入项目固化技能目录（与 cloudflare-tunnel 并列），随 FPK 分发（已验证打进包）
+3. 配合 v0.21.74：`OBSIDIAN_VAULT_PATH` 指向 `DATA_DIR/knowledge`——知识库页面 + AI 的 Obsidian 技能读写同一 vault，全链路打通
+
+## 验证
+
+- 249 受控测试：删除 `data/skills/note-taking/obsidian` → 重启 monitor → 自动恢复 ✓（"无法删除"保证成立）
+- 102/249 均确认 obsidian 技能在位；包内 `skills/note-taking/obsidian/SKILL.md` 确认打包
+- monitor.js 语法通过；WebDAV 已同步
 
 ---
 
