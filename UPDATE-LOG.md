@@ -4,6 +4,14 @@
 
 ---
 
+## v0.21.69（2026-08-06）
+
+**新增**（对齐官方 v0.20.0 能力）：
+- **redirect 中途纠偏**：AI 回复进行中直接输入新消息即可纠偏（网关自动调用 agent.redirect，保留当前工作状态结合新要求调整）；消息带「🎯 纠偏」标签，输入框有纠偏提示
+- **Grounded Citations 证据引用**：AI 按内置 grounded-citations 技能输出带编号引用（[n]）+ Sources 来源块；前端渲染为引用角标 + 可点击来源卡片；支持 [unverified] 未核实标记与逐字证据核验工作流（skill 已在包内）
+
+- 安装包：fnos-hermes-agent_v0.21.69.fpk（43.9MB）
+
 ## v0.21.68（2026-08-06）
 
 **修复**：新建会话弹窗的模型下拉显示 `[object Object]`——providers 的 models 元素是对象（{id,name,enabled}），原代码直接字符串化渲染。已改为提取模型名并按 provider 分组展示（禁用模型过滤）。

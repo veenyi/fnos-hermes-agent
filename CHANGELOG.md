@@ -1,4 +1,33 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.68)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.69)
+
+---
+
+
+
+# v0.21.69 — 对齐官方 v0.20.0：redirect 中途纠偏 + Grounded Citations 证据引用
+
+> 用户指出 v0.20.0 的两项官方能力未集成：① redirect（任务中途补充修正，当前工作状态与最初要求保留）；② grounded-citations（带编号引用、来源台账、逐字证据的研究工作流）。
+
+## ① Redirect 中途纠偏（ui/index.html + 网关原生能力）
+
+调研确认：**网关层已原生支持 redirect**（busy follow-up：`busy_input_mode=interrupt` 默认模式 + `agent._supports_active_turn_redirect` → 忙时收到文本消息自动调 `agent.redirect(text)`，保留已完成工具结果、纠偏作为真实 user 消息注入重试；`steer` 模式在工具边界注入；子 agent/压缩中自动降级 queue）。前端补齐体验：
+
+- **流式回复中输入消息 = 纠偏**：发送时 toast「🎯 已发送纠偏（redirect）」，用户消息带「🎯 纠偏」标签（AI 明确这是中途修正）
+- **输入框 placeholder 流式中提示**：「回复中…可输入消息实时纠偏（redirect）」，结束自动恢复
+- 停止按钮保持独立（中断整轮 vs 纠偏二选一）
+
+## ② Grounded Citations 证据引用（ui/index.html + 内置 skill）
+
+调研确认：官方实现是 **Skill 层**（`skills/research/grounded-citations`，含 `sources.py` 台账：编号台账、`[n]` 发射、`[unverified]` 标记、`verify --evidence` 逐字证据门禁），核心运行时不透传 citations 字段——模型按 skill 提示输出 `[n]` 内联标记 + `Sources:` 块。该 skill 已在包内（hermes-src/skills/research/grounded-citations v1.1.0，249 确认就位）。前端补齐渲染：
+
+- **`Sources:` / `## Sources` 块 → 来源卡片**（`preprocessSources`：逐行 URL 转可点击链接卡片，标题提取）
+- **正文 `[n]` / `[1,2]` 纯数字引用 → 引用角标**（`renderCitations`，排除 markdown 链接形式，真实链路验证不误伤）
+- 样式：`.citations-block` / `.cite-item` / `.cite-ref`（来源卡 + 蓝色角标）
+
+## 验证
+
+- 语法检查通过；逻辑单测：Sources→来源卡 PASS、[n]→角标 PASS、真实 marked 链路链接不误伤 PASS、流式中发送=纠偏 PASS
+- 102/249 已热更（服务健康）；WebDAV 已同步（FPK + 更新记录）
 
 ---
 
