@@ -6823,7 +6823,7 @@ function openChannelSession(chId, sessionId){
   // 拉取消息
   apiGet('/api/channel-sessions/'+encodeURIComponent(sessionId)+'/messages').then(function(res){
     if(!res || !res.ok || !res.messages || !res.messages.length){
-      if(body) body.innerHTML = '<div class="system-tip">该通道会话暂无消息记录'+(res&&res.error?' ('+esc(res.error)+')':'')+'</div>';
+      if(body) body.innerHTML = '<div class="system-tip">该通道会话暂无消息记录'+(res&&res.error&&!/fetch|Failed/i.test(res.error)?' ('+esc(res.error)+')':'')+'</div>';
       if(subEl) subEl.textContent = chName + ' · 0 条消息';
       return;
     }
@@ -6843,7 +6843,7 @@ function openChannelSession(chId, sessionId){
     });
     if(body){ body.innerHTML = html; body.scrollTop = body.scrollHeight; }
   }).catch(function(e){
-    if(body) body.innerHTML = '<div class="system-tip">加载失败：'+esc(e.message||'网络错误')+'</div>';
+    if(body) body.innerHTML = '<div class="system-tip">通道会话服务暂不可用（网关/仪表盘未就绪），请稍后刷新重试</div>';
   });
 }
 function toggleAgent(id){
@@ -7916,7 +7916,7 @@ function transcribeVoice(dataUrl, mime){
 }
 /* ── 语音设置 ── */
 function openVoiceSettings(){
-  var on = localStorage.getItem('fnos-voice-autoplay') !== '0';
+  var on = localStorage.getItem('fnos-voice-autoplay') === '1';
   var autosend = localStorage.getItem('fnos-voice-autosend') !== '0';
   var voiceChat = localStorage.getItem('fnos-voice-chat') === '1';
   var html = '<div class="modal-overlay" id="voiceSetOverlay" onclick="if(event.target===this)closeVoiceSettings()">' +
@@ -8829,7 +8829,7 @@ function sendRaw(text){
         else _genDeltaSeen = true;
         mdEl.innerHTML = renderMarkdown(fullText, true); body.scrollTop=body.scrollHeight; _chatHTML[sid] = body.innerHTML;
         // 流式语音朗读：自动朗读开启时边生成边逐句朗读（首个 delta 打开 WS，增量持续喂给服务端按句合成）
-        if(localStorage.getItem('fnos-voice-autoplay') !== '0'){
+        if(localStorage.getItem('fnos-voice-autoplay') === '1'){
           if(!_voiceStream.active){ _voiceStreamOpen(); }
           _voiceStreamFeed(d);
         }
@@ -8961,7 +8961,7 @@ function sendRaw(text){
           '<button class="msg-act-btn" onclick="forkMsg(this)" title="Fork 新话题"><svg viewBox="0 0 24 24"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9"/><path d="M12 12v3"/></svg>Fork</button>';
         asst.insertBefore(actBar, asst.querySelector('.msg-meta'));
         // 自动朗读：流式朗读已激活则发 done 收尾（边生成已边朗读完，不重复整段）；未激活回退整段朗读
-        if(!aborted && fullText && localStorage.getItem('fnos-voice-autoplay') !== '0'){
+        if(!aborted && fullText && localStorage.getItem('fnos-voice-autoplay') === '1'){
           if(_voiceStream.active){ _voiceStreamDone(); }
           else {
             var _spkBtn = actBar.querySelector('.msg-act-btn');
