@@ -942,7 +942,7 @@
 /* ===== V17.1 新增：专家计数 / 工作流 / 角色管理 ===== */
 .exp-count{font-size:12px;color:var(--text3);margin:0 0 10px}
 .exp-dept .cnt{font-size:11px;color:var(--text3);margin-left:4px}
-.wf-intro{font-size:13px;color:var(--text2);margin-bottom:12px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;line-height:1.5}
+.wf-intro{font-size:13px;color:var(--text2);margin-bottom:12px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;line-height:1.5;text-align:center}
 .wf-cat-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:13px}
 .wf-cat-bar label{color:var(--text3);font-weight:500}
 .wf-cat-bar select{flex:1;max-width:280px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg1);color:var(--text);font-size:13px;cursor:pointer;font-family:inherit}
@@ -11969,16 +11969,57 @@ function renderWorkflowPresets(){
     catSel.innerHTML = cats.map(function(c){ return '<option value="'+esc(c.id)+'"'+(c.id===_wfCat?' selected':'')+'>'+esc(c.label)+'</option>'; }).join('');
   }
   var appliedKey = String((_cfg.extensions.workflow && _cfg.extensions.workflow.key) || '').replace(/\\/g,'/');
+  var wfOv = (_cfg.extensions && _cfg.extensions.workflow_templates_override) || {};
   grid.innerHTML = presets.filter(function(p){ return !_wfCat || p.category===_wfCat; }).map(function(p){
+    var ov = wfOv[p.key];
+    var pp = ov ? Object.assign({}, p, ov) : p;
     var applied = (String(p.key).replace(/\\/g,'/')===appliedKey);
-    var catLabel = catLabels[p.category]||p.category||'通用';
-    var nameZh = nameLabels[p.name] || p.name;
+    var catLabel = catLabels[pp.category]||pp.category||'通用';
+    var nameZh = nameLabels[pp.name] || pp.name;
     return '<div class="ext-card'+(applied?' active':'')+'">'+
-      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(nameZh)+'</div><div class="status">'+esc(catLabel)+(applied?' · 已应用':'')+'</div></div></div>'+
-      '<div class="conn-desc">'+esc(p.description||'')+'</div>'+
-      '<button class="action" data-wfkey="'+esc(p.key)+'" onclick="applyWorkflow(this.getAttribute(\'data-wfkey\'))">'+(applied?'重新应用':'应用')+'</button></div>';
+      '<div class="top"><div class="icon">🎛️</div><div><div class="name">'+esc(nameZh)+'</div><div class="status">'+esc(catLabel)+(applied?' · 已应用':'')+(ov?' · 已编辑':'')+'</div></div></div>'+
+      '<div class="conn-desc">'+esc(pp.description||'')+'</div>'+
+      '<div style="display:flex;gap:6px">'+
+      '<button class="action" data-wfkey="'+esc(p.key)+'" onclick="applyWorkflow(this.getAttribute(\'data-wfkey\'))">'+(applied?'重新应用':'应用')+'</button>'+
+      '<button class="action" data-wfkey="'+esc(p.key)+'" onclick="openWorkflowTemplateEditor(this.getAttribute(\'data-wfkey\'))">编辑</button>'+
+      '</div></div>';
   }).join('') || '<div class="empty-state">暂无工作流模板。</div>';
 }
+/* 工作流模板编辑：编辑名称/描述/分类保存到覆盖层（extensions.workflow_templates_override） */
+function openWorkflowTemplateEditor(key){
+  var presets = window.AO_WORKFLOW_PRESETS || [];
+  var ov = (_cfg.extensions && _cfg.extensions.workflow_templates_override) || {};
+  var p = presets.filter(function(x){ return x.key===key; })[0];
+  if(!p) return;
+  var cur = ov[key] || p;
+  var html='<div class="modal-overlay" id="wfEditOverlay" onclick="if(event.target===this)closeWfEdit()">'+
+    '<div class="modal" style="max-width:480px">'+
+    '<div class="modal-head"><h3>编辑工作流模板</h3><button class="modal-close" onclick="closeWfEdit()">\u00d7</button></div>'+
+    '<div class="modal-body" style="padding:14px 16px">'+
+    '<div class="field"><label>名称</label><input id="wfe_name" class="input" value="'+esc(cur.name||'')+'"></div>'+
+    '<div class="field"><label>分类</label><input id="wfe_category" class="input" value="'+esc(cur.category||'')+'"></div>'+
+    '<div class="field"><label>描述</label><textarea id="wfe_desc" style="width:100%;min-height:90px;background:var(--bg0);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;line-height:1.6">'+esc(cur.description||'')+'</textarea></div>'+
+    '<div class="hint" style="font-size:11px;color:var(--text3)">编辑保存后覆盖模板显示（步骤编辑请在应用后使用工作流 DAG 编辑器）。</div>'+
+    '</div>'+
+    '<div class="modal-foot" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">'+
+    '<button class="btn" onclick="closeWfEdit()">取消</button>'+
+    '<button class="btn primary" onclick="saveWorkflowTemplateEditor(\''+esc(key).replace(/'/g,"\\'")+'\')">保存</button>'+
+    '</div></div></div>';
+  var d=document.createElement('div'); d.innerHTML=html; document.body.appendChild(d.firstChild);
+}
+function saveWorkflowTemplateEditor(key){
+  if(!_cfg.extensions) _cfg.extensions={};
+  if(!_cfg.extensions.workflow_templates_override) _cfg.extensions.workflow_templates_override={};
+  _cfg.extensions.workflow_templates_override[key]={
+    name:document.getElementById('wfe_name').value.trim(),
+    category:document.getElementById('wfe_category').value.trim(),
+    description:document.getElementById('wfe_desc').value.trim()
+  };
+  apiPost('/api/config', _cfg).then(function(){
+    toast('✅ 工作流模板已保存'); closeWfEdit(); renderWorkflowPresets();
+  }).catch(function(){ toast('保存失败：网络错误','error'); });
+}
+function closeWfEdit(){ var o=document.getElementById('wfEditOverlay'); if(o) o.remove(); }
 function setWfCat(cat){ _wfCat=cat; renderWorkflowPresets(); }
 function applyWorkflow(key){
   var nk=String(key||'').replace(/\\/g,'/');
@@ -12090,15 +12131,68 @@ function _workflowExperts(){
       skills:[], quick_prompts:[], workflow:true };
   });
 }
-// 内置精选（API 30 个）+ 工作流专家（268 个）合并清单，按 slug 去重（内置优先）
+// 内置精选（API 30 个）+ 工作流专家（268 个）合并清单，按 slug 去重（内置优先）；套用专家设定覆盖（编辑层）
+var _expertOverrides = {};
+function _applyExpertOverride(e){
+  var ov=_expertOverrides[(e.slug||e.id)];
+  if(!ov) return e;
+  var n={};
+  Object.keys(e).forEach(function(k){ n[k]=e[k]; });
+  ['name','emoji','desc','prompt','scene','skills','quick_prompts','skill_count'].forEach(function(k){
+    if(ov[k]!==undefined) n[k]=ov[k];
+  });
+  return n;
+}
 function _allBuiltinExperts(){
   var base=window.BUILTIN_EXPERTS_ARR||_builtinExperts()||[];
   var wf=_workflowExperts();
   var seen={}; base.forEach(function(e){ seen[e.slug||e.id]=1; });
-  var out=base.slice();
-  wf.forEach(function(e){ if(!seen[e.slug||e.id]) out.push(e); });
+  var out=base.map(_applyExpertOverride);
+  wf.forEach(function(e){ if(!seen[e.slug||e.id]) out.push(_applyExpertOverride(e)); });
   return out;
 }
+/* 内置专家编辑弹窗：编辑设定保存到覆盖层（PUT /api/experts/:slug），渲染时套用 */
+function openBuiltinExpertEditor(slug){
+  var list=_allBuiltinExperts();
+  var e=list.filter(function(x){ return (x.slug||x.id)===slug; })[0];
+  if(!e) return;
+  var html='<div class="modal-overlay" id="expEditOverlay" onclick="if(event.target===this)closeExpEdit()">'+
+    '<div class="modal" style="max-width:520px">'+
+    '<div class="modal-head"><h3>编辑专家设定 · '+esc(e.name)+'</h3><button class="modal-close" onclick="closeExpEdit()">\u00d7</button></div>'+
+    '<div class="modal-body" style="padding:14px 16px;max-height:70vh;overflow-y:auto">'+
+    '<div class="field"><label>名称</label><input id="ee_name" class="input" value="'+esc(e.name||'')+'"></div>'+
+    '<div class="field"><label>图标（Emoji）</label><input id="ee_emoji" class="input" value="'+esc(e.emoji||'')+'" placeholder="如 🧠"></div>'+
+    '<div class="field"><label>简介</label><input id="ee_desc" class="input" value="'+esc(e.desc||'')+'"></div>'+
+    '<div class="field"><label>系统提示词</label><textarea id="ee_prompt" style="width:100%;min-height:160px;background:var(--bg0);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;line-height:1.6;font-family:monospace">'+esc(e.prompt||'')+'</textarea></div>'+
+    '<div class="field"><label>技能（逗号分隔）</label><input id="ee_skills" class="input" value="'+esc((e.skills||[]).join(', '))+'" placeholder="如 web_search, file_manager"></div>'+
+    '<div class="field"><label>快捷提问（逗号分隔）</label><input id="ee_quick" class="input" value="'+esc((e.quick_prompts||[]).join(', '))+'" placeholder="如 你擅长什么？, 帮我完成一项任务"></div>'+
+    '<div class="hint" style="font-size:11px;color:var(--text3);margin-top:6px">修改保存后立即生效（覆盖内置模板，不创建副本）。重置请删除覆盖。</div>'+
+    '</div>'+
+    '<div class="modal-foot" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">'+
+    '<button class="btn" onclick="closeExpEdit()">取消</button>'+
+    '<button class="btn primary" onclick="saveBuiltinExpertEditor(\''+esc(slug).replace(/'/g,"\\'")+'\')">保存设定</button>'+
+    '</div></div></div>';
+  var d=document.createElement('div'); d.innerHTML=html; document.body.appendChild(d.firstChild);
+}
+function saveBuiltinExpertEditor(slug){
+  var name=document.getElementById('ee_name').value.trim()||'未命名';
+  var data={
+    name:name,
+    emoji:document.getElementById('ee_emoji').value.trim(),
+    desc:document.getElementById('ee_desc').value.trim(),
+    prompt:document.getElementById('ee_prompt').value,
+    skills:(document.getElementById('ee_skills').value||'').split(/[,，]/).map(function(s){return s.trim();}).filter(Boolean),
+    quick_prompts:(document.getElementById('ee_quick').value||'').split(/[,，]/).map(function(s){return s.trim();}).filter(Boolean)
+  };
+  fetch(apiUrl('/api/experts/'+encodeURIComponent(slug)), { method:'PUT', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify(data) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(j.ok){ toast('✅ 专家设定已保存：'+name); closeExpEdit(); window.__builtinLoaded=false; renderBuiltinExperts(); }
+      else toast('保存失败：'+(j.error||'未知'),'error');
+    })
+    .catch(function(){ toast('网络错误','error'); });
+}
+function closeExpEdit(){ var o=document.getElementById('expEditOverlay'); if(o) o.remove(); }
 function _builtinExperts(){
   if(BUILTIN_EXPERTS) return BUILTIN_EXPERTS;
   // 内置专家：预设智能体模板（后续追加 Octop 转换的飞牛专家）
@@ -12199,6 +12293,7 @@ function _expertCardHtml(e, kind){
       '<div class="exp-card-foot">'+
         ((e.skills&&e.skills.length)?'<span class="exp-badge">🛠 '+sc+' 技能</span>':'<span></span>')+
         '<div class="exp-card-actions">'+
+          '<button class="action sm" onclick="openBuiltinExpertEditor(\''+_jsStr(e.slug||e.id)+'\')">编辑设定</button>'+
           (exists
             ? '<button class="action sm primary" onclick="chatWithPersona(\''+_jsStr(e.slug||e.id)+'\')">对话</button>'+
               '<button class="action sm" onclick="openExpertCreateForm(\''+_jsStr(e.slug||e.id)+'\')">'+(active?'使用中':'激活')+'</button>'
@@ -12222,6 +12317,7 @@ function renderBuiltinExperts(){
       apiGet('/api/experts?scope=builtin').then(function(r){
         window.__builtinLoaded=true;
         window.BUILTIN_EXPERTS_ARR=(r&&Array.isArray(r.experts))?r.experts:_builtinExperts();
+        _expertOverrides=(r&&r.overrides)||{};
         _renderExpertList('builtin', _allBuiltinExperts(), { kind:'builtin', searchId:'expBuiltinSearch' });
       }).catch(function(){
         window.__builtinLoaded=true;
@@ -13729,7 +13825,7 @@ function saveConnector(){
   var fields=getConnFields();
   apiPost('/api/connectors/'+encodeURIComponent(_currentConnKind), fields).then(function(r){
     if(r && r.error) toast('保存失败：'+r.error);
-    else { toast('已保存连接器凭证'); closeConnectorModal(); renderConnectors(); }
+    else { toast('已保存，正在重启网关以加载连接器工具（约 5 秒后生效）'); closeConnectorModal(); setTimeout(function(){ renderConnectors(); }, 6000); }
   }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 function invokeConnectorTool(){

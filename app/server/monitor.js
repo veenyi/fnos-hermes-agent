@@ -4078,7 +4078,7 @@ async function handleFetch(req) {
   // 需要令牌的变更操作（仅写操作，GET 不需要 token）
   const writePaths = ["/api/start", "/api/stop", "/api/restart", "/api/dashboard/start", "/api/dashboard/stop", "/api/config", "/api/config/test", "/api/hermes/update", "/api/logs/clear", "/api/tunnel/start", "/api/tunnel/stop", "/api/voice/config", "/api/kb/write", "/api/kb/new", "/api/kb/settle", "/api/memory/append"];
   const isWrite = ["POST", "PUT", "DELETE"].includes(req.method);
-  const pathIsWrite = writePaths.includes(path) || /^\/api\/channels\/[^/]+\/toggle$/.test(path);
+  const pathIsWrite = writePaths.includes(path) || /^\/api\/channels\/[^/]+\/toggle$/.test(path) || /^\/api\/experts\/[a-zA-Z0-9_-]+$/.test(path);
   if (isWrite && pathIsWrite && !checkToken(req)) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
@@ -5330,6 +5330,23 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
   }
+  // PUT /api/experts/:slug → 保存内置专家设定覆盖（编辑后渲染时套用，覆盖静态模板）
+  const expertEditMatch = path.match(/^\/api\/experts\/([a-zA-Z0-9_-]+)$/);
+  if (expertEditMatch && req.method === "PUT") {
+    try {
+      const slug = expertEditMatch[1];
+      const body = await req.json().catch(() => ({}));
+      if (!body || typeof body !== "object") return new Response(JSON.stringify({ ok: false, error: "参数错误" }), { status: 400, headers: jsonHeaders() });
+      const ov = _readExpertsOverrides();
+      ov[slug] = body;
+      writeFileSync(`${VAR_DIR}/experts-overrides.json`, JSON.stringify(ov, null, 2));
+      log(`[experts] 内置专家 ${slug} 设定已保存（覆盖层）`);
+      return new Response(JSON.stringify({ ok: true, slug }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
   // POST /api/profiles → 创建 profile（调用 hermes profile create）
   if (path === "/api/profiles" && req.method === "POST") {
     try {
@@ -5461,12 +5478,15 @@ async function handleFetch(req) {
 
   // ─── 专家：内置清单与创建 ──────────────────────────────────────────────
   // GET /api/experts?scope=builtin|market → 内置专家清单（2026-08-05 起市场已并入内置，两值同返回合并清单）
+  function _readExpertsOverrides(){
+    try { return JSON.parse(readFileSync(`${VAR_DIR}/experts-overrides.json`, "utf8")); } catch { return {}; }
+  }
   if (path === "/api/experts" && req.method === "GET") {
     try {
       const url = new URL(req.url, "http://localhost");
       const scope = (url.searchParams.get("scope") || "builtin").trim();
       const list = BUILTIN_EXPERTS_ALL;
-      return new Response(JSON.stringify({ ok: true, scope, experts: list }), { headers: jsonHeaders() });
+      return new Response(JSON.stringify({ ok: true, scope, experts: list, overrides: _readExpertsOverrides() }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
@@ -7544,34 +7564,47 @@ async function handleFetch(req) {
       }
       const h = new Headers();
       h.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
-      // 尝试从 dashboard 获取用量数据
       let usage = null;
+      // 主源：本地会话文件统计（应用自己的会话数据，稳定可靠）
+      // —— dashboard 的 analytics 依赖 active profile 的 state.db，active profile 无该库时恒为 0（此前用量消失的根因）
       try {
-        const r = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/usage`, {
-          headers: h, signal: AbortSignal.timeout(8000),
+        const files = existsSync(SESSIONS_DIR) ? readdirSync(SESSIONS_DIR).filter(f => f.endsWith(".json")) : [];
+        let totalSessions = 0, totalMessages = 0;
+        const byModel = {};
+        const daily = {};
+        files.forEach(f => {
+          try {
+            const s = JSON.parse(readFileSync(`${SESSIONS_DIR}/${f}`, "utf8"));
+            if (!s || s.id === undefined) return;
+            totalSessions++;
+            const msgs = Array.isArray(s.messages) ? s.messages.length : 0;
+            totalMessages += msgs;
+            const model = s.model || "unknown";
+            if (!byModel[model]) byModel[model] = { sessions: 0, messages: 0 };
+            byModel[model].sessions++;
+            byModel[model].messages += msgs;
+            const d = new Date(s.updated_at || Date.now());
+            const day = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+            if (!daily[day]) daily[day] = { date: day, sessions: 0, messages: 0 };
+            daily[day].sessions++;
+            daily[day].messages += msgs;
+          } catch {}
         });
-        if (r.ok) usage = await r.json();
+        usage = {
+          total_sessions: totalSessions, total_messages: totalMessages,
+          by_model: byModel,
+          daily: Object.keys(daily).sort().map(k => daily[k]),
+        };
       } catch {}
-      // 备用：从 sessions 统计 token
-      if (!usage) {
+      // 补充：dashboard analytics（可选，available 时并入 tokens/成本）
+      if (usage && isPortListening(DASHBOARD_PORT)) {
         try {
-          const r2 = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/sessions`, {
-            headers: h, signal: AbortSignal.timeout(8000),
+          const r = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/analytics/usage?days=30`, {
+            headers: h, signal: AbortSignal.timeout(6000),
           });
-          if (r2.ok) {
-            const data = await r2.json();
-            const sessions = Array.isArray(data) ? data : (data.sessions || data.items || []);
-            let totalPrompt = 0, totalCompletion = 0, totalMsgs = 0;
-            const byModel = {};
-            sessions.forEach(s => {
-              const msgs = s.message_count || (s.messages ? s.messages.length : 0);
-              totalMsgs += msgs;
-              const model = s.model || "unknown";
-              if (!byModel[model]) byModel[model] = { sessions: 0, messages: 0 };
-              byModel[model].sessions++;
-              byModel[model].messages += msgs;
-            });
-            usage = { total_sessions: sessions.length, total_messages: totalMsgs, by_model: byModel };
+          if (r.ok) {
+            const raw = await r.json();
+            if (raw.totals) usage.tokens = raw.totals.total_input || 0;
           }
         } catch {}
       }
