@@ -15,11 +15,14 @@
 3. **升级保留配置防御**（cmd/install_init + monitor.js auto-update）：
    - install_init 升级检测增强：TRIM_PKGHOME 未传时探测多个实际路径的 config.yaml（/var/apps/hermes-agent/home、/vol1、/vol3），防误判「全新安装」清空 providers 配置
    - 自动更新（appcenter-cli install-fpk）显式传 TRIM_APPDEST/TRIM_PKGHOME/TRIM_PKGVAR 环境变量，确保升级识别已有配置
-4. **恢复版本迭代**：v0.21.81（不再固定 80——相同版本号导致 fnOS 拒绝覆盖安装）
+4. **连接器 MCP 服务器消失自愈**（monitor.js，用户反馈"MCP 服务器设置后过一段时间消失"）：
+   - 根因：config.yaml 曾 YAML 损坏（hermes 忽略损坏配置 → MCP 工具丢失）；且 hermes 保存配置等外部写入可能覆盖 mcp_servers 块
+   - 修复：`_moduleLevelAutoRegisterMcp` 改为**合并模式**（保留用户手动配置的非 conn-* MCP，conn-* 按凭证补齐）+ **每 3 分钟定期自愈**（mcp_servers 被外部抹掉自动补回）；已实测"手动抹掉 → 重启/定期自动恢复"
+5. **恢复版本迭代**：v0.21.81（不再固定 80——相同版本号导致 fnOS 拒绝覆盖安装）
 
 ## 验证
 
-- 回退 GET 实测返回 `["sensenova1"]`；install_init 语法 + 部署确认（102/249）；monitor/index 语法通过；服务 healthy；WebDAV 已同步
+- 回退 GET 实测返回 `["sensenova1"]`；MCP 自愈实测（抹掉 mcp_servers → 自动恢复 conn-tencent-ima）；install_init 语法 + 部署确认（102/249）；monitor/index 语法通过；服务 healthy；WebDAV 已同步
 
 ---
 

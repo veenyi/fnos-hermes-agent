@@ -645,6 +645,27 @@ function _replaceTopLevelKey(raw, key, block) {
 }
 
 // 模块级自动注册：直接操作文件，不依赖 handleFetch 内部函数
+function _moduleParseMcpServers(yml) {
+  const out = {};
+  const s = String(yml || "");
+  let block = "";
+  const mTop = s.match(/^mcp_servers:\s*\n([\s\S]*?)(?=^[a-zA-Z_][a-zA-Z0-9_-]*:)/m);
+  if (mTop) block = mTop[1];
+  else {
+    const mEnd = s.match(/^mcp_servers:\s*\n([\s\S]*)$/m);
+    if (mEnd) block = mEnd[1];
+  }
+  let cur = null;
+  block.split("\n").forEach(l => {
+    const km = l.match(/^  ([a-zA-Z0-9_\-]+):\s*$/);
+    if (km) { cur = km[1]; out[cur] = {}; return; }
+    if (cur && /^    \S/.test(l)) {
+      const vm = l.match(/^    (\S+):\s*(.*)$/);
+      if (vm) out[cur][vm[1]] = vm[2].trim();
+    }
+  });
+  return out;
+}
 function _moduleLevelAutoRegisterMcp() {
   try {
     let st = {};
@@ -652,31 +673,47 @@ function _moduleLevelAutoRegisterMcp() {
     let yml = "";
     try { if (existsSync(HERMES_CONFIG)) yml = readFileSync(HERMES_CONFIG, "utf8"); } catch (e) {}
     const nodeBin = resolvedNodeBin || "node";
-    const mcpObj = {};
+    const connObj = {};
     CONNECTOR_CATALOG.forEach(function (cat) {
       if (cat.mcp_mode !== "gateway") return;
       const creds = st[cat.kind] || {};
       if (!(cat.fields || []).every(function (f) { return !!creds[f.key]; })) return;
-      mcpObj["conn-" + cat.kind] = { command: nodeBin, args: [MCP_BRIDGE_SCRIPT, cat.kind, String(UI_PORT)] };
+      connObj["conn-" + cat.kind] = { command: nodeBin, args: [MCP_BRIDGE_SCRIPT, cat.kind, String(UI_PORT)] };
     });
-    const names = Object.keys(mcpObj);
+    // 合并：保留现有非 conn-* 的 MCP 服务器（用户手动配置不被覆盖），conn-* 按凭证补齐
+    const merged = _moduleParseMcpServers(yml);
+    Object.keys(connObj).forEach(k => { merged[k] = connObj[k]; });
+    // 清理已无凭证的 conn-*（防止残留失效配置）
+    Object.keys(merged).forEach(k => {
+      if (k.startsWith("conn-") && !connObj[k]) delete merged[k];
+    });
+    const names = Object.keys(merged);
     let block;
     if (names.length === 0) {
       block = "mcp_servers: {}";
     } else {
       block = "mcp_servers:\n" + names.map(function (n) {
-        const e = mcpObj[n];
-        return "  " + n + ":\n    command: " + JSON.stringify(e.command) + "\n    args:\n" +
-          e.args.map(function (a) { return "      - " + JSON.stringify(a); }).join("\n");
+        const e = merged[n];
+        const cmd = e.command || e.command_cmd || "";
+        const args = Array.isArray(e.args) ? e.args : [];
+        let out = "  " + n + ":\n    command: " + JSON.stringify(cmd) + "\n";
+        if (args.length) out += "    args:\n" + args.map(a => "      - " + JSON.stringify(a)).join("\n") + "\n";
+        Object.keys(e).forEach(k2 => {
+          if (k2 === "command" || k2 === "args" || k2 === "command_cmd") return;
+          out += "    " + k2 + ": " + e[k2] + "\n";
+        });
+        return out.replace(/\n$/, "");
       }).join("\n");
     }
     yml = _replaceTopLevelKey(yml, "mcp_servers", block);
     try { writeFileSync(HERMES_CONFIG, yml, { mode: 0o644 }); } catch (e) {}
-    log(names.length > 0
-      ? "[MCP-BRIDGE] module-level auto-register: wrote " + names.length + " gateway connector(s) to config.yaml"
-      : "[MCP-BRIDGE] module-level auto-register: no configured gateway connectors");
+    const connCount = Object.keys(connObj).length;
+    if (connCount > 0) log(`[MCP-BRIDGE] auto-register: ${connCount} 个网关连接器已同步到 config.yaml（共 ${names.length} 个 MCP server）`);
   } catch (e) { log("[MCP-BRIDGE] module-level auto-register failed: " + e.message); }
 }
+// 定期自愈：mcp_servers 被外部写操作（hermes 保存配置等）抹掉/覆盖时自动补回，
+// 解决连接器工具"过一段时间消失"的问题
+setInterval(function(){ try { _moduleLevelAutoRegisterMcp(); } catch (e) {} }, 180000);
 _ensureMcpBridgeScript();
 _moduleLevelAutoRegisterMcp();
 
