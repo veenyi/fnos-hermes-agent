@@ -13066,7 +13066,10 @@ function renderCronJobs(){
       var schedule = j.schedule || j.cron || '';
       var paused = j.paused || j.status === 'paused';
       var skills = j.skills || j.attached_skills || [];
-      var deliver = j.deliver_to || j.delivery || 'local';
+      var _dv = j.deliver_to != null ? j.deliver_to : j.delivery;
+      var deliver = (typeof _dv === 'string') ? (_dv || 'local')
+        : (_dv && typeof _dv === 'object') ? String(_dv.channel || _dv.name || _dv.type || _dv.kind || 'local')
+        : 'local';
       var nextRun = j.next_run_at ? new Date(j.next_run_at).toLocaleString('zh-CN') : '';
       var lastRun = j.last_run_at ? new Date(j.last_run_at).toLocaleString('zh-CN') : '';
       var lastStatus = j.last_status || '';
@@ -13102,6 +13105,7 @@ function renderCronJobs(){
         '</div>' +
         (lastStatus==='error' && lastError ? '<div style="font-size:11px;color:#ef4444;background:#ef44441a;border-radius:6px;padding:5px 9px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(lastError)+'">⚠️ '+esc(lastError)+'</div>' : '') +
         '<div class="mcp-actions" style="margin-top:8px">' +
+          '<button class="ov-actbtn" onclick="openCronModalById(\''+esc(id)+'\')">编辑</button>' +
           (paused ? '<button class="ov-actbtn start" onclick="cronAction(\''+esc(id)+'\',\'resume\')">恢复</button>' : '<button class="ov-actbtn" onclick="cronAction(\''+esc(id)+'\',\'pause\')">暂停</button>') +
           '<button class="ov-actbtn" onclick="cronAction(\''+esc(id)+'\',\'run\')">立即执行</button>' +
           '<button class="ov-actbtn stop" onclick="cronAction(\''+esc(id)+'\',\'remove\')">删除</button>' +
@@ -13117,9 +13121,23 @@ function cronAction(jobId, action){
     if(res.ok){ toast('✅ 操作成功: '+action); renderCronJobs(); } else toast(res.error||'操作失败','error');
   }).catch(function(e){ toast('网络错误','error'); });
 }
-function openCronModal(){
+var _cronEditId = '';   // 编辑中的任务 id（空=新建）
+function openCronModalById(id){
+  var job = (_cronJobs||[]).find(function(j){ return (j.id||j.job_id)===id; });
+  if(job) openCronModal(job);
+  else toast('未找到任务','error');
+}
+function openCronModal(job){
   _cronSched = null; _cronSchedTab = 'period'; // 每次打开重置调度器状态
+  var isEdit = !!(job && (job.id || job.job_id));
+  _cronEditId = isEdit ? String(job.id || job.job_id) : '';
   window._cronDeliverList = [{channel:'local',url:'',message:''}];
+  if(isEdit && Array.isArray(job.deliveries) && job.deliveries.length){
+    window._cronDeliverList = job.deliveries.map(function(d){
+      if(typeof d === 'string') return { channel:d, url:'', message:'' };
+      return { channel:d.channel||'local', url:d.url||'', message:d.message||'' };
+    });
+  }
   var templates = [
     {icon:'📰', name:'每日 AI 新闻推送', desc:'科技/AI/财经要闻摘要', schedule:'0 8 * * *', prompt:'搜索今日科技、AI、财经领域的重要新闻，生成一份简洁的每日新闻摘要（5-10条），包含标题、一句话摘要和重要性评级。', deliver:['weixin']},
     {icon:'📖', name:'每日 5 个英语单词', desc:'单词+释义+例句推送', schedule:'0 7 * * *', prompt:'挑选 5 个适合日常交流的英语单词，每个给出音标、中文释义、2 个实用例句，并生成一段用这 5 个词写的小短文。', deliver:[{channel:'webhook', url:'', message:'{output}'}]},
@@ -13145,7 +13163,7 @@ function openCronModal(){
   window._cronTemplates = templates;
   var html = '<div class="modal-overlay" id="cronModalOverlay" onclick="if(event.target===this)closeCronModal()">' +
     '<div class="modal" style="max-width:660px;max-height:88vh;overflow-y:auto">' +
-    '<div class="modal-head"><h3>添加自动化任务</h3><button class="modal-close" onclick="closeCronModal()">×</button></div>' +
+    '<div class="modal-head"><h3>'+(isEdit?'编辑任务':'添加自动化任务')+'</h3><button class="modal-close" onclick="closeCronModal()">×</button></div>' +
     '<div class="modal-body">' +
       '<div style="background:var(--accent-bg);color:var(--accent);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.7;margin-bottom:12px">🧩 支持<b>多通道投递</b>：可同时推送到微信 / Telegram / 钉钉 / 企业微信等多个通道，每个通道独立定制消息；还支持 <b>Webhook POST</b>（企业微信机器人、钉钉机器人），消息模板用 <code>{output}</code> 引用任务输出。</div>' +
       '<div class="field"><label>📌 模板（点击一键填充）</label><div class="cron-tpl-grid">'+tplHtml+'</div></div>' +
@@ -13156,11 +13174,21 @@ function openCronModal(){
       '<div class="field cron-form-group"><label>技能（可选，逗号分隔）</label><input type="text" id="cronSkills" placeholder="例如 blogwatcher, find-nearby"></div>' +
       '<div class="field cron-form-group"><label>重复次数（可选，留空=无限）</label><input type="number" id="cronRepeat" placeholder="留空表示无限重复" min="1"></div>' +
     '</div>' +
-    '<div class="modal-foot"><button class="action" onclick="closeCronModal()">取消</button><button class="action primary" onclick="createCronJob()">创建任务</button></div>' +
+    '<div class="modal-foot"><button class="action" onclick="closeCronModal()">取消</button><button class="action primary" onclick="createCronJob()">'+(isEdit?'保存修改':'创建任务')+'</button></div>' +
     '</div></div>';
   document.body.insertAdjacentHTML('beforeend', html);
   renderCronSched();
   renderCronDelivers();
+  // 编辑模式：预填表单
+  if(isEdit){
+    var _nEl=document.getElementById('cronName'); if(_nEl && job.name) _nEl.value=job.name;
+    var _pEl=document.getElementById('cronPrompt'); if(_pEl && job.prompt) _pEl.value=job.prompt;
+    var _sEl=document.getElementById('cronSkills'); if(_sEl && (job.skills||[]).length) _sEl.value=(job.skills||[]).join(', ');
+    var _rEl=document.getElementById('cronRepeat');
+    if(_rEl && job.repeat_count!=null) _rEl.value=job.repeat_count;
+    if(job.schedule || job.cron){ cronSchedFromString(job.schedule || job.cron); renderCronSched(); }
+    renderCronDelivers();
+  }
 }
 // ── 可视化调度构建器（WorkBuddy 风格：频率 Tab = 周期 / 按间隔 / 单次 + 实时预览）──
 var _cronSched = null;
@@ -13371,12 +13399,27 @@ function createCronJob(){
   if(skillsRaw) payload.skills = skillsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean);
   var repeat = document.getElementById('cronRepeat').value.trim();
   if(repeat) payload.repeat = parseInt(repeat);
-  fetch(apiUrl('/api/cron-jobs'), { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
-    .then(function(r){ return r.json(); })
-    .then(function(res){
-      if(res.ok){ toast('✅ 定时任务已创建'+(res.webhooks_attached?('，已关联 '+res.webhooks_attached+' 个 Webhook 投递'):'')); closeCronModal(); renderCronJobs(); }
-      else toast(res.error||'创建失败','error');
-    }).catch(function(e){ toast('网络错误: '+e.message,'error'); });
+  var _editId = _cronEditId;
+  // 编辑模式：先删除旧任务（hermes cron 无 update），再创建新任务
+  var _submit = function(){
+    fetch(apiUrl('/api/cron-jobs'), { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if(res.ok){
+          toast(_editId ? '✅ 任务已保存修改' : ('✅ 定时任务已创建'+(res.webhooks_attached?('，已关联 '+res.webhooks_attached+' 个 Webhook 投递'):'')));
+          _cronEditId=''; closeCronModal(); renderCronJobs();
+        }
+        else toast(res.error||'创建失败','error');
+      }).catch(function(e){ toast('网络错误: '+e.message,'error'); });
+  };
+  if(_editId){
+    fetch(apiUrl('/api/cron-jobs/'+encodeURIComponent(_editId)+'/action'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'remove'}) })
+      .then(function(r){ return r.json(); })
+      .then(function(res){ _submit(); })
+      .catch(function(){ toast('删除旧任务失败，未修改','error'); });
+  } else {
+    _submit();
+  }
 }
 
 /* ============================ 记忆页面 ============================ */
