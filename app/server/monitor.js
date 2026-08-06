@@ -135,6 +135,11 @@ function _deployBuiltinSkills(){
 }
 _deployBuiltinSkills();
 
+// 同步 fnOS 应用中心运行状态（app 表 status='running'）——monitor 实际运行中，防应用中心 UI 误显示未启动
+try {
+  execSync(`sudo -n sudo -u postgres /usr/bin/psql -d appcenter -c "UPDATE app SET status='running' WHERE app_name='hermes-agent'" 2>&1`, { timeout: 10000 });
+} catch (e) {}
+
 // 知识库/记忆种子：首次启动时写入基础内容（仅文件不存在时），让知识库与记忆页不空
 function _kbRootForSeed(){
   try {
