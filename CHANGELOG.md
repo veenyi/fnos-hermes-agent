@@ -1,4 +1,22 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.69)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.70)
+
+---
+
+
+
+# v0.21.70 — 新建会话「工作区文件夹」可选择（下拉 + 自定义）
+
+> 用户反馈：工作区文件夹只有文本输入，不给选择。
+
+## 实现
+
+1. **后端**（monitor.js）：新增 `GET /api/workspace/dirs`，列出 `DATA_DIR/workspace` 下的一级子目录（排序返回）
+2. **前端**（index.html）：新建会话弹窗的工作区输入框加 `datalist`——打开弹窗时拉取已有工作区目录，**可下拉选择**已有工作区，也可自由输入新名称（datalist 原生组合）
+
+## 验证
+
+- 102：`/api/workspace/dirs` 返回 `["fnos-ops","reverse-skill"]`；249：返回空数组（工作区无子目录，正常）
+- monitor.js 语法 + index.html 脚本检查通过；两台 monitor 已重启、服务 healthy；WebDAV 已同步
 
 ---
 

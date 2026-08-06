@@ -9044,6 +9044,17 @@ async function handleFetch(req) {
     return new Response(JSON.stringify({ ok: true, voice: v }), { headers: jsonHeaders() });
   }
 
+  // ─── 工作区目录列表（新建会话选择工作区文件夹） ───
+  if (path === "/api/workspace/dirs" && req.method === "GET") {
+    try {
+      const dirs = readdirSync(WORKSPACE_DIR, { withFileTypes: true })
+        .filter(e => e.isDirectory()).map(e => e.name).sort();
+      return new Response(JSON.stringify({ ok: true, dirs }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: true, dirs: [] }), { headers: jsonHeaders() });
+    }
+  }
+
   // ─── Chat: WebSocket 消息队列（前端先 POST 消息入队，再建 WS 连接取流）──────
   if (path === "/api/chat/ws-send" && req.method === "POST") {
     const body = await req.json();
