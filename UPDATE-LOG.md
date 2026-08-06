@@ -4,6 +4,16 @@
 
 ---
 
+## v0.21.86（2026-08-07）
+
+**重大新增（Hermes 知识整合方案融合）**：
+- **知识整合三层闭环**：记忆（memories/）↔ 知识库（knowledge/）↔ 技能（skills/）打通
+- **init/ 首装模板**：新 NAS 安装 fpk 即自动部署 8 条项目经验知识 + 记忆模板 + knowledge-sync 技能 + 每 30 分钟镜像 crontab（memories → knowledge 单向）
+- **手段级技能 knowledge-sync**：「记下来/沉淀」→ 知识库秒见
+- 安装/升级回调自动执行 init；monitor 启动镜像兜底
+
+- 安装包：fnos-hermes-agent_v0.21.86.fpk（43.9MB）
+
 ## v0.21.85（2026-08-07）
 
 **紧急修复**：纠偏（redirect）连续触发导致网关 turn 失败（「Gateway 连接失败」）——nemo_relay scope 栈错乱自愈修复，已部署 254/102/249 三台。
