@@ -4,6 +4,37 @@
 
 
 
+# v0.21.80 增强 — 应用内自动更新（appcenter-cli 直装）+ 飞牛操作员专家全面增强
+
+> 用户需求：①充分学习飞牛开发平台（appcenter-cli / 开放 API / 更新日志）把「飞牛操作员」专家权限全面维护加强；②实现应用内自动更新——用户检查到新版本后可一键安装升级包，无需手动下载。
+
+## ① 应用内自动更新（不再需要手动下载 FPK）
+
+- **机制确认**：fnOS 提供 `appcenter-cli`（/usr/local/bin/appcenter-cli）——`install-fpk xxx.fpk` 可直接安装/升级应用（覆盖安装保留配置）
+- **权限**：102/249 已配置 sudoers 白名单（`/etc/sudoers.d/hermes-appcenter`：hermes-agent 免密执行 appcenter-cli），实测 `sudo -n appcenter-cli list` 通过
+- **后端**（monitor.js）：`POST /api/app/auto-update` —— 查询 GitHub Release 最新 FPK 直链 → 下载到 /tmp → 校验 gzip 头 → `sudo -n appcenter-cli install-fpk` 安装升级 → 返回结果
+- **前端**（index.html）：更新页发现新版本时显示两个按钮——「⚡ 自动更新」（一键下载安装，期间应用重启）与「下载安装包 (.fpk)」（跳 GitHub/网盘手动下载兜底）
+- 下载加速：GitHub 直连慢时可改用「下载安装包」走加速方案或用户飞牛网盘
+
+## ② 内置专家「飞牛操作员」全面增强（对齐飞牛开发平台）
+
+- 技能扩充：+code_execution、+skills
+- 提示词全面覆盖平台能力：
+  - **appcenter-cli**：install-fpk/install-local/list/start/stop/check/status/uninstall/default-volume/manual-install
+  - **开放平台 API**：POST /api/v1/trimapp + TRIM_API_TOKEN（系统平台配置/共享授权/用户授权/文件权限/路径转换）
+  - **应用中心体系**：FPK 结构、回调脚本、三目录配置持久化、热补丁、自动更新
+  - **运维域**：存储卷/Docker/日志/网络/备份/用户权限
+- 快捷提问补充：查看已安装应用、appcenter-cli 安装升级、查询共享授权等
+
+## 验证
+
+- 更新检查接口正常（current=latest=0.21.80，download_url 就绪）；sudoers 免密实测通过；服务 healthy
+- monitor.js/experts-data.js/index.html 语法通过；102/249 热更；WebDAV 已同步
+
+---
+
+
+
 # v0.21.80 — 用量统计根治 + 内置专家/工作流编辑 + 居中统一 + 连接器提示
 
 > 用户反馈：①用量统计没数据了；②内置专家/工作流需允许编辑；③团队/工作流/定时文字居中不统一；④连接器功能不行；⑤桌面图标一大一小。
