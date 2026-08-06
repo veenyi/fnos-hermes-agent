@@ -4452,8 +4452,15 @@ async function handleFetch(req) {
       if (!dl) {
         dl = await fetch(url, { signal: AbortSignal.timeout(600000) });
       }
-      if (!dl.ok) throw new Error(`安装包下载失败: HTTP ${dl.status}`);
-      const buf = Buffer.from(await dl.arrayBuffer());
+      // 下载后校验 gzip 头：分享服务对完整请求可能返回 HTML 预览页（HTTP 200 但非文件），
+      // 非 gzip 时自动切换到 GitHub 兜底下载
+      let buf = Buffer.from(await dl.arrayBuffer());
+      if (buf.length > 0 && (buf[0] !== 0x1f || buf[1] !== 0x8b)) {
+        log(`[app-update] 分享直链内容非 FPK（可能是预览页 HTML），切换 GitHub 下载`);
+        dl = await fetch(url, { signal: AbortSignal.timeout(600000) });
+        if (!dl.ok) throw new Error(`GitHub 下载失败: HTTP ${dl.status}`);
+        buf = Buffer.from(await dl.arrayBuffer());
+      }
       if (!buf.length) throw new Error("安装包为空");
       const fpkPath = `/tmp/hermes-agent-update.fpk`;
       writeFileSync(fpkPath, buf);
