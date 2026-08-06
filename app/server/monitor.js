@@ -107,6 +107,33 @@ function compareVersions(a, b) {
 }
 let APP_VERSION = readAppVersion();
 log(`[启动检测] 应用包版本(manifest): ${APP_VERSION}`);
+
+// 内置技能固化部署：hermes 技能系统只发现 $HERMES_HOME/skills（+ config external_dirs），
+// hermes-src/skills 的 bundled 技能默认不可见。启动时把应用依赖的内置技能复制到
+// DATA_DIR/skills（缺失才补，不覆盖用户已有/修改），保证每台机器装上应用即有、
+// 即使被删除也会在下次启动自动恢复（"无法删除"的内置技能）。
+const BUILTIN_SKILLS = ["note-taking/obsidian"];
+function _deployBuiltinSkills(){
+  try {
+    const srcRoot = `${APP_DIR}/hermes-src/skills`;
+    const dstRoot = `${DATA_DIR}/skills`;
+    if (!existsSync(srcRoot)) return;
+    BUILTIN_SKILLS.forEach(rel => {
+      const src = `${srcRoot}/${rel}`;
+      const dst = `${dstRoot}/${rel}`;
+      if (!existsSync(src)) return;
+      try {
+        if (existsSync(`${dst}/SKILL.md`)) return;   // 已存在：不覆盖用户内容
+        mkdirSync(dirname(dst), { recursive: true });
+        cpSync(src, dst, { recursive: true });
+        log(`[skills] 内置技能已固化: ${rel} → ${dstRoot}/${rel}`);
+      } catch (e) {
+        log(`[skills] 固化 ${rel} 失败: ${e.message}`);
+      }
+    });
+  } catch (e) { log(`[skills] 内置技能固化扫描失败: ${e.message}`); }
+}
+_deployBuiltinSkills();
 // 热更新/完整更新写入 manifest 后调用，令运行中的进程立即上报新版本号，
 // 避免「更新完成但概览页仍显示旧版本」的问题。
 function reloadAppVersion() {
