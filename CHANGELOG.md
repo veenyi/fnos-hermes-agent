@@ -1,4 +1,29 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.75)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.76)
+
+---
+
+
+
+# v0.21.76 — 知识库/记忆种子内容 + 自动沉淀机制（技能使用自动记录、「记住」指令）
+
+> 用户反馈：102/249 上知识库与记忆页都是空的；并确认开工「自动沉淀」（对话/技能使用后自动整理写入知识库）。
+
+## 实现
+
+1. **种子内容**（monitor.js `_seedKnowledgeAndMemory`，启动时自动写入，仅文件不存在时）：
+   - 知识库 `README.md`：知识库使用说明 + 建议目录结构（概念/技能使用/对话沉淀/项目）
+   - 记忆 `notes.md`：笔记基础框架（用户偏好/环境信息/项目上下文），记忆页不再空白
+2. **自动沉淀 API**（monitor.js）：
+   - `POST /api/kb/settle`：type=skill 按日期追加到知识库「技能使用/YYYY-MM-DD.md」；type=note 追加到「沉淀笔记.md」
+   - `POST /api/memory/append`：追加到记忆 MEMORY.md / notes.md；均入 writePaths 令牌保护
+3. **前端自动沉淀**（index.html）：
+   - **技能使用自动记录**：对话中调用的工具/技能（onTool 收集）在回复完成后自动写入知识库「技能使用」——每次对话用了什么技能一目了然，形成技能使用沉淀
+   - **「记住」指令**：消息含「记住/请记住/记下来」→ 内容自动追加到记忆 notes.md（toast「🧠 已记住」）
+
+## 验证
+
+- 102/249：种子生效（知识库 README + notes.md 89 字节）；kb/settle 创建「技能使用/2026-08-06.md」；memory/append 写入 notes 成功；测试残留已清理
+- monitor.js 语法 + index.html 脚本检查通过；两台 monitor 重启后 healthy；WebDAV 已同步
 
 ---
 

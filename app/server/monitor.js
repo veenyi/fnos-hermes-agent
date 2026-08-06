@@ -134,6 +134,61 @@ function _deployBuiltinSkills(){
   } catch (e) { log(`[skills] 内置技能固化扫描失败: ${e.message}`); }
 }
 _deployBuiltinSkills();
+
+// 知识库/记忆种子：首次启动时写入基础内容（仅文件不存在时），让知识库与记忆页不空
+function _kbRootForSeed(){
+  try {
+    const envText = readFileSync(`${DATA_DIR}/.env`, "utf8");
+    const m = envText.match(/^OBSIDIAN_VAULT_PATH\s*=\s*(.+)$/m);
+    if (m && m[1].trim()) return m[1].trim();
+  } catch {}
+  return `${DATA_DIR}/knowledge`;
+}
+function _seedKnowledgeAndMemory(){
+  try {
+    const kroot = _kbRootForSeed();
+    mkdirSync(kroot, { recursive: true });
+    const readme = `${kroot}/README.md`;
+    if (!existsSync(readme)) {
+      writeFileSync(readme,
+`# 📚 Hermes 知识库
+
+这是 Hermes 的持久化知识库（Obsidian 兼容：.md + frontmatter + [[wikilink]]）。
+
+## 使用方式
+
+- 左侧菜单「知识库」浏览 / 编辑笔记
+- 正文用 \`[[笔记名]]\` 串联相关笔记（自动生成反向链接）
+- 对话中的技能使用、重要结论会自动沉淀到本库
+- 与 AI 的 Obsidian 技能共用同一 vault（OBSIDIAN_VAULT_PATH）
+
+## 建议目录
+
+- \`概念/\` — 领域知识、术语
+- \`技能使用/\` — 每次对话调用的技能记录（自动）
+- \`对话沉淀/\` — 重要对话的要点提炼（自动）
+- \`项目/\` — 项目上下文、决策记录
+`, "utf8");
+      log(`[kb] 知识库种子 README 已创建`);
+    }
+    const notes = `${DATA_DIR}/notes.md`;
+    if (!existsSync(notes)) {
+      writeFileSync(notes,
+`# 笔记（notes.md）
+
+Agent 的项目笔记、用户偏好与环境信息。对话中说「记住……」的内容会自动追加到这里。
+
+## 用户偏好
+
+## 环境信息
+
+## 项目上下文
+`, "utf8");
+      log(`[memory] 记忆笔记种子已创建`);
+    }
+  } catch (e) { log(`[seed] 种子写入失败: ${e.message}`); }
+}
+_seedKnowledgeAndMemory();
 // 热更新/完整更新写入 manifest 后调用，令运行中的进程立即上报新版本号，
 // 避免「更新完成但概览页仍显示旧版本」的问题。
 function reloadAppVersion() {
@@ -4021,7 +4076,7 @@ async function handleFetch(req) {
   });
 
   // 需要令牌的变更操作（仅写操作，GET 不需要 token）
-  const writePaths = ["/api/start", "/api/stop", "/api/restart", "/api/dashboard/start", "/api/dashboard/stop", "/api/config", "/api/config/test", "/api/hermes/update", "/api/logs/clear", "/api/tunnel/start", "/api/tunnel/stop", "/api/voice/config", "/api/kb/write", "/api/kb/new"];
+  const writePaths = ["/api/start", "/api/stop", "/api/restart", "/api/dashboard/start", "/api/dashboard/stop", "/api/config", "/api/config/test", "/api/hermes/update", "/api/logs/clear", "/api/tunnel/start", "/api/tunnel/stop", "/api/voice/config", "/api/kb/write", "/api/kb/new", "/api/kb/settle", "/api/memory/append"];
   const isWrite = ["POST", "PUT", "DELETE"].includes(req.method);
   const pathIsWrite = writePaths.includes(path) || /^\/api\/channels\/[^/]+\/toggle$/.test(path);
   if (isWrite && pathIsWrite && !checkToken(req)) {
@@ -9163,6 +9218,55 @@ async function handleFetch(req) {
       mkdirSync(dirname(abs), { recursive: true });
       writeFileSync(abs, String(body.content ?? ""), "utf8");
       return new Response(JSON.stringify({ ok: true, path: rel }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  if (path === "/api/kb/settle" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const type = body.type === "skill" ? "skill" : "note";
+      const content = String(body.content || "").trim();
+      if (!content) return new Response(JSON.stringify({ ok: false, error: "缺少内容" }), { status: 400, headers: jsonHeaders() });
+      const root = _kbRoot();
+      let rel = "", full = "";
+      if (type === "skill") {
+        const d = new Date(); const pad = n => String(n).padStart(2, "0");
+        const dateStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        rel = `技能使用/${dateStr}.md`;
+        full = `${root}/${rel}`;
+        mkdirSync(dirname(full), { recursive: true });
+        let cur = "";
+        try { cur = existsSync(full) ? readFileSync(full, "utf8") : ""; } catch {}
+        if (!cur) cur = `---\ncreated: ${new Date().toISOString()}\ntags: [技能使用]\n---\n\n# 技能使用记录 ${dateStr}\n\n`;
+        if (!cur.endsWith("\n")) cur += "\n";
+        writeFileSync(full, cur + content + "\n", "utf8");
+      } else {
+        rel = "沉淀笔记.md";
+        full = `${root}/${rel}`;
+        let cur = "";
+        try { cur = existsSync(full) ? readFileSync(full, "utf8") : ""; } catch {}
+        if (!cur) cur = `---\ntags: [沉淀]\n---\n\n# 沉淀笔记\n\n`;
+        if (!cur.endsWith("\n")) cur += "\n";
+        writeFileSync(full, cur + content + "\n", "utf8");
+      }
+      return new Response(JSON.stringify({ ok: true, path: rel }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  if (path === "/api/memory/append" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const file = body.file === "memory" ? "MEMORY.md" : body.file === "notes" ? "notes.md" : null;
+      const content = String(body.content || "").trim();
+      if (!file || !content) return new Response(JSON.stringify({ ok: false, error: "参数错误" }), { status: 400, headers: jsonHeaders() });
+      const fp = `${DATA_DIR}/${file}`;
+      let cur = "";
+      try { cur = existsSync(fp) ? readFileSync(fp, "utf8") : ""; } catch {}
+      if (!cur.endsWith("\n")) cur += "\n";
+      writeFileSync(fp, cur + content + "\n", { mode: 0o644 });
+      return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
