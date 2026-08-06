@@ -4444,7 +4444,11 @@ async function handleFetch(req) {
         try { execSync(`rm -rf ${stage}`, { timeout: 30000 }); } catch {}
         throw new Error("解包覆盖失败: " + e.message);
       }
-      log(`[app-update] 文件覆盖完成（version=${version || "?"}），60 秒后自动重启生效`);
+      // 清除版本缓存：确保 UI 显示新版本（VERSION_OVERRIDE_FILE 残留会导致显示旧版本）
+      try { unlinkSync(VERSION_OVERRIDE_FILE); } catch {}
+      try { HERMES_VERSION = "unknown"; } catch {}
+      try { APP_VERSION = readAppVersion(); } catch {}
+      log(`[app-update] 文件覆盖完成（version=${version || "?"}），服务即将自动重启生效`);
       // 异步重启 monitor（应用自身重启加载新代码；gateway 由 monitor 拉起时加载新 hermes-src）
       setTimeout(() => {
         try {
