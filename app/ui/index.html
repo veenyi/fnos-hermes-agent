@@ -176,6 +176,22 @@
     .msg.user{align-self:flex-end;align-items:flex-end}
     .msg.assistant{align-self:flex-start;align-items:flex-start}
     .msg-bubble{padding:12px 14px;border-radius:14px;font-size:14px;line-height:1.6;word-break:break-word}
+    /* 知识库（Obsidian 风格） */
+    .kb-file,.kb-dir{padding:3px 8px;border-radius:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text2)}
+    .kb-file:hover,.kb-dir:hover{background:var(--bg3);color:var(--text)}
+    .kb-file.active{background:var(--blue-bg);color:var(--blue);font-weight:600}
+    .kb-caret{display:inline-block;width:12px;font-size:10px;color:var(--text3)}
+    .kb-wikilink{color:var(--accent);text-decoration:none;border-bottom:1px dashed var(--accent)}
+    .kb-wikilink:hover{text-decoration:underline}
+    .kb-wikilink.dead{color:var(--text3);border-bottom:1px dashed var(--border);cursor:default}
+    .kb-props{margin:8px 0 14px;padding:8px 10px;border-left:3px solid var(--accent);background:var(--bg0);border-radius:0 8px 8px 0;display:flex;flex-direction:column;gap:3px}
+    .kb-prop{display:flex;gap:8px;font-size:12px}
+    .kb-prop-k{color:var(--text3);flex-shrink:0;min-width:90px}
+    .kb-prop-v{color:var(--text);word-break:break-all}
+    .kb-backlinks{margin-top:22px;padding-top:14px;border-top:1px solid var(--border)}
+    .kb-bl-title{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px}
+    .kb-bl-item{padding:3px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:var(--accent)}
+    .kb-bl-item:hover{background:var(--bg3)}
     /* Grounded Citations：来源卡片 + 引用角标 */
     .citations-block{margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--bg1)}
     .citations-title{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px}
@@ -1100,6 +1116,7 @@
     <button class="nav-btn" title="扩展" onclick="switchPage('extensions')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>扩展</button>
     <button class="nav-btn" title="通讯" onclick="switchPage('comm')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.56 12.56 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.56 12.56 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>通讯</button>
     <button class="nav-btn" title="隧道" onclick="switchPage('tunnel')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/><rect x="6" y="9" width="12" height="6" rx="1"/><path d="M12 9v6M9 12h6"/></svg>隧道</button>
+    <button class="nav-btn" title="知识库" onclick="switchPage('kb')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>知识库</button>
     <button class="nav-btn" title="连接器" onclick="switchPage('connectors')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>连接器</button>
     <button class="nav-btn" title="定时" onclick="switchPage('cron')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>定时</button>
     <button class="nav-btn" title="记忆" onclick="switchPage('memory')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4 7l-1 4H10l-1-4C7 14.5 5 12 5 9a7 7 0 0 1 7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg>记忆</button>
@@ -1788,6 +1805,28 @@
   </div>
 </div>
 <div class="update-gh"><a class="gh-button" href="https://github.com/veenyi/fnos-hermes-agent/releases/latest" target="_blank">GitHub 下载页 →</a></div>
+          </div>
+        </section>
+
+        <!-- 知识库页（Obsidian 风格：文件树 + 笔记阅读/编辑） -->
+        <section class="page" id="page-kb">
+          <div class="page-header">
+            <h1>📚 知识库</h1>
+            <div style="display:flex;gap:8px;margin-left:auto">
+              <button class="ov-actbtn" onclick="kbNewNote()">＋ 新建笔记</button>
+              <button class="ov-actbtn" onclick="kbLoadTree()">↻ 刷新</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;flex:1;min-height:0;margin-top:12px">
+            <!-- 左：文件树 -->
+            <div style="width:230px;flex-shrink:0;border:1px solid var(--border);border-radius:10px;background:var(--bg1);display:flex;flex-direction:column;min-height:0;overflow:hidden">
+              <div style="padding:8px 10px;font-size:12px;font-weight:600;color:var(--text2);border-bottom:1px solid var(--border)">📂 笔记库</div>
+              <div id="kbTree" style="flex:1;overflow-y:auto;padding:6px;font-size:13px"></div>
+            </div>
+            <!-- 右：笔记内容 -->
+            <div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--bg1);display:flex;flex-direction:column;min-height:0;overflow:hidden">
+              <div id="kbViewer" style="flex:1;overflow-y:auto;padding:18px 20px"></div>
+            </div>
           </div>
         </section>
 
@@ -9927,7 +9966,170 @@ function switchPage(name){
   if(name==='experts') renderExpertsPage();
   if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); }
   if(name==='settings') renderSettings();
+  if(name==='kb'){ kbLoadTree(); }
   if(name!=='chat') hideScrollBtn();   // 回到底部按钮仅用于聊天页（Issue #10）
+}
+
+/* ============================ 知识库（Obsidian 风格 vault） ============================ */
+var _kbTree = null;
+var _kbCurrent = '';
+var _kbRootPath = '';
+function kbLoadTree(){
+  apiGet('/api/kb/tree').then(function(res){
+    var el=document.getElementById('kbTree');
+    if(!el) return;
+    if(!res || !res.ok){ el.innerHTML='<div class="empty-state" style="padding:12px;font-size:12px">加载失败</div>'; return; }
+    _kbTree = res.tree || [];
+    _kbRootPath = res.root || '';
+    kbRenderTree();
+  });
+}
+function kbRenderTree(){
+  var el=document.getElementById('kbTree'); if(!el) return;
+  function render(items, depth){
+    var html='';
+    (items||[]).forEach(function(it){
+      if(it.type==='dir'){
+        html += '<div class="kb-dir" data-d="'+depth+'" onclick="kbToggleDir(this)"><span class="kb-caret">▸</span> 📁 <span class="kb-name">'+esc(it.name)+'</span></div>'+
+          '<div class="kb-children" style="display:none">'+render(it.children||[], depth+1)+'</div>';
+      } else {
+        var active = (_kbCurrent===it.path);
+        html += '<div class="kb-file'+(active?' active':'')+'" data-d="'+depth+'" onclick="kbOpenNote(\''+esc(it.path).replace(/'/g,"\\'")+'\')">📄 <span class="kb-name">'+esc(it.name.replace(/\.md$/i,''))+'</span></div>';
+      }
+    });
+    return html;
+  }
+  el.innerHTML = render(_kbTree, 0) || '<div class="empty-state" style="padding:12px;font-size:12px">暂无笔记<br>点「＋ 新建笔记」开始沉淀</div>';
+}
+function kbToggleDir(el){
+  var ch=el.nextElementSibling, caret=el.querySelector('.kb-caret');
+  if(ch){ ch.style.display = (ch.style.display==='block') ? 'none':'block'; }
+  if(caret) caret.textContent = (ch && ch.style.display==='block') ? '▾':'▸';
+}
+function kbOpenNote(path){
+  _kbCurrent=path;
+  kbRenderTree();
+  apiGet('/api/kb/read?path='+encodeURIComponent(path)).then(function(res){
+    var v=document.getElementById('kbViewer'); if(!v) return;
+    if(!res || !res.ok){ v.innerHTML='<div class="empty-state">读取失败</div>'; return; }
+    kbViewNote(res.content, path);
+  });
+}
+function kbViewNote(content, path){
+  var v=document.getElementById('kbViewer'); if(!v) return;
+  var props='', body=content||'';
+  var fm=body.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if(fm){
+    props=fm[1].split('\n').filter(function(l){ return l.trim() && !l.trim().startsWith('#'); }).map(function(l){
+      var m=l.match(/^([^:]+):\s*(.+)$/);
+      return m ? '<div class="kb-prop"><span class="kb-prop-k">'+esc(m[1])+'</span><span class="kb-prop-v">'+esc(m[2])+'</span></div>' : '';
+    }).join('');
+    body=body.slice(fm[0].length);
+  }
+  var rendered = renderMarkdown(body, false);
+  rendered = rendered.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, function(m, target, label){
+    var t=(target||'').trim(), l=(label||t).trim();
+    var href=kbFindNotePath(t);
+    return href ? '<a href="#" class="kb-wikilink" onclick="kbOpenNote(\''+esc(href).replace(/'/g,"\\'")+'\');return false;">'+esc(l)+'</a>'
+                : '<span class="kb-wikilink dead">'+esc(l)+'</span>';
+  });
+  v.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'+
+      '<b style="font-size:16px">'+esc((path||'').split('/').pop().replace(/\.md$/i,''))+'</b>'+
+      '<span style="font-size:11px;color:var(--text3)">'+esc(path||'')+'</span>'+
+      '<span style="margin-left:auto;display:flex;gap:6px">'+
+        '<button class="ov-actbtn" onclick="kbEditNote()">✏️ 编辑</button>'+
+        '<button class="ov-actbtn" onclick="kbDeleteNote()" title="删除">🗑</button>'+
+      '</span></div>'+
+    (props?'<div class="kb-props">'+props+'</div>':'')+
+    '<div class="kb-body" style="line-height:1.7">'+rendered+'</div>'+
+    '<div class="kb-backlinks" id="kbBacklinks"></div>';
+  kbLoadBacklinks(path);
+}
+function kbFindNotePath(title){
+  function find(items){
+    for(var i=0;i<(items||[]).length;i++){
+      var it=items[i];
+      if(it.type==='file' && it.name.replace(/\.md$/i,'')===title) return it.path;
+      if(it.type==='dir'){ var r=find(it.children||[]); if(r) return r; }
+    }
+    return null;
+  }
+  return find(_kbTree||[]);
+}
+function kbEditNote(){
+  if(!_kbCurrent) return;
+  apiGet('/api/kb/read?path='+encodeURIComponent(_kbCurrent)).then(function(res){
+    if(!res || !res.ok) return;
+    var v=document.getElementById('kbViewer'); if(!v) return;
+    v.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'+
+        '<b style="font-size:16px">'+esc(_kbCurrent.split('/').pop())+'</b>'+
+        '<span style="margin-left:auto;display:flex;gap:6px">'+
+          '<button class="ov-actbtn primary" onclick="kbSaveNote()">💾 保存</button>'+
+          '<button class="ov-actbtn" onclick="kbCancelEdit()">取消</button>'+
+        '</span></div>'+
+      '<textarea id="kbEditor" style="width:100%;min-height:440px;background:var(--bg0);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;line-height:1.6;resize:vertical">'+esc(res.content)+'</textarea>';
+    var ta=document.getElementById('kbEditor'); if(ta) ta.focus();
+  });
+}
+function kbSaveNote(){
+  var ta=document.getElementById('kbEditor'); if(!ta) return;
+  fetch(apiUrl('/api/kb/write'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ path:_kbCurrent, content: ta.value }) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){ if(j.ok){ toast('✅ 已保存'); kbOpenNote(_kbCurrent); } else toast(j.error||'保存失败','error'); })
+    .catch(function(){ toast('网络错误','error'); });
+}
+function kbCancelEdit(){ if(_kbCurrent) kbOpenNote(_kbCurrent); }
+function kbNewNote(){
+  var name=prompt('笔记标题（可含路径，如 概念/Agent）：');
+  if(!name || !name.trim()) return;
+  var parts=name.trim().split('/');
+  var title=parts.pop(), dir=parts.join('/');
+  fetch(apiUrl('/api/kb/new'), { method:'POST', headers:{'Content-Type':'application/json','X-Monitor-Token':monitorToken||''}, body: JSON.stringify({ name: title, dir: dir }) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(j.ok){ toast('✅ 已创建'); _kbCurrent=j.path; kbLoadTree(); setTimeout(function(){ kbOpenNote(j.path); }, 400); }
+      else toast(j.error||'创建失败','error');
+    })
+    .catch(function(){ toast('网络错误','error'); });
+}
+function kbDeleteNote(){
+  if(!_kbCurrent) return;
+  if(!confirm('确定删除笔记？\n'+_kbCurrent)) return;
+  var abs = (_kbRootPath ? _kbRootPath + '/' : '') + _kbCurrent;
+  fetch(apiUrl('/api/files?path='+encodeURIComponent(abs)), { method:'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(j.ok){ toast('🗑 已删除'); _kbCurrent=''; kbLoadTree(); var v=document.getElementById('kbViewer'); if(v) v.innerHTML='<div class="empty-state">选择左侧笔记查看</div>'; }
+      else toast(j.error||'删除失败','error');
+    });
+}
+function kbLoadBacklinks(path){
+  var title=(path||'').split('/').pop().replace(/\.md$/i,'');
+  var el=document.getElementById('kbBacklinks'); if(!el) return;
+  el.innerHTML='<div class="kb-bl-title">🔗 反向链接</div><div style="font-size:12px;color:var(--text3)">加载中…</div>';
+  apiGet('/api/kb/tree').then(function(res){
+    var files=[];
+    function scan(items){ (items||[]).forEach(function(it){ if(it.type==='file' && it.path!==path) files.push(it.path); if(it.type==='dir') scan(it.children||[]); }); }
+    scan((res&&res.tree)||[]);
+    var matched=[], i=0;
+    function next(){
+      if(i>=files.length || matched.length>=20){ render(); return; }
+      var p=files[i++];
+      apiGet('/api/kb/read?path='+encodeURIComponent(p)).then(function(r){
+        if(r && r.ok && r.content.indexOf('[['+title+']]')>=0) matched.push(p);
+        next();
+      }).catch(function(){ next(); });
+    }
+    function render(){
+      el.innerHTML = '<div class="kb-bl-title">🔗 反向链接</div>'+
+        (matched.length ? matched.map(function(p){
+          return '<div class="kb-bl-item" onclick="kbOpenNote(\''+esc(p).replace(/'/g,"\\'")+'\')">📄 '+esc(p.replace(/\.md$/i,''))+'</div>';
+        }).join('') : '<div style="font-size:12px;color:var(--text3)">暂无反向链接</div>');
+    }
+    next();
+  });
 }
 
 /* ============================ 隧道（Cloudflare Tunnel 外网访问） ============================ */

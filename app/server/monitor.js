@@ -3994,7 +3994,7 @@ async function handleFetch(req) {
   });
 
   // 需要令牌的变更操作（仅写操作，GET 不需要 token）
-  const writePaths = ["/api/start", "/api/stop", "/api/restart", "/api/dashboard/start", "/api/dashboard/stop", "/api/config", "/api/config/test", "/api/hermes/update", "/api/logs/clear", "/api/tunnel/start", "/api/tunnel/stop", "/api/voice/config"];
+  const writePaths = ["/api/start", "/api/stop", "/api/restart", "/api/dashboard/start", "/api/dashboard/stop", "/api/config", "/api/config/test", "/api/hermes/update", "/api/logs/clear", "/api/tunnel/start", "/api/tunnel/stop", "/api/voice/config", "/api/kb/write", "/api/kb/new"];
   const isWrite = ["POST", "PUT", "DELETE"].includes(req.method);
   const pathIsWrite = writePaths.includes(path) || /^\/api\/channels\/[^/]+\/toggle$/.test(path);
   if (isWrite && pathIsWrite && !checkToken(req)) {
@@ -9076,6 +9076,87 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ ok: true, dirs }), { headers: jsonHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ ok: true, dirs: [] }), { headers: jsonHeaders() });
+    }
+  }
+
+  // ─── 知识库（Obsidian 风格 vault：.md + [[wikilink]]，根目录优先 OBSIDIAN_VAULT_PATH） ───
+  function _kbRoot(){
+    const env = _readEnvFile();
+    const ov = (env["OBSIDIAN_VAULT_PATH"] || "").trim();
+    const root = ov || `${DATA_DIR}/knowledge`;
+    try { mkdirSync(root, { recursive: true }); } catch {}
+    return root;
+  }
+  function _kbSafe(rel){
+    if (rel === undefined || rel === null) return null;
+    const root = _kbRoot();
+    const abs = resolvePath(root, String(rel).replace(/^\/+/, ""));
+    if (abs !== root && !abs.startsWith(root + "/")) return null;
+    return abs;
+  }
+  if (path === "/api/kb/tree" && req.method === "GET") {
+    try {
+      const root = _kbRoot();
+      function walk(dir, prefix){
+        const out = [];
+        readdirSync(dir, { withFileTypes: true })
+          .filter(e => !e.name.startsWith("."))
+          .sort((a, b) => (a.isDirectory() === b.isDirectory() ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1))
+          .forEach(e => {
+            const rel = prefix ? prefix + "/" + e.name : e.name;
+            if (e.isDirectory()) out.push({ name: e.name, type: "dir", path: rel, children: walk(`${dir}/${e.name}`, rel) });
+            else if (e.name.toLowerCase().endsWith(".md")) out.push({ name: e.name, type: "file", path: rel });
+          });
+        return out;
+      }
+      return new Response(JSON.stringify({ ok: true, root, tree: walk(root, "") }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  if (path === "/api/kb/read" && req.method === "GET") {
+    try {
+      const abs = _kbSafe(url.searchParams.get("path") || "");
+      if (!abs) return new Response(JSON.stringify({ ok: false, error: "非法路径" }), { status: 400, headers: jsonHeaders() });
+      if (!existsSync(abs) || !statSync(abs).isFile()) return new Response(JSON.stringify({ ok: false, error: "笔记不存在" }), { status: 404, headers: jsonHeaders() });
+      const content = readFileSync(abs, "utf8");
+      return new Response(JSON.stringify({ ok: true, path: String(url.searchParams.get("path") || ""), content }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  if (path === "/api/kb/write" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      let rel = String(body.path || "").trim();
+      if (!rel) return new Response(JSON.stringify({ ok: false, error: "缺少 path" }), { status: 400, headers: jsonHeaders() });
+      if (!rel.toLowerCase().endsWith(".md")) rel += ".md";
+      const abs = _kbSafe(rel);
+      if (!abs) return new Response(JSON.stringify({ ok: false, error: "非法路径" }), { status: 400, headers: jsonHeaders() });
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(abs, String(body.content ?? ""), "utf8");
+      return new Response(JSON.stringify({ ok: true, path: rel }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  if (path === "/api/kb/new" && req.method === "POST") {
+    try {
+      const body = await req.json().catch(() => ({}));
+      const name = String(body.name || "未命名").trim();
+      const dir = String(body.dir || "").trim();
+      const rel = dir ? `${dir}/${name.replace(/\.md$/i, "")}.md` : `${name.replace(/\.md$/i, "")}.md`;
+      const abs = _kbSafe(rel);
+      if (!abs) return new Response(JSON.stringify({ ok: false, error: "非法路径" }), { status: 400, headers: jsonHeaders() });
+      if (existsSync(abs)) return new Response(JSON.stringify({ ok: false, error: "笔记已存在" }), { status: 409, headers: jsonHeaders() });
+      mkdirSync(dirname(abs), { recursive: true });
+      const ts = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      const front = `---\ncreated: ${ts.getFullYear()}-${pad(ts.getMonth()+1)}-${pad(ts.getDate())}T${pad(ts.getHours())}:${pad(ts.getMinutes())}:00+08:00\ntags: []\n---\n\n# ${name.replace(/\.md$/i, "")}\n\n`;
+      writeFileSync(abs, front, "utf8");
+      return new Response(JSON.stringify({ ok: true, path: rel, content: front }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
     }
   }
 
