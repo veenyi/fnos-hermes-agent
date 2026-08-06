@@ -1,4 +1,34 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.84)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.85)
+
+---
+
+
+
+# v0.21.85 — 修复：redirect 连续触发导致网关 turn 失败（nemo_relay scope 栈自愈）
+
+> 用户紧急反馈：254（192.168.3.254）机器对话报「Gateway 连接失败」，怀疑与今天的纠偏（redirect）功能相关。
+
+## 根因
+
+- 用户在流式回复中**连续发送多条消息**（redirect，00:58 内 3 次 abort 前流）——monitor 只中断自己的流，**未通知网关取消前一个 turn**，导致同一 session 新旧 turn 并发
+- 网关侧 `nemo_relay` 的 scope 栈因此错乱（`RuntimeError: scope handle is not at the top of the stack`，relay_runtime.py end_turn 的 scope.pop 失败）
+- pop 失败被 try/except 捕获（进程不崩），但**残留 scope 栈**影响后续 turn → turn 结束失败 → 前端显示「Gateway 连接失败」
+- 254 为第三台机器（Veenyi13900HX，@vol3 布局，monitor/gateway 由 monitor 管理）
+
+## 修复（hermes-src/agent/relay_runtime.py）
+
+- `end_turn` 的 scope.pop 失败后**自愈**：循环 `get_handle()` + `pop` 清空整个 scope 栈（最多 16 层），让下一个 turn 从干净栈开始——残留不再累积、后续 turn 不再失败
+- 已部署 254/102/249 三台并重启 gateway 验证 healthy
+
+## 说明
+
+- 254 服务本身未死（monitor/gateway/dashboard 均 healthy），「Gateway 连接失败」为 redirect 并发导致的 turn 失败
+- 彻底治本（redirect 前通知网关取消前 turn）作为后续优化方向
+
+## 验证
+
+- 254：gateway 重启后 healthy（pid 1824327）；102/249 部署后 gateway healthy
+- relay_runtime.py 语法通过；WebDAV 已同步（v0.21.85.fpk）
 
 ---
 
