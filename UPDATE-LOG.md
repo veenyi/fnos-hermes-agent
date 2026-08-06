@@ -4,6 +4,12 @@
 
 ---
 
+## v0.21.68（2026-08-06）
+
+**修复**：新建会话弹窗的模型下拉显示 `[object Object]`——providers 的 models 元素是对象（{id,name,enabled}），原代码直接字符串化渲染。已改为提取模型名并按 provider 分组展示（禁用模型过滤）。
+
+- 安装包：fnos-hermes-agent_v0.21.68.fpk（43.9MB）
+
 ## v0.21.67（2026-08-06）
 
 **打包脚本修复**：robocopy 按目录名排除曾误伤 `ui/scripts`（marked 库）与 `web_dist/assets`（Dashboard 前端），导致安装后 Markdown 无格式、Dashboard 启动崩。已改为全量镜像 + 显式删开发目录 + 资源断言，杜绝残缺包。**请使用本版本安装（v0.21.66 及更早 slim 包有缺陷）**。
