@@ -521,6 +521,16 @@ else
     log_msg "TRIM_USERNAME 为空，跳过权限修复"
 fi
 
+
+
+# —— 知识整合初始化：部署 knowledge/memories/skill/mirror + crontab（Hermes 方案） ——
+if [ -x "${TRIM_APPDEST:-/var/apps/hermes-agent}/init/init.sh" ]; then
+    log_msg '>>> 运行知识整合初始化 (init.sh) ...'
+    "${TRIM_APPDEST:-/var/apps/hermes-agent}/init/init.sh" >> "${TRIM_PKGVAR}/info.log" 2>&1 || log_msg 'WARNING: init.sh 执行失败'
+else
+    log_msg 'init.sh 不存在'
+fi
+
 trap - ERR
 log_msg "install_callback finished successfully."
 exit 0
