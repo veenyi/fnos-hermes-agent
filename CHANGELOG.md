@@ -1,4 +1,34 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.78)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.79)
+
+---
+
+
+
+# v0.21.79 — 官方 Dashboard 不适配页提示（chat/system 空白 + 更新失败误导报错）
+
+> 用户反馈（严重）：①dashboard/chat、dashboard/system 打开没显示（空白黑屏）；②更新 Hermes 报 `Not a git repository. Please reinstall`。
+
+## 根因
+
+均为**官方 dashboard / hermes CLI 上游与发行模式（vendored 源码）的不适配**，应用自身对应功能正常：
+
+1. **dashboard/chat 空白**：官方聊天页依赖 PTY 终端桥（xterm.js + /api/pty WS），在应用门户（8650 代理）下无法渲染
+2. **dashboard/system 空白**：该页调用的 `/api/system` 在 hermes 0.20 上游不存在（此前已确认）
+3. **更新失败**：官方 `hermes update` 走 git 检查（`update_cmd.py` 检测 `.git`），而发行模式的 hermes-src 是内置源码（非 git 克隆）→ 报误导性 "Not a git repository. Please reinstall"
+
+## 修复
+
+1. **monitor.js**：dashboard 代理拦截 `/chat`、`/system` 路由，返回**中文提示页**（说明该页不适配原因 + 引导应用内替代：「对话」页 /「概览」页），不再显示空白
+2. **update_cmd.py**：非 git 分支改为中文指引——「当前为内置源码安装（非 git 仓库），官方 hermes update 不适用；请使用应用中心 FPK 或应用内『更新』页」，替代误导的 reinstall 提示
+
+## 验证
+
+- 249：`/proxy/dashboard/chat`、`/system` 均返回提示页（含「此页不适配」）；update_cmd.py 修复在位；服务 healthy
+- monitor.js 语法通过；WebDAV 已同步（v0.21.79.fpk）
+
+## 说明
+
+应用自己的「对话」「概览」「更新」页功能完整，官方 dashboard 的上述入口仅作提示引导。
 
 ---
 
