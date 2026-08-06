@@ -1,4 +1,30 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.83)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.84)
+
+---
+
+
+
+# v0.21.84 — 安装失败修复（uv 404：wheel URL 斜杠 bug + editable 多源重试）
+
+> 用户反馈：装 v0.21.81/83 时报「uv 安装失败: curl: (22) 404」，v0.21.80 不出现。
+
+## 根因
+
+两层问题叠加：
+
+1. **editable 安装失败**（清华镜像对个别依赖 404）→ 回退 wheel 安装路径
+2. **wheel 查询 URL bug**：`https://pypi.tuna.tsinghua.edu.cn/simplehermes-agent/`（**缺斜杠**，应为 `/simple/hermes-agent/`，v0.21.78 改清华镜像时引入）→ 查询必然 404 → 报「simple index query failed / wheel 方式失败」
+
+v0.21.80 不报错是因为当时 editable 安装直接成功、没走到 wheel 回退路径；81/83 恰好 editable 失败（清华镜像依赖 404）暴露了 URL bug。
+
+## 修复（cmd/install_callback）
+
+1. **wheel 查询 URL 修正**：`/simple/hermes-agent/`（+ sed base 同步清华根），并补充官方 PyPI 兜底查询
+2. **editable 多源重试**：首次清华镜像 → 失败清理残留后换**官方 PyPI**（pypi.org）→ 再失败换**阿里云镜像**，三源兜底大幅提高安装成功率
+
+## 验证
+
+- install_callback 语法通过；102/249 已 sudo 部署；WebDAV 已同步（v0.21.84.fpk）
 
 ---
 
