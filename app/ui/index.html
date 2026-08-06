@@ -12297,6 +12297,7 @@ function _expertCardHtml(e, kind){
       '<div class="exp-card-desc">'+esc((p.prompt||'').slice(0,120))+'</div>'+
       '<div class="exp-card-foot"><div style="display:flex;gap:6px;flex-wrap:wrap">'+modelTag+skillTag+'</div>'+
       '<div class="exp-card-actions">'+
+        '<button class="action sm danger" onclick="deleteMyExpert(\''+_jsStr(p.id)+'\',event)" title="删除该专家">删除</button>'+
         '<button class="action sm" onclick="openPersonaModal(\''+_jsStr(p.id)+'\')">编辑</button>'+
         '<button class="action sm primary" onclick="chatWithPersona(\''+_jsStr(p.id)+'\')">对话</button>'+
       '</div></div></div>';
@@ -12326,6 +12327,20 @@ function renderMineExperts(){
   var grid=document.getElementById('expMineGrid'); if(!grid) return;
   if(!_profilesLoaded){ grid.innerHTML='<div class="empty-state">加载中…</div>'; return; }
   _renderExpertList('mine', _profiles, { kind:'mine', searchId:'expMineSearch' });
+}
+function deleteMyExpert(pid, e){
+  if(e) e.stopPropagation();
+  var p=_profiles.find(function(x){ return x.id===pid; });
+  if(!p) return;
+  if(!confirm('确定删除专家「'+(p.name||pid)+'」？该专家的配置与会话将一并删除。')) return;
+  fetch(apiUrl('/api/profiles/'+encodeURIComponent(pid)), { method:'DELETE', headers:{'X-Monitor-Token':monitorToken||''} })
+    .then(function(r){ return r.json().catch(function(){ return {}; }); })
+    .then(function(j){
+      if(j.ok===false && j.error){ toast('删除失败：'+j.error,'error'); return; }
+      toast('🗑 已删除专家：'+(p.name||pid));
+      fetchProfiles(function(){ renderMineExperts(); renderRail(); });
+    })
+    .catch(function(){ toast('删除失败：网络错误','error'); });
 }
 function renderBuiltinExperts(){
   var grid=document.getElementById('expBuiltinGrid'); if(!grid) return;

@@ -1,4 +1,25 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.80)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.81)
+
+---
+
+
+
+# v0.21.81 — 我的专家删除按钮 + 回退模型刷新持久化修复 + 升级保留配置防御（恢复版本迭代）
+
+> 用户反馈：①已安装的专家要有删除按钮；②回退模型刷新页面又没了；③更新会丢配置；④相同版本号导致无法手动安装更新 → 恢复版本迭代。
+
+## 修复
+
+1. **我的专家删除按钮**（index.html）：我的专家卡片新增「删除」按钮（deleteMyExpert → DELETE /api/profiles/:id → 刷新列表与会话树）；后端 DELETE profiles 补 token 鉴权保护
+2. **回退模型刷新丢失**（monitor.js）：根因——GET /api/config 硬编码 `fallback_providers: []`，前端刷新永远拿到空。修复为从 `config.json` 读取已保存的回退列表（实测读取回 sensenova1）
+3. **升级保留配置防御**（cmd/install_init + monitor.js auto-update）：
+   - install_init 升级检测增强：TRIM_PKGHOME 未传时探测多个实际路径的 config.yaml（/var/apps/hermes-agent/home、/vol1、/vol3），防误判「全新安装」清空 providers 配置
+   - 自动更新（appcenter-cli install-fpk）显式传 TRIM_APPDEST/TRIM_PKGHOME/TRIM_PKGVAR 环境变量，确保升级识别已有配置
+4. **恢复版本迭代**：v0.21.81（不再固定 80——相同版本号导致 fnOS 拒绝覆盖安装）
+
+## 验证
+
+- 回退 GET 实测返回 `["sensenova1"]`；install_init 语法 + 部署确认（102/249）；monitor/index 语法通过；服务 healthy；WebDAV 已同步
 
 ---
 

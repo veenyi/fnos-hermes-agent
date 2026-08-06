@@ -54,12 +54,20 @@ log_msg "app_version 覆盖文件清理完成"
 # （上一环境的 extensions.json / providers-state 等）会导致新装后左侧会话树
 # 出现一堆旧角色分组、模型页出现不可用的假 provider。
 # 仅清理配置类文件，保留 chat/ 会话历史与日志；升级安装（有 config.yaml）不动。
-if [ ! -f "${TRIM_PKGHOME}/data/config.yaml" ]; then
+# 注意：appcenter-cli install-fpk 可能不传 TRIM_PKGHOME env → 探测实际路径，防误判全新安装清空配置
+_HAS_CFG=0
+for _cand in "${TRIM_PKGHOME}/data/config.yaml" \
+             "/var/apps/hermes-agent/home/data/config.yaml" \
+             "/vol1/@apphome/hermes-agent/data/config.yaml" \
+             "/vol3/@apphome/hermes-agent/data/config.yaml"; do
+  if [ -f "$_cand" ]; then _HAS_CFG=1; break; fi
+done
+if [ "$_HAS_CFG" = "0" ]; then
     rm -f "${TRIM_PKGVAR}/extensions.json" \
           "${TRIM_PKGVAR}/providers-state.yaml" \
           "${TRIM_PKGVAR}/provider-models.json" \
           "${TRIM_PKGVAR}/.env.providers" 2>/dev/null || true
-    log_msg "全新安装（无 hermes 配置）：残留配置类文件清理完成"
+    log_msg "全新安装（未探测到 hermes 配置）：残留配置类文件清理完成"
 else
     log_msg "检测到已有 hermes 配置（升级安装），保留 @appdata 配置"
 fi

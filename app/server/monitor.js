@@ -4393,7 +4393,12 @@ async function handleFetch(req) {
       // 校验：确认是合法 fpk（gzip tar 头）
       if (buf[0] !== 0x1f || buf[1] !== 0x8b) throw new Error("下载内容不是有效的 FPK 包（gzip）");
       // 用 appcenter-cli 安装升级（sudo 免密白名单已配置 /etc/sudoers.d/hermes-appcenter）
-      const out = execSync(`sudo -n appcenter-cli install-fpk ${fpkPath} 2>&1`, { timeout: 600000, encoding: "utf8", env: { ...process.env, PATH: "/usr/local/bin:/usr/bin:/bin" } });
+      // 显式传 TRIM_* 环境变量：确保 install_init 升级检测识别已有配置而保留（防误判全新安装清配置）
+      const out = execSync(`sudo -n appcenter-cli install-fpk ${fpkPath} 2>&1`, {
+        timeout: 600000, encoding: "utf8",
+        env: { ...process.env, PATH: "/usr/local/bin:/usr/bin:/bin",
+          TRIM_APPDEST: APP_DIR, TRIM_PKGHOME: DATA_DIR.replace(/\/data$/, ""), TRIM_PKGVAR: VAR_DIR },
+      });
       log(`[app-update] appcenter-cli 安装完成: ${String(out).slice(0, 300)}`);
       return new Response(JSON.stringify({ ok: true, version, output: String(out).slice(-800) }), { headers: jsonHeaders() });
     } catch (e) {
@@ -6922,11 +6927,13 @@ async function handleFetch(req) {
     }
 
     // 构建前端配置结构
+    let _savedFallback = [];
+    try { const _cf = readJSON(CONFIG_FILE); if (Array.isArray(_cf.fallback_providers)) _savedFallback = _cf.fallback_providers; } catch {}
     const safe = {
       providers: visibleProviders,
       active_provider: activeProvName,
       hermes_configured: hermesConfigured,
-      fallback_providers: [],
+      fallback_providers: _savedFallback,
       _version: CONFIG_VERSION,
       presets: Object.keys(PROVIDER_PRESETS).map(id => ({
         id,
