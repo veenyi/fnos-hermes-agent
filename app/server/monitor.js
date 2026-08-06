@@ -4429,15 +4429,30 @@ async function handleFetch(req) {
       log(`[app-update] FPK 已下载: ${(buf.length / 1048576).toFixed(1)}MB → ${fpkPath}`);
       // 校验：确认是合法 fpk（gzip tar 头）
       if (buf[0] !== 0x1f || buf[1] !== 0x8b) throw new Error("下载内容不是有效的 FPK 包（gzip）");
-      // 用 appcenter-cli 安装升级（sudo 免密白名单已配置 /etc/sudoers.d/hermes-appcenter）
-      // 显式传 TRIM_* 环境变量：确保 install_init 升级检测识别已有配置而保留（防误判全新安装清配置）
-      const out = execSync(`sudo -n appcenter-cli install-fpk ${fpkPath} 2>&1`, {
-        timeout: 600000, encoding: "utf8",
-        env: { ...process.env, PATH: "/usr/local/bin:/usr/bin:/bin",
-          TRIM_APPDEST: APP_DIR, TRIM_PKGHOME: DATA_DIR.replace(/\/data$/, ""), TRIM_PKGVAR: VAR_DIR },
-      });
-      log(`[app-update] appcenter-cli 安装完成: ${String(out).slice(0, 300)}`);
-      return new Response(JSON.stringify({ ok: true, version, output: String(out).slice(-800) }), { headers: jsonHeaders() });
+      // 安装：appcenter-cli install-fpk 不支持已安装应用升级（实测仅返回 "is installed" 不执行），
+      // 改为「解包覆盖」——解压 FPK 直接覆盖 APP_DIR（hermes-agent 有写权限，配置在 @appdata/@apphome 不受影响）
+      const stage = `/tmp/fpk-auto-${Date.now()}`;
+      try {
+        execSync(`rm -rf ${stage} && mkdir -p ${stage} && tar xzf ${fpkPath} -C ${stage}`, { timeout: 120000, encoding: "utf8" });
+        execSync(`cd ${stage} && tar xzf app.tgz`, { timeout: 600000, encoding: "utf8" });
+        // 覆盖应用目录（bin/server/ui/hermes-src/package.json 等；config 为 fnOS 只读模板不覆盖）
+        execSync(`cp -rf ${stage}/bin ${stage}/server ${stage}/ui ${stage}/hermes-src ${stage}/package.json ${APP_DIR}/ 2>/dev/null; true`, { timeout: 600000, encoding: "utf8" });
+        // 更新 fnOS 应用壳 manifest（sudo cp 免密白名单已配置）
+        try { execSync(`sudo -n cp ${stage}/manifest /var/apps/hermes-agent/manifest && sudo -n chown root:root /var/apps/hermes-agent/manifest 2>/dev/null; true`, { timeout: 15000 }); } catch {}
+        execSync(`rm -rf ${stage}`, { timeout: 30000 });
+      } catch (e) {
+        try { execSync(`rm -rf ${stage}`, { timeout: 30000 }); } catch {}
+        throw new Error("解包覆盖失败: " + e.message);
+      }
+      log(`[app-update] 文件覆盖完成（version=${version || "?"}），60 秒后自动重启生效`);
+      // 异步重启 monitor（应用自身重启加载新代码；gateway 由 monitor 拉起时加载新 hermes-src）
+      setTimeout(() => {
+        try {
+          log("[app-update] 自动更新完成，正在重启服务…");
+          _triggerGatewayRestart("app-auto-update");
+        } catch (e) { log(`[app-update] 重启触发失败: ${e.message}`); }
+      }, 2000);
+      return new Response(JSON.stringify({ ok: true, version, note: "文件已覆盖，服务即将自动重启生效" }), { headers: jsonHeaders() });
     } catch (e) {
       log(`[app-update] 自动更新失败: ${e.message}`);
       return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
