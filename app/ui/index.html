@@ -176,6 +176,14 @@
     .msg.user{align-self:flex-end;align-items:flex-end}
     .msg.assistant{align-self:flex-start;align-items:flex-start}
     .msg-bubble{padding:12px 14px;border-radius:14px;font-size:14px;line-height:1.6;word-break:break-word}
+    /* Grounded Citations：来源卡片 + 引用角标 */
+    .citations-block{margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--bg1)}
+    .citations-title{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px}
+    .cite-item{display:flex;align-items:flex-start;gap:6px;padding:3px 0;font-size:12px}
+    .cite-item a{color:var(--accent);text-decoration:none;word-break:break-all}
+    .cite-item a:hover{text-decoration:underline}
+    .cite-num{flex-shrink:0;color:var(--text3);font-size:11px;line-height:1.5}
+    .cite-ref{display:inline-block;background:var(--blue-bg);color:var(--blue);border-radius:4px;padding:0 4px;font-size:10px;font-weight:600;line-height:1.4;margin:0 1px;cursor:default}
     .msg.user .msg-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
     .msg.assistant .msg-bubble{background:var(--bg1);border:1px solid var(--border);border-bottom-left-radius:4px;color:var(--text)}
     .msg-bubble .table-wrap{overflow-x:auto;margin:8px 0;max-width:100%}
@@ -6171,6 +6179,7 @@ var _chState = { defs:{}, channels:{}, current:null, filter:'all' };
 var _chQrSeq = 0;
 var _connState = { list:[] };
 var _msgState = { streaming:false, abortCtrl:null, ws:null };
+var _pendingRedirect = false;   // 流式回复中发送的消息 = redirect 中途纠偏标记
 var _persona = 'default';
 var _personaPrompt = '';
 var _pendingAttachments = [];
@@ -6354,6 +6363,7 @@ function renderMarkdown(text, streaming){
   var src = streaming ? balanceMarkdown(text||'') : (text||'');
   src = src.replace(/\r/g,'');
   src = preprocessMarkdown(src);
+  src = preprocessSources(src);
   src = linkifyBareUrls(src);
   var html;
   try {
@@ -6371,6 +6381,35 @@ function renderMarkdown(text, streaming){
     html = html.replace(/(<img[^>]+src=")(\/(?:tmp|uploads|workspace|data)\/[^"]+)(")/gi, function(m,p,path,q){ return p+BASE+path+q; });
   }
   html = html.replace(/<table>/g,'<div class="table-wrap"><table>').replace(/<\/table>/g,'</table></div>');
+  html = renderCitations(html, src);
+  return html;
+}
+/* ── Grounded Citations 渲染（对齐官方 grounded-citations skill）──
+ * Sources 块 → 来源卡片（可点击）；正文 [n] / [1,2] 纯数字引用 → 引用角标 */
+function preprocessSources(src){
+  if(!src || src.indexOf('Sources')<0) return src;
+  try{
+    // 匹配 "## Sources" / "Sources:" 后的行块（每行一条 URL 或 "[n] URL 标题"）
+    src = src.replace(/(^|\n)[ \t]*#{0,3}[ \t]*Sources[ \t]*:?[ \t]*\n((?:[ \t]*[^\n]*\n?)+)/i, function(m, pre, block){
+      var lines = block.split('\n').map(function(l){ return l.replace(/^[ \t]*[-*]?[ \t]*/, '').trim(); })
+        .filter(function(l){ return l && l.indexOf('http')===0; });
+      if(!lines.length) return m;
+      var cards = lines.map(function(u){
+        var url = (u.match(/https?:\/\/[^\s<>"']+/)||[''])[0];
+        var title = u.replace(url,'').replace(/^[ \t]*[\[\]\d.,\s-]+/,'').trim() || url;
+        return '<div class="cite-item"><span class="cite-num">↗</span><a href="'+esc(url)+'" target="_blank" rel="noopener" title="'+esc(url)+'">'+esc(title)+'</a></div>';
+      }).join('');
+      return pre + '\n<div class="citations-block"><div class="citations-title">📚 来源</div>' + cards + '</div>\n';
+    });
+  }catch(e){}
+  return src;
+}
+function renderCitations(html, src){
+  if(!html) return html;
+  try{
+    // [n] / [1,2] 纯数字引用 → 角标（排除 markdown 链接 [n](url) 形式）
+    html = html.replace(/\[(\d+(?:\s*[,，]\s*\d+)*)\](?!\()/g, '<sup class="cite-ref">[$1]</sup>');
+  }catch(e){}
   return html;
 }
 /* 旧版 mdToHtml 保留为简单兜底（非流式渲染时使用） */
@@ -8418,17 +8457,19 @@ function onSendOrStop(){
 }
 function setSendState(streaming){
   var btn=document.getElementById('sendBtn'); if(!btn) return;
+  var ta=document.getElementById('chatInput');
   if(streaming){
     if(btn.classList.contains('stop')) return;
     btn.classList.add('stop');
     btn.disabled=false;
     btn.title='停止生成（直接中断当前进度）';
     btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>';
+    if(ta && ta.placeholder.indexOf('纠偏')<0){ ta.setAttribute('data-ph', ta.placeholder); ta.placeholder='回复中…可输入消息实时纠偏（redirect）'; }
   } else {
     btn.classList.remove('stop');
     btn.title='发送';
     btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>';
-    var ta=document.getElementById('chatInput');
+    if(ta && ta.getAttribute('data-ph')){ ta.placeholder = ta.getAttribute('data-ph'); ta.removeAttribute('data-ph'); }
     btn.disabled=!((ta && ta.value.trim()) || _pendingAttachments.length);
   }
 }
@@ -8501,6 +8542,14 @@ function sendChat(){
   if(text.charAt(0)==='/'){ handleSlashCommand(text); return; }
   // 圆桌讨论模式
   if(_rtState.active && currentSession===_rtState.sessionId){ rtSend(text); return; }
+  // 流式回复中发送 = redirect 中途纠偏（网关 busy follow-up 自动调用 agent.redirect，保留当前工作状态）
+  if(_msgState.streaming){
+    _pendingRedirect = true;   // 供 sendRaw 标记用户消息为「纠偏」
+    toast('🎯 已发送纠偏（redirect）：AI 将结合新要求调整方向');
+    sendRaw(text);
+    _pendingRedirect = false;
+    return;
+  }
   sendRaw(text);
 }
 
@@ -8596,7 +8645,8 @@ function sendRaw(text){
 
   var userDiv = document.createElement('div'); userDiv.className='msg user';
   var chips = attachments.map(function(a){ return '<span class="attach-chip">📎 '+esc(a.name||'附件')+'</span>'; }).join(' ');
-  userDiv.innerHTML = '<div class="msg-bubble">'+quoteHtml+escapeHtml(text).replace(/\n/g,'<br>')+(chips?'<div style="margin-top:6px">'+chips+'</div>':'')+'</div><div class="msg-meta">你 · '+fmtDateTime(Date.now())+'</div>';
+  var redirectTag = _pendingRedirect ? '<span style="display:inline-block;background:var(--accent);color:#fff;font-size:10px;border-radius:4px;padding:1px 6px;margin-right:6px">🎯 纠偏</span>' : '';
+  userDiv.innerHTML = '<div class="msg-bubble">'+quoteHtml+redirectTag+escapeHtml(text).replace(/\n/g,'<br>')+(chips?'<div style="margin-top:6px">'+chips+'</div>':'')+'</div><div class="msg-meta">你 · '+fmtDateTime(Date.now())+'</div>';
   body.appendChild(userDiv); body.scrollTop=body.scrollHeight;
   condenseChatBody();
 
