@@ -8929,6 +8929,17 @@ async function handleFetch(req) {
         log(`[profile-sync] 同步活跃 profile 失败: ${e.message}`);
       }
 
+      // ── 持久化前端配置扩展字段（fallback_providers 等）到 CONFIG_FILE ──
+      // 此前 fallback_providers 从未写入 config.json，重启后回退功能丢失
+      try {
+        const cfgFile = readJSON(CONFIG_FILE) || {};
+        if (body.fallback_providers !== undefined) cfgFile.fallback_providers = Array.isArray(body.fallback_providers) ? body.fallback_providers : [];
+        writeJSON(CONFIG_FILE, cfgFile, true);
+        log(`[config] fallback_providers 已持久化: ${JSON.stringify(cfgFile.fallback_providers || [])}`);
+      } catch (e) {
+        log(`[config] 保存 fallback_providers 失败: ${e.message}`);
+      }
+
       return new Response(JSON.stringify({ ok: true, gateway_restarting: _toolsetsChanged }), { headers: jsonHeaders() });
     }
 
