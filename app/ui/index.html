@@ -1188,6 +1188,7 @@
                 <div class="title" id="chatTitle">项目规划讨论</div>
                 <div class="subtitle" id="chatSubtitle">默认主力助手 · 12 条消息</div>
               </div>
+              <button id="chReturnBtn" class="ov-actbtn" style="display:none;margin-left:auto;flex-shrink:0" onclick="exitChannelView()" title="退出通道会话，返回正常会话">← 返回</button>
             </div>
             <div class="right">
               <button class="tool-btn" id="roundtableBtn" title="多 Agent 圆桌讨论" onclick="openRoundtable()" style="width:32px;height:32px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M5 21v-2a4 4 0 0 1 4-4h2"/><path d="M13 21v-2a4 4 0 0 1 4-4h2"/><path d="M12 17v4"/></svg></button>
@@ -6797,6 +6798,15 @@ function renderRail(){
   el.innerHTML = html;
 }
 var _channelSessions = null;
+var _channelViewActive = false;   // 通道会话只读视图状态（聊天页标题显示返回按钮，切页自动退出）
+function exitChannelView(){
+  _channelViewActive = false;
+  var rb = document.getElementById('chReturnBtn'); if(rb) rb.style.display='none';
+  var body = document.getElementById('chatBody');
+  if(body) body.innerHTML = '<div class="system-tip">已退出通道会话。在左侧选择会话继续。</div>';
+  updateHeader();
+  loadSessions();
+}
 function fetchChannelSessions(){
   apiGet('/api/channel-sessions').then(function(res){
     if(res && res.ok && res.groups){ _channelSessions = res.groups; renderRail(); }
@@ -6810,6 +6820,8 @@ function openChannelSession(chId, sessionId){
   // 通道会话：直接在 WEBUI 聊天窗口加载消息（从 Dashboard API 拉取）
   var def = (_chState.defs && _chState.defs[chId]) || {};
   var chName = def.name || chId;
+  _channelViewActive = true;
+  var rb = document.getElementById('chReturnBtn'); if(rb) rb.style.display='inline-flex';
   // 切换到聊天页
   switchPage('chat');
   // 更新标题
@@ -9985,7 +9997,7 @@ function switchPage(name){
   if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); }
   if(name==='settings') renderSettings();
   if(name==='kb'){ kbLoadTree(); }
-  if(name!=='chat') hideScrollBtn();   // 回到底部按钮仅用于聊天页（Issue #10）
+  if(name!=='chat'){ hideScrollBtn(); if(_channelViewActive){ _channelViewActive=false; var _rb=document.getElementById('chReturnBtn'); if(_rb) _rb.style.display='none'; } }
 }
 
 /* ============================ 知识库（Obsidian 风格 vault） ============================ */
