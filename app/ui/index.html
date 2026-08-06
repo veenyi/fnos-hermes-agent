@@ -57,7 +57,10 @@
     .app{display:flex;height:100vh;height:100dvh;width:100vw}
 
     /* 全局左侧导航 */
-    .global-sidebar{width:72px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:2px;flex-shrink:0;z-index:10;transition:width .2s ease,padding .2s ease,border-color .2s ease}
+    .global-sidebar{width:72px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:2px;flex-shrink:0;z-index:10;transition:width .2s ease,padding .2s ease,border-color .2s ease;overflow-y:auto;overflow-x:hidden}
+    .global-sidebar::-webkit-scrollbar{width:4px}
+    .global-sidebar::-webkit-scrollbar-thumb{background:rgba(128,128,128,.35);border-radius:4px}
+    .global-sidebar::-webkit-scrollbar-track{background:transparent}
     .global-sidebar.collapsed{width:0;padding:0;border-right:none;overflow:hidden}
     .global-sidebar .nav-btn{width:64px;border-radius:var(--radius-md);border:none;background:transparent;color:var(--text2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 4px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:500}
     .global-sidebar .nav-btn:hover{background:var(--bg3);color:var(--text)}

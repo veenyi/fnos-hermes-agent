@@ -1,4 +1,26 @@
-# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.76)
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.77)
+
+---
+
+
+
+# v0.21.77 — 侧边栏可滚动（矮窗口 / 内嵌 iframe 下功能完整显示）
+
+> 用户反馈：通过本地 Launcher 内嵌打开时「功能显示不全」——侧边栏底部菜单（定时/记忆/轨迹/用量/更新/设置）被裁切且无法滚动访问。
+
+## 根因
+
+`.global-sidebar` 无 overflow 滚动：14 个导航项在矮视口（内嵌 iframe 约 640px 高）下底部菜单溢出被裁，且不可滚动。
+
+## 修复（ui/index.html）
+
+- `.global-sidebar` 增加 `overflow-y:auto;overflow-x:hidden`：菜单超出时侧边栏可滚动，底部功能（记忆/轨迹/用量/更新/设置）在任意窗口高度都能访问
+- 细滚动条样式（4px 半透明，暗色融合）
+- 配套：本地 Hermes Launcher 内嵌高度 70vh→82vh、应用窗口 1180×860→1280×940
+
+## 验证
+
+- index.html 脚本语法通过；102/249 已热更；WebDAV 已同步（v0.21.77.fpk）
 
 ---
 
