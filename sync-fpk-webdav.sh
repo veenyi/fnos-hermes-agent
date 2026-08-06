@@ -1,14 +1,33 @@
 #!/bin/bash
-# sync-fpk-webdav.sh — 上传最新 FPK 到 alist WebDAV（nas.aio.run:5244/dav/FnosAPP/）
+# sync-fpk-webdav.sh — 同步 FPK 安装包 + 更新记录 MD 到 alist WebDAV（nas.aio.run:5244/dav/FnosAPP/）
 # 用法：bash sync-fpk-webdav.sh [指定.fpk 路径（默认 pkg 下最新）]
-# 每次打包完成后运行本脚本，把安装包同步一份到用户飞牛（tim/Ferr0li@123）
+#   -md  仅上传更新记录 MD（不传 FPK）
+# 每次打包完成后运行，把安装包与 fnos-hermes-agent.md（单一持续更新记录）同步到用户飞牛
 set -u
 CHAT1="C:/Users/veenyi/Documents/QoderCN/2026-08-02/chat-1"
 PKG_DIR="$CHAT1/fnos-hermes-agent/pkg"
+UPDATE_MD="$CHAT1/fnos-hermes-agent/UPDATE-LOG.md"
 WEBDAV_BASE="http://nas.aio.run:5244/dav/FnosAPP"
 WD_USER="tim"
 WD_PASS="Ferr0li@123"
 
+MD_ONLY=0
+[ "${1:-}" = "-md" ] && MD_ONLY=1
+
+# ── 1) 更新记录 MD ──
+if [ -f "$UPDATE_MD" ]; then
+  echo "===== 同步更新记录 → $WEBDAV_BASE/fnos-hermes-agent.md ====="
+  curl -s --connect-timeout 20 --max-time 120 -u "$WD_USER:$WD_PASS" -T "$UPDATE_MD" "$WEBDAV_BASE/fnos-hermes-agent.md" -o /dev/null -w 'PUT: %{http_code}\n'
+  MD_SIZE=$(stat -c '%s' "$UPDATE_MD")
+  MD_REMOTE=$(curl -s --connect-timeout 20 --max-time 30 -u "$WD_USER:$WD_PASS" -I "$WEBDAV_BASE/fnos-hermes-agent.md" 2>/dev/null | grep -i content-length | tr -d '\r' | awk '{print $2}')
+  [ "$MD_REMOTE" = "$MD_SIZE" ] && echo "MD SYNC OK ✅" || echo "MD SYNC MISMATCH ⚠️"
+else
+  echo "WARN: UPDATE-LOG.md 不存在，跳过 MD 同步"
+fi
+
+[ "$MD_ONLY" = "1" ] && { echo "（-md 模式完成）"; exit 0; }
+
+# ── 2) FPK 安装包 ──
 FPK="${1:-}"
 if [ -z "$FPK" ]; then
   FPK=$(ls -t "$PKG_DIR"/fnos-hermes-agent_v*.fpk 2>/dev/null | head -1)
@@ -22,7 +41,6 @@ curl -s --connect-timeout 20 --max-time 600 -u "$WD_USER:$WD_PASS" -T "$FPK" "$W
 RC=$?
 if [ "$RC" -ne 0 ]; then echo "ERROR: 上传失败 rc=$RC"; exit 1; fi
 
-# 校验：远端大小与本地一致
 REMOTE=$(curl -s --connect-timeout 20 --max-time 30 -u "$WD_USER:$WD_PASS" -I "$WEBDAV_BASE/$NAME" 2>/dev/null | grep -i content-length | tr -d '\r' | awk '{print $2}')
 echo "本地大小: $SIZE | 远端大小: ${REMOTE:-?}"
 if [ "$REMOTE" = "$SIZE" ]; then

@@ -56,3 +56,12 @@ echo ""
 echo "===== [5] 产物 ====="
 ls -la hermes-agent.fpk 2>/dev/null
 
+echo ""
+echo "===== [6] 归档到 pkg/ 并同步 WebDAV ====="
+VER=$(grep '^version' "$DST/manifest" | awk '{print $3}')
+mkdir -p "$SRC/pkg"
+mv -f hermes-agent.fpk "$SRC/pkg/fnos-hermes-agent_v$VER.fpk" 2>/dev/null || { echo "WARN: 产物移动失败（可能已归档）"; }
+echo "归档: pkg/fnos-hermes-agent_v$VER.fpk"
+# 一步同步：FPK + 更新记录 MD → alist WebDAV
+bash "$CHAT1/sync-fpk-webdav.sh" 2>&1 | tail -8
+
