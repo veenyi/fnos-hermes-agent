@@ -9,7 +9,17 @@ PKG_DIR="$CHAT1/fnos-hermes-agent/pkg"
 UPDATE_MD="$CHAT1/fnos-hermes-agent/UPDATE-LOG.md"
 WEBDAV_BASE="http://nas.aio.run:5244/dav/FnosAPP"
 WD_USER="tim"
-WD_PASS="Ferr0li@123"
+# 密码从本地安全文件读取（不进入 git 仓库，防止泄露）：
+#   文件：~/.qwenworkcn/webdav-credentials（格式：第一行密码）
+WD_PASS=""
+CRED_FILE="$HOME/.qwenworkcn/webdav-credentials"
+if [ -f "$CRED_FILE" ]; then
+  WD_PASS=$(head -1 "$CRED_FILE" 2>/dev/null | tr -d '\r\n')
+fi
+if [ -z "$WD_PASS" ]; then
+  echo "ERROR: 未找到 WebDAV 密码（请写入 $CRED_FILE 第一行，或设置环境变量 WD_PASS）"
+  exit 1
+fi
 
 MD_ONLY=0
 [ "${1:-}" = "-md" ] && MD_ONLY=1
