@@ -4464,6 +4464,14 @@ async function handleFetch(req) {
       try { unlinkSync(VERSION_OVERRIDE_FILE); } catch {}
       try { HERMES_VERSION = "unknown"; } catch {}
       try { APP_VERSION = readAppVersion(); } catch {}
+      // 同步 fnOS 应用中心版本记录（postgres appcenter.app 表）——应用中心 UI 显示版本与 manifest 一致
+      const _appVer = String(version || "").replace(/^fnos-hermes-agent_v|^v/, "");
+      if (_appVer) {
+        try {
+          execSync(`sudo -n sudo -u postgres /usr/bin/psql -d appcenter -c "UPDATE app SET version='${_appVer}' WHERE app_name='hermes-agent'" 2>&1`, { timeout: 15000 });
+          log(`[app-update] fnOS 应用中心版本已同步: ${_appVer}`);
+        } catch (e2) { log(`[app-update] 应用中心版本同步失败: ${e2.message}`); }
+      }
       log(`[app-update] 文件覆盖完成（version=${version || "?"}），服务即将自动重启生效`);
       // 异步重启 monitor（应用自身重启加载新代码；gateway 由 monitor 拉起时加载新 hermes-src）
       setTimeout(() => {
