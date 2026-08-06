@@ -231,7 +231,10 @@ ensure_tui_bundle() {
         return 0
     fi
 
-    log_msg ">>> tui_dist/entry.js missing, provisioning from wheel ..."
+    # tui_dist 缺失时不再从 PyPI wheel 下载（环境为内置源码/Node 版，无需 PyPI 包；
+    # 且第三方索引对 hermes-agent 查询不稳定）。tui_dist 为可选终端 UI，缺失仅提示。
+    log_msg "WARNING: tui_dist/entry.js 缺失，跳过 PyPI wheel 下载（可选终端 UI，不影响主功能）"
+    return 0
 
     # ── 非致命：子 shell 内执行，失败仅 WARNING ──
     (
