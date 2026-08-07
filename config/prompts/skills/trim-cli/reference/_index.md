@@ -6,12 +6,18 @@
 
 | 任务 | 先看文档 | 何时继续下钻 |
 | --- | --- | --- |
-| 登录、登出、连接失败、session 回落 | [user.md](user.md) | 需要用户、用户组或登录设备详情时继续看 `user.md` |
+| 登录、登出、profile session、连接失败、session 回落 | [user.md](user.md) | 需要用户、用户组、登录设备或 profile/raw 认证细节时继续看 `user.md` |
 | 列目录、判断当前用户目录、搜索文件 | [workflows/file-routing.md](workflows/file-routing.md) | 确认命令方向后，再看 [file.md](file.md) |
 | 看共享目录、ACL、别人共享给我的文件 | [workflows/file-routing.md](workflows/file-routing.md) | 需要 `file share.*` 或 `file.getAcl` 细节时，再看 [file.md](file.md) |
 | 查看下载任务、创建下载任务 | [download.md](download.md) | 下载任务路径仍要遵守 canonical `/vol{n}/...` 规则 |
 | 查看或管理应用中心应用、安装 fpk | [app-center.md](app-center.md) | 写操作需要 `--yes`，复杂依赖/向导转 App Center UI |
+| 搜索照片、查看照片详情或预览地址 | [photos.md](photos.md) | 需要先有有效 fnOS session |
+| AI 搜图、统计匹配数量或生成照片预览链接 | [workflows/photos-routing.md](workflows/photos-routing.md) | 先区分匹配总数、本次返回条数和预览链接 |
+| 查看影视数量、搜索影片或生成投屏链接 | [workflows/media-routing.md](workflows/media-routing.md) | Media 会自动 OAuth，播放链接按敏感凭据处理 |
 | 查看系统信息、CPU、内存、日志 | [sysinfo.md](sysinfo.md)、[resmon.md](resmon.md)、[log.md](log.md) | 根据具体目标跳到对应模块 |
+| 发送未封装的已认证请求 | [user.md](user.md) | 先确认 session/profile 是否可用，再决定是否使用 `raw <req>` |
+| 开启或关闭 SSH 服务 | [network.md](network.md) | 启用 SSH 属于安全敏感操作，执行前确认授权 |
+| 重启或关闭 NAS | [power.md](power.md) | 高影响写操作，必须确认目标设备和授权 |
 | 查看 Docker 镜像、容器、Compose，或执行启停/删除 | [dockermgr.md](dockermgr.md) | 长耗时和删除类操作先看模块里的高风险提醒 |
 | 查看存储池、磁盘、SMART | [stor.md](stor.md) | 读操作可直接在模块文档中选命令 |
 | 做挂载、卸载、扩容、替盘、格式化、弹出等存储写操作 | [workflows/storage-dangerous-ops.md](workflows/storage-dangerous-ops.md) | 确认顺序后，再看 [stor.md](stor.md) 的字段和端点约束 |
@@ -22,6 +28,8 @@
 | 文档 | 用途 |
 | --- | --- |
 | [workflows/file-routing.md](workflows/file-routing.md) | 路由文件相关需求，区分 `/`、当前用户目录、具体 `/vol{n}/...`、共享目录和搜索入口 |
+| [workflows/photos-routing.md](workflows/photos-routing.md) | 路由相册统计、AI 搜索和抽样预览需求 |
+| [workflows/media-routing.md](workflows/media-routing.md) | 路由影视统计、搜索、详情和投屏播放需求 |
 | [workflows/storage-dangerous-ops.md](workflows/storage-dangerous-ops.md) | 在高风险存储写操作前固定先做只读探测、密码验证和确认 |
 | [workflows/device-validation.md](workflows/device-validation.md) | 统一真机验证账号顺序、最小探测、写后回归和清理口径 |
 
@@ -39,6 +47,9 @@
 | [../entries/trim-log.md](../entries/trim-log.md) | 日志列表、模块过滤、清除/导出/归档、老版本接口提醒 |
 | [../entries/trim-system.md](../entries/trim-system.md) | 静态系统信息、机器类型、版本、身份识别 |
 | [../entries/trim-monitor.md](../entries/trim-monitor.md) | 运行态指标（CPU、内存）和 resmon 指标路由 |
+| [../entries/trim-network.md](../entries/trim-network.md) | 网络服务开关，当前覆盖 SSH 服务 |
+| [../entries/trim-photos.md](../entries/trim-photos.md) | 相册目录、搜索、详情和预览链接 |
+| [../entries/trim-media.md](../entries/trim-media.md) | 影视 OAuth、媒体库统计、搜索、详情和播放链接 |
 
 ## 按模块找文档
 
@@ -53,7 +64,16 @@
 | log | [log.md](log.md) | 日志查询、导出、清除、归档策略 |
 | resmon | [resmon.md](resmon.md) | CPU、内存等资源监控 |
 | sysinfo | [sysinfo.md](sysinfo.md) | 系统信息和机器类型 |
+| network | [network.md](network.md) | 网络服务开关 |
+| power | [power.md](power.md) | 重启或关闭 NAS |
+| photos | [photos.md](photos.md) | Photos 认证、搜索、详情和预览 URL |
+| media | [media.md](media.md) | Media OAuth、统计、搜索、详情和播放 URL |
 
 ## 文档约定
 
 所有模块文档遵循 [_conventions.md](_conventions.md) 定义的统一格式。workflow 文档只负责操作顺序、停手条件和常见误判，不重复完整字段表。
+
+补充约定：
+
+- profile/session、`login` / `logout`、`raw` 的共享认证链路统一看 [user.md](user.md)。
+- 输入 guard 遇到控制字符、空值或过长值时会直接报错；skill 示例不要假设 CLI 会帮忙清洗参数。

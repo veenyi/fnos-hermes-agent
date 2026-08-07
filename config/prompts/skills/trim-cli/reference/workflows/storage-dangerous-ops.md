@@ -16,8 +16,11 @@
 - `storage extend`
 - `storage format`
 - `storage eject`
+- `storage disk-mount`
+- `storage disk-umount`
+- `storage request`，除非你能确认目标端点只读
 
-`storage mount` 风险较低，但仍应先确认目标池标识和当前状态。
+`storage mount` 风险较低，但仍应先确认目标池标识和当前状态。`storage disk-mount` / `storage disk-umount` 面向可移动磁盘，也应先确认目标磁盘。
 
 ## 2. 固定先做的只读探测
 
@@ -25,12 +28,14 @@
 
 1. `trim-cli storage pools`
 2. `trim-cli storage disks`
-3. 按目标需要补 `trim-cli storage health <disk>` 或 `trim-cli storage smart <disk>`
-4. 如果是可移动设备，再看 `trim-cli storage removable`
+3. 如果要创建存储池，补 `trim-cli storage free-disks`
+4. 按目标需要补 `trim-cli storage health <disk>` 或 `trim-cli storage smart <disk>`
+5. 如果是可移动设备，再看 `trim-cli storage removable` 和 `trim-cli storage disk-info <disk>`
 
 目的：
 
 - 确认目标到底是 pool uuid、`trim_*` 标识，还是具体磁盘名
+- 创建存储池时确认候选盘/分区；系统盘剩余空间候选要用返回的 `part`，不要用整盘 `name`
 - 确认磁盘状态、池状态、是否可移动
 - 避免把磁盘操作误发到存储池，或把存储池操作误发到磁盘
 
@@ -40,9 +45,11 @@
 | --- | --- |
 | 验证密码并转发密码 | `umount`、`create`、`stop`、`add-disk`、`remove-disk`、`replace-disk`、`resize` |
 | 只验证密码，不转发密码 | `extend`、`format`、`eject` |
-| 仅确认，不做密码验证 | `mount` |
+| 仅确认，不做密码验证 | `mount`、`disk-mount`、`disk-umount` |
+| 通用请求 | `request` 默认确认；如果传 `--password`，会验证并转发密码 |
 
 如果用户没有明确给出密码，且命令属于前两类，不要假设存在默认密码。
+如果要用 `storage request` 调用可能修改设备状态的 `stor.*` 端点，也按高风险写操作处理。
 
 ## 4. 常见误判
 

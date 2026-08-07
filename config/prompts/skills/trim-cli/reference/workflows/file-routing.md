@@ -10,6 +10,7 @@
 | 看某个具体目录 | `trim-cli file ls /vol{n}/...` | 不要把聚合根和具体 canonical 路径混用 |
 | 在当前用户目录下搜文件 | `trim-cli file search <key>` | 不要手工猜当前用户目录；CLI 会先探测再推导 |
 | 在指定目录下搜文件 | `trim-cli file search <key> /vol{n}/...` | 不要传聚合根或非 canonical 路径 |
+| 上传本地文件到 NAS | `trim-cli file upload /vol{n}/... <localFile>` | 远端参数是目录，不是最终文件路径 |
 | 搜“别人共享给我”的文件 | `trim-cli file search-others <key>` | 不要把它当成 `file share list` 的别名 |
 | 看共享目录元数据 | `trim-cli file share info <path>` | 不要混成 share link 管理 |
 | 列可见共享目录 | `trim-cli file share list [uid]` | 不要把它当成文件搜索 |
@@ -33,6 +34,7 @@
 - `file search-others` 返回的是“别人共享给当前用户的文件搜索结果”，不是共享目录列表
 - `file acl get` 查的是权限信息，不等同于共享目录状态
 - `file cp` / `file mv` 的目标参数是目标目录，不是最终文件路径
+- `file upload` 的 `uploadName` 是 HTTP 上传/续传路径，不一定是用户最终看到的文件名
 
 ## 4. 什么时候必须停下来确认
 
@@ -44,4 +46,5 @@
 ## 5. 下一步
 
 - 已经确定命令方向：去看 [../file.md](../file.md)
+- 要验证上传行为：去看 [file-upload-validation.md](file-upload-validation.md)
 - 仍然不确定路径语义：先停在这里，不要继续猜 payload

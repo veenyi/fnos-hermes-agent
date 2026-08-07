@@ -19,9 +19,16 @@
 | 搜当前用户目录下的文件 | `trim-cli file search <key>` | CLI 会先探测再推导当前用户目录 |
 | 在显式路径下搜索 | `trim-cli file search <key> /vol{v}/...` | 每个路径都必须是 canonical 路径 |
 | 搜别人共享给当前用户的文件 | `trim-cli file search-others <key>` | 这是 finder 搜索，不是共享目录列表 |
+| 列目录、统计空间、查看访问权限 | `file ls-dir/calc/access <path>` | 只接受具体 `/vol{v}/...` 路径，`ls-dir` 也可不传路径 |
+| 看文件属性、大小或下载 URL | `file prop/size/download-url <path>` | 只接受具体 `/vol{v}/...` 路径 |
 | 看共享目录元数据或列表 | `file share info/list/list-others/admin-list/admin-list-others` | 共享目录与 share link 不是同一语义 |
 | 看 ACL | `trim-cli file acl get <path>` | ACL 查询与共享目录状态不是同一概念 |
-| 做创建、删除、复制、移动 | `file mkdir/rm/cp/mv` | 写操作默认要求具体 `/vol{v}/...` 路径 |
+| 设置 ACL 或所有者 | `file acl set` / `file chown` | 权限写操作，需要 `--yes` |
+| 转换或导出 TrimACL 报告 | `file trimacl conv/report` | 权限转换类写操作，需要 `--yes` |
+| 做创建、重命名、删除、复制、移动 | `file mkdir/rename/rm/cp/mv` | 写操作默认要求具体 `/vol{v}/...` 路径；重命名需要 `--yes` |
+| 压缩或解压文件 | `file compress/extract` | 写操作，需要 `--yes` |
+| 管理当前用户回收站 | `file trash list/search/restore/clear` | 恢复和清空需要 `--yes` |
+| 管理团队文件和团队回收站 | `file team list/trash-list-trashbin/trash-list/trash-restore/trash-clear` | 恢复和清空需要 `--yes`；清空需要团队卷号和团队目录名 |
 | 上传前检查目标路径 | `trim-cli file check-upload /vol{v}/... <size>` | 只做预检查，不上传文件内容 |
 | 上传单个本地文件 | `trim-cli file upload /vol{v}/... <localFile>` | 远端参数是目录，CLI 会拼接本地文件名 |
 
@@ -45,33 +52,37 @@
 ## 端点索引
 - 核心列表和元数据：
   - `file.ls`
-  - `file.lsDir`（未实现）
-  - `file.calc`（未实现）
-  - `file.prop`（未实现）
-  - `file.access`（未实现）
-  - `file.usage`（未实现）
+  - `file.lsDir`
+  - `file.calc`
+  - `file.prop`
+  - `file.access`
+  - `file.usage`
 - 变更和传输：
   - `file.mkdir`
-  - `file.rename`（未实现）
+  - `file.rename`
   - `file.rm`
   - `file.cp`
   - `file.mv`
-  - `file.cancel`（未实现）
+  - `file.cancel`
 - 所有权和 ACL：
-  - `file.chown`（未实现）
+  - `file.chown`
   - `file.getAcl`
-  - `file.setAcl`（未实现）
+  - `file.setAcl2`
+  - `file.trimacl.conv`
+  - `file.trimacl.conv.report`
+  - `file.setAcl`（旧 ACL 接口未实现）
 - 上传/下载/压缩：
   - `file.checkUpload`
-  - `file upload` CLI HTTP `/upload` flow
-  - `file.download`（未实现）
-  - `file.compress`（未实现）
-  - `file.extract`（未实现）
-  - `file.size`（未实现）
+  - `file upload` CLI `/upload` flow；上传传输跟随当前连接安全策略
+  - `file.download`
+  - `file.compress`
+  - `file.extract`
+  - `file.size`
 - 搜索：
   - `appcgi.finder.fileSearch`
   - `appcgi.finder.searchOtherSharing`
-  - `appcgi.finder.trashSearch`（未实现）
+  - `appcgi.finder.trashSearch`
+  - `appcgi.finder.cancelSearch`
 - 共享目录：
   - `file.share.info`
   - `file.share.list`
@@ -80,12 +91,21 @@
   - `file.share.admin.listOthers`
   - `file.share.add2`
   - `file.share.del2`
-- 收藏夹/最近文件（均未实现）：
+- 收藏夹/最近文件：
   - `file.fav.list`、`file.fav.add`、`file.fav.del`
   - `file.recent.list`、`file.recent.add`、`file.recent.del`、`file.recent.clear`
-- 回收站和团队（均未实现）：
+- 应用文件和系统分区：
+  - `appcgi.filestor.getAppDirList`
+  - `appcgi.filestor.getSysPartInfo`
+  - `appcgi.filestor.isMountPoint`
+- 回收站：
   - `file.trash.list`、`file.trash.clear`、`file.trash.restore`
-  - `file.team.lsDir`、`file.team.trash.*`
+- 团队文件：
+  - `file.team.lsDir`
+  - `file.team.trash.listTrashbin`
+  - `file.team.trash.list`
+  - `file.team.trash.clear`
+  - `file.team.trash.restore`
 
 ## 端点详情
 
@@ -162,12 +182,93 @@ trim-cli file mkdir /vol{v}/...
 | Field | Always Present | Type | Meaning | Conditions / Notes | Example |
 | --- | --- | --- | --- | --- | --- |
 | `result` | no | string | Terminal marker | `succ`/`fail` | `succ` |
-| `errno` | no | number | ��误码 | 失败时出现 | `17` |
+| `errno` | no | number | 错误码 | 失败时出现 | `17` |
 | `errmsg` | no | string | 错误描述 | | `file exists` |
 
 #### Field Semantics
 - `path` 是完整目标路径，不是父目录加名称。
 - 目前不支持可选的权限参数。
+
+### file.prop
+
+#### Endpoint
+`file.prop`
+
+#### Purpose
+查看指定文件或目录的属性。
+
+#### Trim CLI Mapping
+```
+trim-cli file prop /vol{v}/...
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value `file.prop` | `file.prop` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+| `files` | body | yes | string[] | 要查询的路径列表 | CLI 当前发送单个路径 | `["/vol2/1106/a.txt"]` |
+
+### file.size
+
+#### Endpoint
+`file.size`
+
+#### Purpose
+查看单个文件或目录的大小。
+
+#### Trim CLI Mapping
+```
+trim-cli file size /vol{v}/...
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value `file.size` | `file.size` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+| `file` | body | yes | string | 要计算的路径 | 单个 canonical 路径 | `/vol2/1106/a.txt` |
+
+### file.download
+
+#### Endpoint
+`file.download`
+
+#### Purpose
+请求一个或多个文件的下载 URL。
+
+#### Trim CLI Mapping
+```
+trim-cli file download-url /vol{v}/...
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value `file.download` | `file.download` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+| `files` | body | yes | string[] | 要下载的路径列表 | CLI 当前发送单个路径 | `["/vol2/1106/a.txt"]` |
+
+### file.rename
+
+#### Endpoint
+`file.rename`
+
+#### Purpose
+重命名指定文件或目录。
+
+#### Trim CLI Mapping
+```
+trim-cli file rename /vol{v}/... <newName> --yes
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value `file.rename` | `file.rename` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+| `path` | body | yes | string | 要重命名的路径 | 必须为 `/vol{v}/...` | `/vol2/1106/a.txt` |
+| `newName` | body | yes | string | 新名称 | 只能是名称片段，不能包含 `/` | `b.txt` |
 
 ### file.checkUpload
 
@@ -196,7 +297,7 @@ trim-cli file check-upload /vol{v}/... <size> [--overwrite skip|replace|rename]
 | --- | --- | --- | --- | --- | --- |
 | `result` | no | string | Terminal marker | `succ`/`fail` | `succ` |
 | `skip` | no | number | 跳过提示 | 部分版本返回 | `1` |
-| `uploadName` | no | string | 实际上传文件名 | 同名保留两者时可能返回新名称 | `new (1).jpg` |
+| `uploadName` | no | string | HTTP 上传/断点路径文件名 | POST `/upload` 的 `Trim-Path` 使用该名称；它不一定等于用户最终看到的文件名 | `new.iso.~#2` |
 | `from` | no | number | 续传起点 | 部分版本返回 | `1048576` |
 | `completed` | no | number | 已完成字节数 | 部分版本返回 | `1048576` |
 | `errno` | no | number | 错误码 | 失败时出现 | `4386` |
@@ -222,13 +323,14 @@ trim-cli file upload /vol{v}/... <localFile> [--overwrite skip|replace|rename]
 2. 使用本地文件名拼出完整远端目标路径。
 3. 调用 `file.checkUpload`。
 4. 如果返回 `skip` 或 `completed`，直接视为成功。
-5. 如果返回 `uploadName`，用该名称替换最终上传文件名。
-6. 使用 HTTP `POST /upload` 上传 multipart 字段 `trim-upload-file`。
+5. 如果返回 `uploadName`，HTTP `Trim-Path` 使用父目录加该名称；用户可见结果仍是请求的目标路径。
+6. 使用 `POST /upload` 上传 multipart 字段 `trim-upload-file`；本机或显式允许的远端 WS 使用 HTTP，远端默认 WSS 使用 HTTPS。
+7. 20 MiB 及以上文件会缓存 `uploadName` 路径用于后续断点续传；缓存续传遇到 `328496` 会重试，遇到 `4100` 会回退普通检查。
 
 #### HTTP Headers
 | Header | Required | Meaning |
 | --- | --- | --- |
-| `Trim-Path` | yes | URI-encoded final remote file path |
+| `Trim-Path` | yes | URI-encoded HTTP upload path; may use backend `uploadName` |
 | `Trim-From` | yes | 续传起点；无续传时为 `0` |
 | `Trim-Overwrite` | yes | `0` skip, `1` replace, `2` rename |
 | `Trim-Mtim` | yes | 本地文件 mtime，Unix 秒 |
@@ -244,7 +346,7 @@ trim-cli file upload /vol{v}/... <localFile> [--overwrite skip|replace|rename]
 
 #### Trim CLI Mapping
 ```
-trim-cli file rm /vol{v}/...
+trim-cli file rm /vol{v}/... --yes
 ```
 
 #### Request
@@ -258,13 +360,72 @@ trim-cli file rm /vol{v}/...
 - 后端使用 `files: string[]`，不是单个 `path` 字段。
 - CLI 当前只暴露单目标删除，但后端支持数组。
 
+### file.trash.list
+
+#### Endpoint
+`file.trash.list`
+
+#### Purpose
+列出当前用户回收站文件。
+
+#### Trim CLI Mapping
+```
+trim-cli file trash list
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value `file.trash.list` | `file.trash.list` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+
+### file.trash.restore
+
+#### Endpoint
+`file.trash.restore`
+
+#### Purpose
+从回收站恢复指定文件。
+
+#### Trim CLI Mapping
+```
+trim-cli file trash restore /vol{v}/... --yes
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value `file.trash.restore` | `file.trash.restore` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+| `files` | body | yes | string[] | 要恢复的回收站路径 | CLI 当前发送单个路径 | `["/vol2/1106/a.txt"]` |
+| `overwrite` | body | yes | number | 冲突处理策略 | `2` 表示自动改名保留两者 | `2` |
+
+### file.trash.clear
+
+#### Endpoint
+`file.trash.clear`
+
+#### Purpose
+清空当前用户回收站。
+
+#### Trim CLI Mapping
+```
+trim-cli file trash clear --yes
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value `file.trash.clear` | `file.trash.clear` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+
 ### file.cp
 
 #### Endpoint
 `file.cp`
 
 #### Purpose
-将文件或目录复制到指定 canonical fnOS 目���目录。
+将文件或目录复制到指定 canonical fnOS 目标目录。
 
 #### Trim CLI Mapping
 ```
@@ -293,7 +454,7 @@ trim-cli file cp <src> <destDir>
 `file.mv`
 
 #### Purpose
-将文件或目录���动到指定 canonical fnOS 目标目录。
+将文件或目录移动到指定 canonical fnOS 目标目录。
 
 #### Trim CLI Mapping
 ```

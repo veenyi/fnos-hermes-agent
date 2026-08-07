@@ -15,9 +15,10 @@
   - `appcgi.eventlogger.common.export`
   - `appcgi.eventlogger.common.archive`（设置归档策略）
   - `appcgi.eventlogger.common.archive.get`（查询归档策略）
+  - `appcgi.eventlogger.debuglog.copyStart`（开始复制诊断日志）
+  - `appcgi.eventlogger.debuglog.copyStop`（取消复制诊断日志）
 - 未实现：
   - `log.*`（旧版日志查询家族）
-  - `appcgi.eventlogger.debuglog.*`（调试日志复制）
 
 ## 端点详情
 
@@ -161,6 +162,63 @@ trim-cli logger archive query
 - 响应包含当前归档配置，CLI 直接打印后端返回的 payload。
 - 响应中 `validPath` 字段（如存在）表示路径有效性状态。
 
+### appcgi.eventlogger.debuglog.copyStart
+
+#### Endpoint
+`appcgi.eventlogger.debuglog.copyStart`
+
+#### Purpose
+复制后端诊断日志（Debug Log）到指定输出目录，并返回任务进度。
+
+#### Trim CLI Mapping
+```
+trim-cli logger debuglog copy-start --output-dir <path> [--srv-type <0|1|2>]...
+trim-cli diagnostic-log export --output-dir <path> [--srv-type <0|1|2>]...
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value | `appcgi.eventlogger.debuglog.copyStart` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+| `outputDir` | body | yes | string | 输出目录 | CLI 要求已挂载存储空间或外挂盘路径，格式如 `/vol1/<dir>` 或 `/vol00/<mount>/<dir>`；不要使用系统目录如 `/tmp`、`/var/tmp`、`/home/...` | `/vol00/RemovableDisk/debug-log` |
+| `srvType` | body | no | number[] | 复制类别 | `0` 系统，`1` 内置应用，`2` 内置服务；未传时后端按全部类别处理。CLI 支持重复传入或逗号分隔，并按顺序去重。 | `[0,1,2]` |
+
+#### Response
+| Field | Always Present | Type | Meaning | Conditions / Notes | Example |
+| --- | --- | --- | --- | --- | --- |
+| `taskId` | no | string | 复制任务 ID | doing/success 进度帧的 `data` 中返回 | `ftask_1` |
+| `fileNumTotal` | no | number | 需要复制的文件总数 | 进度帧返回 | `51` |
+| `fileNumDone` | no | number | 已复制文件数 | 进度帧返回 | `2` |
+
+#### Protocol Notes
+- 后端可能先返回 `result:"doing"` 进度帧，再返回终态帧。CLI 会优先展示带 `taskId` 的进度 payload，方便后续执行 `diagnostic-log stop`。
+- `outputDir` 必须预先存在于设备侧已挂载的存储空间或外挂盘下。普通存储常见路径是 `/volN/<uid>/...`；外挂盘常见路径是 `/vol00/<mount-name>/...`。
+
+#### Errors
+- 常见错误包括缺少 `outputDir`、目录不存在、创建目录失败、目录不可写、磁盘空间不足、重复任务、任务不存在等。
+
+### appcgi.eventlogger.debuglog.copyStop
+
+#### Endpoint
+`appcgi.eventlogger.debuglog.copyStop`
+
+#### Purpose
+取消正在进行的诊断日志复制任务。
+
+#### Trim CLI Mapping
+```
+trim-cli logger debuglog copy-stop --task-id <taskId>
+trim-cli diagnostic-log stop --task-id <taskId>
+```
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | Endpoint selector | Fixed value | `appcgi.eventlogger.debuglog.copyStop` |
+| `reqid` | body | yes | string | Request correlation ID | Generated per request | `69ba...` |
+| `taskId` | body | yes | string | 复制任务 ID | CLI 要求非空且不包含空白字符 | `ftask_1` |
+
 ## 注意事项
 - 旧版 `log.*` 家族端点和当前 `appcgi.eventlogger.common.*` 端点可能在不同固件版本上共存。
-- 调试日志复制功能（`debuglog.*`）尚未实现。
+- `logger debuglog copy-start` / `diagnostic-log export` 的 `outputDir` 需要选择已挂载存储空间或外挂盘路径；系统盘路径不是有效诊断日志导出目标。

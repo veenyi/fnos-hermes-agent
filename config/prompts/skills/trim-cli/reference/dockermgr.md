@@ -41,11 +41,11 @@ Docker 管理模块，涵盖 Docker 镜像、容器、网络、Compose 项目和
   - `appcgi.dockermgr.imagePull`
   - `appcgi.dockermgr.imageInspect`
   - `appcgi.dockermgr.imageRemove`
-  - `appcgi.dockermgr.imageDownloadList`（未实现）
-  - `appcgi.dockermgr.imageLoad`（未实现）
-  - `appcgi.dockermgr.imageSave`（未实现）
-  - `appcgi.dockermgr.imageUpgrade`（未实现）
-  - `appcgi.dockermgr.imageCancel`（未实现）
+  - `appcgi.dockermgr.imageDownloadList`（通过 `docker request`）
+  - `appcgi.dockermgr.imageLoad`（通过 `docker request`）
+  - `appcgi.dockermgr.imageSave`（通过 `docker request`）
+  - `appcgi.dockermgr.imageUpgrade`（通过 `docker request`）
+  - `appcgi.dockermgr.imageCancel`（通过 `docker request`）
 - 容器：
   - `appcgi.dockermgr.containerList`
   - `appcgi.dockermgr.containerCreate`
@@ -57,8 +57,8 @@ Docker 管理模块，涵盖 Docker 镜像、容器、网络、Compose 项目和
   - `appcgi.dockermgr.containerRestart`
   - `appcgi.dockermgr.containerKill`
   - `appcgi.dockermgr.containerRemove`
-  - `appcgi.dockermgr.containerModify`（未实现）
-- 网络（均未实现）：
+  - `appcgi.dockermgr.containerModify`
+- 网络：
   - `appcgi.dockermgr.networkCreate`
   - `appcgi.dockermgr.networkList`
   - `appcgi.dockermgr.networkRemove`
@@ -67,13 +67,21 @@ Docker 管理模块，涵盖 Docker 镜像、容器、网络、Compose 项目和
 - 系统和 Compose：
   - `appcgi.dockermgr.stats`
   - `appcgi.dockermgr.composeList`
-  - `appcgi.dockermgr.systemStart`（未实现）
-  - `appcgi.dockermgr.systemStop`（未实现）
-  - `appcgi.dockermgr.systemRestart`（未实现）
-  - `appcgi.dockermgr.composeContainers`（未实现）
-  - `appcgi.dockermgr.composeCreate`（未实现）
-  - `appcgi.dockermgr.composeStart`（未实现）
-  - `appcgi.dockermgr.composeStop`（未实现）
+  - `appcgi.dockermgr.systemStart`（通过 `docker request`）
+  - `appcgi.dockermgr.systemStop`（通过 `docker request`）
+  - `appcgi.dockermgr.systemRestart`（通过 `docker request`）
+  - `appcgi.dockermgr.composeContainers`（通过 `docker request`）
+  - `appcgi.dockermgr.composeCreate`（通过 `docker request`）
+  - `appcgi.dockermgr.composeStart`（通过 `docker request`）
+  - `appcgi.dockermgr.composeStop`（通过 `docker request`）
+
+未封装为固定子命令的 `appcgi.dockermgr.*` 端点通过以下入口调用：
+
+```bash
+trim-cli docker request appcgi.dockermgr.<name> --json '<object>' --yes
+```
+
+`--json` 必须是 JSON object，不能包含 `req` 或 `reqid`。默认需要确认；Docker system、network、Compose 和镜像导入导出类操作可能影响运行中服务，自动化调用前应先执行只读探测。
 
 ## 端点详情
 
