@@ -46,6 +46,22 @@ rm -f "${TRIM_APPDEST}/hermes-agent.sock" 2>/dev/null || true
 rm -f "/var/apps/hermes-agent/target/hermes-agent.sock" 2>/dev/null || true
 log_msg "socket 清理完成"
 
+# 端口冲突清理：安装前杀掉占用应用端口（8650 UI / 8742 gateway / 9219 dashboard）的旧 hermes 进程，
+# 避免端口被占导致安装或启动失败（例如残留的独立安装 gateway）
+for PORT in 8650 8742 9219; do
+    PID=$(ss -tlnp 2>/dev/null | grep ":${PORT} " | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+    if [ -n "$PID" ]; then
+        # 只清理 hermes 相关进程（防止误杀其它应用）
+        CMDLINE=$(ps -p "$PID" -o cmd= 2>/dev/null | grep -iE 'hermes|monitor|gateway' || true)
+        if [ -n "$CMDLINE" ]; then
+            log_msg "端口 ${PORT} 被 hermes 进程 pid=${PID} 占用，清理旧进程"
+            kill -9 "$PID" 2>/dev/null || true
+        fi
+    fi
+done
+sleep 1
+log_msg "端口冲突清理完成"
+
 # 清理残留的版本覆盖文件（@appdata 不随卸载清除，旧 override 会导致 UI 显示旧版本号）
 rm -f "${TRIM_PKGVAR}/app_version" 2>/dev/null || true
 log_msg "app_version 覆盖文件清理完成"

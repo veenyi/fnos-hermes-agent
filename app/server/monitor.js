@@ -4504,6 +4504,13 @@ async function handleFetch(req) {
       if (buf[0] !== 0x1f || buf[1] !== 0x8b) throw new Error("下载内容不是有效的 FPK 包（gzip）");
       // 安装：appcenter-cli install-fpk 不支持已安装应用升级（实测仅返回 "is installed" 不执行），
       // 改为「解包覆盖」——解压 FPK 直接覆盖 APP_DIR（hermes-agent 有写权限，配置在 @appdata/@apphome 不受影响）
+      // 先停止 gateway/dashboard（释放端口与文件占用），再解压覆盖——「先 stop 再解压」流程
+      try {
+        await stopPid(PID_GATEWAY);
+        await stopPid(PID_DASHBOARD);
+        await forceKillHermes();
+        log(`[app-update] 已停止旧 gateway/dashboard（释放 8742/9219）`);
+      } catch (e) { log(`[app-update] 停止旧服务异常（继续覆盖）: ${e.message}`); }
       const stage = `/tmp/fpk-auto-${Date.now()}`;
       try {
         execSync(`rm -rf ${stage} && mkdir -p ${stage} && tar xzf ${fpkPath} -C ${stage}`, { timeout: 120000, encoding: "utf8" });
@@ -4530,13 +4537,14 @@ async function handleFetch(req) {
         } catch (e2) { log(`[app-update] 应用中心版本同步失败: ${e2.message}`); }
       }
       log(`[app-update] 文件覆盖完成（version=${version || "?"}），服务即将自动重启生效`);
-      // 异步重启 monitor（应用自身重启加载新代码；gateway 由 monitor 拉起时加载新 hermes-src）
-      setTimeout(() => {
-        try {
-          log("[app-update] 自动更新完成，正在重启服务…");
-          _triggerGatewayRestart("app-auto-update");
-        } catch (e) { log(`[app-update] 重启触发失败: ${e.message}`); }
-      }, 2000);
+      // monitor 安全自重启：spawn 延迟拉起 start-monitor.sh（完整 env），随后本进程退出；
+      // 新 monitor 启动时自动拉起 gateway/dashboard（provider 检测）→ 服务完整启动、应用中心运行中
+      try {
+        const _rs = `sleep 3; ${VAR_DIR}/start-monitor.sh`;
+        spawn("/bin/sh", ["-c", _rs], { detached: true, stdio: "ignore" }).unref();
+        log(`[app-update] 已安排 monitor 自重启（start-monitor.sh）`);
+      } catch (e) { log(`[app-update] 自重启安排失败: ${e.message}`); }
+      setTimeout(() => { try { process.exit(0); } catch {} }, 1500);
       return new Response(JSON.stringify({ ok: true, version, note: "文件已覆盖，服务即将自动重启生效" }), { headers: jsonHeaders() });
     } catch (e) {
       log(`[app-update] 自动更新失败: ${e.message}`);
