@@ -4,12 +4,8 @@
   "description": "Command-line interface for TRIM NAS",
   "entry": "SKILL.md",
   "bin": {
-    "darwin-arm64": "bin/trim-cli-darwin-arm64",
-    "darwin-x64": "bin/trim-cli-darwin-x64",
     "linux-arm64": "bin/trim-cli-linux-arm64",
-    "linux-x64": "bin/trim-cli-linux-x64",
-    "windows-arm64": "bin/trim-cli-windows-arm64.exe",
-    "windows-x64": "bin/trim-cli-windows-x64.exe"
+    "linux-x64": "bin/trim-cli-linux-x64"
   },
   "reference": "reference/",
   "entriesDir": "entries/",
