@@ -4,6 +4,16 @@
 
 ---
 
+## v0.21.96（2026-08-07）
+
+**自动更新提速与兼容修复（254 实测驱动）**：
+- **GitHub 加速镜像超时 120s → 30s**：镜像被堵时不再干等 2 分钟，快速切换直连（直连 15MB/s）
+- **自重启兼容修复**：部分机器（如 254）没有手动固化的 start-monitor.sh，升级后 monitor 起不来（应用中心卡「start」）——现在缺失时自动 fallback 到 fnOS 标准 `cmd/main start`（显式传 TRIM_APPDEST=target）
+- **环境配置补齐**（254 等）：WebDAV 凭证（HERMES_WD_*）未配置时 WebDAV 通道快速报错提示；sudoers 补 psql/chown 免密（应用中心版本同步 + 权限修复生效）
+- 254 实测：WebDAV 下载 38.3MB 约 6 秒，全流程升级 → 0.21.96 | running
+
+- 安装包：fnos-hermes-agent_v0.21.96.fpk（40.1MB）
+
 ## v0.21.95（2026-08-07）
 
 **飞牛操作员全面强化（trim-cli 官方 v2 Skill）+ 官方升级流程对齐**：
