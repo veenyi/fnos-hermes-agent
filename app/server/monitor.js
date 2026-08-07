@@ -4479,7 +4479,7 @@ async function handleFetch(req) {
           try {
             const _ghp = (process.env.HERMES_GHPROXY || "https://ghproxy.net/").replace(/\/+$/, "");
             log(`[app-update] 尝试 GitHub 加速镜像下载`);
-            dl = await fetch(`${_ghp}/${url.replace(/^https?:\/\//, "")}`, { signal: AbortSignal.timeout(120000) });
+            dl = await fetch(`${_ghp}/${url.replace(/^https?:\/\//, "")}`, { signal: AbortSignal.timeout(30000) });
             if (dl.ok) {
               const _b2 = Buffer.from(await dl.arrayBuffer());
               if (_b2.length > 0 && (_b2[0] === 0x1f && _b2[1] === 0x8b)) { buf = _b2; log(`[app-update] 加速镜像下载成功 ${(buf.length/1048576).toFixed(1)}MB`); }
@@ -4556,12 +4556,16 @@ async function handleFetch(req) {
         execSync(`sudo -n chown -R ${_owner} ${VAR_DIR} 2>/dev/null; chmod -R 750 ${VAR_DIR} 2>/dev/null; true`, { timeout: 60000 });
         log(`[app-update] 权限修复完成（${_owner}，对齐 upgrade_callback / TRIM_APP_STATUS=UPGRADE）`);
       } catch (e) { log(`[app-update] 权限修复异常（继续自重启）: ${e.message}`); }
-      // monitor 安全自重启：spawn 延迟拉起 start-monitor.sh（完整 env），随后本进程退出；
-      // 新 monitor 启动时自动拉起 gateway/dashboard（provider 检测）→ 服务完整启动、应用中心运行中
+      // monitor 安全自重启：spawn 延迟拉起启动脚本（完整 env），随后本进程退出；
+      // 优先 start-monitor.sh（部分机器手动固化）；缺失时 fallback 到 fnOS 标准 cmd/main start
+      // （main 需显式传 TRIM_APPDEST=target——其脚本内 fallback 是壳目录，无 env 时会找不到 monitor.js）
       try {
-        const _rs = `sleep 3; ${VAR_DIR}/start-monitor.sh`;
+        const _sm = `${VAR_DIR}/start-monitor.sh`;
+        const _rs = existsSync(_sm)
+          ? `sleep 3; ${_sm}`
+          : `sleep 3; env TRIM_APPDEST=${APP_DIR} TRIM_PKGHOME=${DATA_DIR.replace(/\/data$/, "")} TRIM_PKGVAR=${VAR_DIR} bash /var/apps/hermes-agent/cmd/main start`;
         spawn("/bin/sh", ["-c", _rs], { detached: true, stdio: "ignore" }).unref();
-        log(`[app-update] 已安排 monitor 自重启（start-monitor.sh）`);
+        log(`[app-update] 已安排 monitor 自重启（${existsSync(_sm) ? "start-monitor.sh" : "cmd/main start"}）`);
       } catch (e) { log(`[app-update] 自重启安排失败: ${e.message}`); }
       setTimeout(() => { try { process.exit(0); } catch {} }, 1500);
       return new Response(JSON.stringify({ ok: true, version, note: "文件已覆盖，服务即将自动重启生效" }), { headers: jsonHeaders() });
