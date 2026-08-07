@@ -4544,6 +4544,18 @@ async function handleFetch(req) {
         } catch (e2) { log(`[app-update] 应用中心版本同步失败: ${e2.message}`); }
       }
       log(`[app-update] 文件覆盖完成（version=${version || "?"}），服务即将自动重启生效`);
+      // ── 官方对齐：upgrade_callback 式权限修复（防覆盖后权限漂移导致 EACCES/启动失败）──
+      // 官方升级流程在 upgrade_callback 阶段会修复目录属主/权限（TRIM_APP_STATUS=UPGRADE 语义）；
+      // auto-update 自更新不经过系统 upgrade_callback，这里补齐等价修复：
+      // 只修 APP_DIR（被覆盖的 bin/server/ui/hermes-src）与 VAR_DIR（pid/tmp/socket），
+      // DATA_DIR（含大体积 venv）不在覆盖范围、跳过避免 chown 大目录耗时。
+      try {
+        const _owner = execSync(`stat -c '%U:%G' ${APP_DIR} 2>/dev/null`).toString().trim() || "hermes-agent:hermes-agent";
+        // chown 需特权（monitor 以应用用户运行，走 sudo -n 免密；chmod 属主可自改）
+        execSync(`sudo -n chown -R ${_owner} ${APP_DIR} 2>/dev/null; chmod 775 ${APP_DIR} 2>/dev/null; true`, { timeout: 60000 });
+        execSync(`sudo -n chown -R ${_owner} ${VAR_DIR} 2>/dev/null; chmod -R 750 ${VAR_DIR} 2>/dev/null; true`, { timeout: 60000 });
+        log(`[app-update] 权限修复完成（${_owner}，对齐 upgrade_callback / TRIM_APP_STATUS=UPGRADE）`);
+      } catch (e) { log(`[app-update] 权限修复异常（继续自重启）: ${e.message}`); }
       // monitor 安全自重启：spawn 延迟拉起 start-monitor.sh（完整 env），随后本进程退出；
       // 新 monitor 启动时自动拉起 gateway/dashboard（provider 检测）→ 服务完整启动、应用中心运行中
       try {
