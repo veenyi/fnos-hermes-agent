@@ -4,6 +4,16 @@
 
 ---
 
+## v0.21.94（2026-08-07）
+
+**记忆页同步官方 Hermes 信息**：
+- **SOUL.md**：同步为官方 Hermes 出厂默认 persona（DEFAULT_SOUL_MD，"You are Hermes Agent, an intelligent AI assistant created by Nous Research..."），与官方保持一致
+- **fnOS 运行环境说明**（系统特征/关键路径/目录别名/工具授权/语言偏好/trim-cli 纪律等）移至 **AGENTS.md** 保留，内容不丢失
+- 记忆页（SOUL.md / MEMORY.md / notes.md）与 hermes 官方同路径读写，天然一致；已同步 102/249 运行时文件（原文件备份于 NAS /tmp/bak-*）
+- 各 profile 的自定义 SOUL.md（如 nas_____ 的运维专家 persona）不受影响
+
+- 安装包：fnos-hermes-agent_v0.21.94.fpk（43.9MB）
+
 ## v0.21.93（2026-08-07）
 
 **更新页改为双通道选择**：
