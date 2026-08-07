@@ -4420,9 +4420,12 @@ async function handleFetch(req) {
   if (path === "/api/app/auto-update" && req.method === "POST") {
     try {
       const body = await req.json().catch(() => ({}));
+      // source 通道选择：auto（多源依次尝试，默认）/ github（仅 GitHub：加速镜像+直连）/ webdav（仅 WebDAV 内部通道）
+      const source = String(body.source || "auto").trim().toLowerCase();
       let url = String(body.url || "").trim();
       let version = String(body.version || "");
-      if (!url) {
+      if (!url && source !== "webdav") {
+        // webdav 通道不需要 url（直接从 WebDAV 取包），且不应查 GitHub 覆盖 version
         const pat = getGitHubPAT();
         const headers = { "Accept": "application/vnd.github+json", "User-Agent": "fnos-hermes-agent" };
         if (pat) headers["Authorization"] = `Bearer ${pat}`;
@@ -4432,8 +4435,8 @@ async function handleFetch(req) {
           if (asset && asset.browser_download_url) { url = asset.browser_download_url; version = data.tag_name || ""; }
         }
       }
-      if (!url) return new Response(JSON.stringify({ ok: false, error: "未找到安装包下载地址（GitHub 可能限流，请稍后或改用网页下载）" }), { headers: jsonHeaders() });
-      log(`[app-update] 开始自动更新 ${version || ""}：${url}`);
+      if (!url && source !== "webdav") return new Response(JSON.stringify({ ok: false, error: "未找到安装包下载地址（GitHub 可能限流，请稍后或改用网页下载）" }), { headers: jsonHeaders() });
+      log(`[app-update] 开始自动更新 ${version || ""}（通道=${source}）：${url || "WebDAV"}`);
       // 下载源：优先 alist 分享直链（用户飞牛 5667/p/<分享码>/<文件>，公众下载通道免认证、国内快）
       // —— WebDAV（5244）仅为发布推送通道，不用于公众下载
       const _shareBase = (process.env.HERMES_SHARE_BASE || "https://nas.aio.run:5667").replace(/\/+$/, "");
@@ -4446,7 +4449,7 @@ async function handleFetch(req) {
         // ① WebDAV（用户内部更新通道，凭证从 data/.env 读取，不硬编码）
         const _envCfg = (() => { try { const t = readFileSync(`${DATA_DIR}/.env`, "utf8"); const g = k => { const m = t.match(new RegExp("^" + k + "\\s*=\\s*(.+)$", "m")); return m ? m[1].trim() : ""; }; return { u: g("HERMES_WD_USER"), p: g("HERMES_WD_PASS"), b: g("HERMES_WD_BASE") }; } catch { return { u: "", p: "", b: "" }; } })();
         const _wdBase = (_envCfg.b || "http://nas.aio.run:5244/dav/FnosAPP").replace(/\/+$/, "");
-        if (_envCfg.u && _envCfg.p) {
+        if (source !== "github" && _envCfg.u && _envCfg.p) {
           try {
             const wdUrl = `${_wdBase}/${_shareFile}`;
             log(`[app-update] 尝试从 WebDAV 下载: ${wdUrl}`);
@@ -4458,8 +4461,8 @@ async function handleFetch(req) {
             } else { log(`[app-update] WebDAV 下载失败 HTTP ${dl.status}，切换下一源`); dl = null; }
           } catch (e) { log(`[app-update] WebDAV 下载异常: ${e.message}`); dl = null; }
         }
-        // ② alist 分享直链（公众通道，免认证）
-        if (!dl && !buf) {
+        // ② alist 分享直链（公众通道，免认证）——仅 auto 通道使用
+        if (source === "auto" && !dl && !buf) {
           try {
             const shareUrl = `${_shareBase}/p/${_shareCode}/${_shareFile}`;
             log(`[app-update] 尝试从 alist 分享直链下载: ${shareUrl}`);
@@ -4471,8 +4474,8 @@ async function handleFetch(req) {
             } else { log(`[app-update] 分享直链下载失败 HTTP ${dl.status}`); dl = null; }
           } catch (e) { log(`[app-update] 分享直链下载异常: ${e.message}`); dl = null; }
         }
-        // ③ GitHub 加速镜像（大陆中继）
-        if (!dl && !buf) {
+        // ③ GitHub 加速镜像（大陆中继）——auto / github 通道使用
+        if ((source === "auto" || source === "github") && !dl && !buf) {
           try {
             const _ghp = (process.env.HERMES_GHPROXY || "https://ghproxy.net/").replace(/\/+$/, "");
             log(`[app-update] 尝试 GitHub 加速镜像下载`);
@@ -4485,8 +4488,8 @@ async function handleFetch(req) {
           } catch (e) { log(`[app-update] 加速镜像下载异常: ${e.message}`); dl = null; }
         }
       }
-      // ④ GitHub 直连（兜底）
-      if (!dl && !buf) {
+      // ④ GitHub 直连（兜底）——auto / github 通道使用；webdav 通道不降级
+      if (source !== "webdav" && !dl && !buf) {
         dl = await fetch(url, { signal: AbortSignal.timeout(600000) });
         if (dl.ok) {
           const _b3 = Buffer.from(await dl.arrayBuffer());
@@ -4496,7 +4499,11 @@ async function handleFetch(req) {
       }
       // 下载后校验 gzip 头：分享服务对完整请求可能返回 HTML 预览页（HTTP 200 但非文件），
       // 非 gzip 时自动切换到 GitHub 兜底下载
-      if (!buf) throw new Error("安装包为空");
+      if (!buf) {
+        if (source === "webdav") throw new Error("WebDAV 通道下载失败：未获取到安装包（请确认 WebDAV 凭证已配置且已发布该版本，或改用 GitHub Release 通道）");
+        if (source === "github") throw new Error("GitHub 通道下载失败：请检查网络/代理后重试，或改用 WebDAV 通道");
+        throw new Error("安装包为空");
+      }
       const fpkPath = `/tmp/hermes-agent-update.fpk`;
       writeFileSync(fpkPath, buf);
       log(`[app-update] FPK 已下载: ${(buf.length / 1048576).toFixed(1)}MB → ${fpkPath}`);
