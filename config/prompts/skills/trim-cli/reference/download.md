@@ -23,7 +23,7 @@
 注意事项：
 - 部分参数在 API 层使用 camelCase（如 `initFlag`），但 CGI 层使用 snake_case（如 `init_flag`）
 - 多数端点接受可选 `uid` 参数
-- `task.addUris` 的 `save_dir` 在实际使用中是���需的
+- `task.addUris` 的 `save_dir` 在实际使用中是必需的
 
 ### 响应模型
 
@@ -85,8 +85,20 @@
 ### 统计类（已实现）
 - `appcgi.downloadcenter.stat.all` — 汇总统计
 
-### 未实现
-- 创建类：`task.addUploadFile`、`task.addfnShareLink`、`task.getfnShareLinkStatus`
+### 泛化请求入口
+
+未封装为固定子命令的 `appcgi.downloadcenter.*` 端点通过以下入口调用：
+
+```bash
+trim-cli download request appcgi.downloadcenter.<name> --json '<object>' --yes
+```
+
+- `--json` 必须是 JSON object，不能包含 `req` 或 `reqid`，CLI 会自动注入。
+- 默认需要交互确认；自动化或确认过风险后用 `--yes`。
+- 响应会按下载中心常见位置解包：`data.rsp`、`data.body`、`data.block.data`。
+
+通过 `download request` 覆盖的端点包括：
+- 创建类：`task.addfnShareLink`、`task.getfnShareLinkStatus`
 - 控制类：`task.pin`、`task.setForceStart`、`task.setFilePriority`、`task.exportTorrentFile`、`task.setDownloadLimit`、`task.setUploadLimit`、`task.setShareLimit`
 - 配置类：`config.getDefaultSaveDir`、`config.setDefaultSaveDir`、`config.getTransferCfg`、`config.setTransferCfg`、`config.getNetworkCfg`、`config.setNetworkCfg`、`config.getAltCfg`、`config.setAltCfg`、`config.getListColumns`、`config.setListColumns`
 - 统计类：`stat.qbittorrent`、`stat.aria2`
@@ -95,6 +107,8 @@
 - 扫描目录：`scanDir.query`、`scanDir.insert`、`scanDir.delete`
 - 工具类：`util.getDirFreeSpace`、`util.isTcpPortInUse`
 - 管理员：`admin.getUsers`
+
+`task.addUploadFile` 涉及上传文件内容和大块传输，不是普通 JSON 参数请求；优先使用文件上传相关命令完成本地文件上传后，再按设备行为调用下载中心端点。
 
 ## 端点详情
 
@@ -338,6 +352,6 @@ trim-cli download stat
 | `up_total_size` | no | number | 总上传量 | | `5368709120` |
 
 ## 注意事项
-- 文件上传（`task.addUploadFile`）需要大块传输支持，尚未实现。
+- 文件上传（`task.addUploadFile`）需要上传内容和大块传输支持，不应当作普通 `download request --json` 调用。
 - `task.addfnShareLink` 是下载中心的导入任务端点，不要与 `appcgi.sharesvr.share.link.*` 的共享链接管理端点混淆。
 - 部分响应数据的具体字段结构可能因后端版本而异。

@@ -21,10 +21,12 @@ description: 当任务涉及认证、用户、用户组、登录设备，或需�
 - 登录是多数真实操作的前置条件
 - 真机验证时先按约定账号顺序准备管理员和非管理员账号
 - 缺少凭据时不要猜测额外账号
+- 固定命令缺失的 `user.*` 端点使用 `user request`；用户、登录设备和 2FA 写操作默认需要确认
 
 ## 常用命令
 
 ```bash
 ./scripts/trim-cli login -u <username> -p <password>
 ./scripts/trim-cli logout
+./scripts/trim-cli user request user.checkNewUser --json '{"user":"cli2"}' --yes
 ```

@@ -21,6 +21,7 @@ description: 当任务涉及 Docker 镜像、容器、Compose、启停删除或�
 - `image pull`、`container stop`、`container restart` 往往比读请求慢
 - `container rm` 默认需要确认；`--force` 不等于 `--yes`
 - 镜像引用和容器 ID 不要混用
+- 固定命令缺失的 `appcgi.dockermgr.*` 端点使用 `docker request`；system/network/compose 写操作前先做只读探测
 
 ## 常用命令
 
@@ -30,4 +31,5 @@ description: 当任务涉及 Docker 镜像、容器、Compose、启停删除或�
 ./scripts/trim-cli docker image pull <imageRef>
 ./scripts/trim-cli docker container ls
 ./scripts/trim-cli docker compose ls
+./scripts/trim-cli docker request appcgi.dockermgr.networkList --json '{}' --yes
 ```

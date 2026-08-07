@@ -1,6 +1,6 @@
 ---
 name: trim-cli
-description: 当用户需要登录 TRIM NAS / fnOS、列目录、搜索文件、查看共享目录、管理应用中心应用、管理 Docker 镜像或容器、查看存储池和磁盘 SMART、执行真机验证时使用
+description: 当用户需要登录 TRIM NAS / fnOS、管理文件、相册或影视、查看应用/Docker/存储状态、执行真机验证时使用
 ---
 
 # trim-cli — TRIM NAS 命令行工具
@@ -15,6 +15,9 @@ trim-cli 是 TRIM NAS（fnOS）的命令行客户端。通过 WebSocket 与 NAS 
 - 列目录、定位当前用户目录、按关键字搜索文件
 - 查看共享目录、ACL，或排查“别人共享给我”的文件
 - 查看系统信息、CPU、内存、日志、下载任务
+- 搜索照片、获取照片详情或预览链接
+- 查询影视库数量、搜索影片、获取影片详情或生成投屏播放链接
+- 开启或关闭 SSH 服务等网络开关
 - 查看或管理应用中心应用、手动安装 fpk、启动/停用/卸载应用
 - 查看或管理 Docker 镜像、容器、Compose
 - 查看存储池、磁盘、SMART，或执行挂载/卸载、扩容、格式化等操作
@@ -30,8 +33,11 @@ trim-cli 是 TRIM NAS（fnOS）的命令行客户端。通过 WebSocket 与 NAS 
 | 看文件、搜文件、区分 `/` 与 `/vol{n}/...` | `./reference/workflows/file-routing.md` | 文件路径语义容易误判，先按 workflow 选命令 |
 | 看共享目录、ACL、别人共享给我的文件 | `./reference/workflows/file-routing.md` | 先区分 `file share`、ACL 和 finder 搜索 |
 | 管理应用中心应用、安装 fpk | `./entries/trim-app.md` | 写操作需要 `--yes`，复杂依赖/向导转 App Center UI |
+| 搜索照片、查看照片详情或预览链接 | `./entries/trim-photos.md` | 复用 fnOS session，但接口签名独立 |
+| AI 搜图、统计匹配数量或获取照片预览 | `./reference/workflows/photos-routing.md` | 先区分匹配总数、本次返回条数和预览语义 |
+| 查看影视数量、搜索影片或生成投屏链接 | `./reference/workflows/media-routing.md` | 自动 OAuth；先区分精确统计、搜索样本和敏感播放 URL |
 | 做存储写操作 | `./reference/workflows/storage-dangerous-ops.md` | 先跑只读探测，再决定是否继续高风险写操作 |
-| 做真机验证 | `./reference/workflows/device-validation.md` | 先按默认账号顺序和最小探测步骤执行 |
+| 做真机验证 | `./reference/workflows/device-validation.md` | 使用用户明确提供或已授权的测试账号，并执行最小探测步骤 |
 | 想按模块查字段或端点 | `./reference/_index.md` | 任务索引之后仍保留模块索引 |
 
 ## 分层入口
@@ -48,8 +54,11 @@ trim-cli 是 TRIM NAS（fnOS）的命令行客户端。通过 WebSocket 与 NAS 
 | `./entries/trim-download.md` | 下载任务列表/详情、创建、暂停/恢复/重试/删除、save_dir 路径校验 |
 | `./entries/trim-app.md` | 应用中心应用列表、状态、安装、fpk 手动安装、更新、启动、停用、卸载 |
 | `./entries/trim-log.md` | 日志列表、模块过滤、清除/导出/归档策略 |
-| `./entries/trim-system.md` | 机器类型、系统版本和静态系统信息识别 |
+| `./entries/trim-system.md` | 机器类型、系统版本、静态系统信息和电源操作 |
 | `./entries/trim-monitor.md` | 运行态指标监控（CPU、内存）和 resmon 监控入口 |
+| `./entries/trim-network.md` | 网络服务开关，当前覆盖 SSH 服务开关 |
+| `./entries/trim-photos.md` | 相册目录、照片搜索、详情和预览链接 |
+| `./entries/trim-media.md` | 影视 OAuth、媒体库统计、搜索、详情和播放链接 |
 
 ## 使用顺序
 
@@ -74,6 +83,7 @@ trim-cli 是 TRIM NAS（fnOS）的命令行客户端。通过 WebSocket 与 NAS 
 - 目标 NAS 网络可达
 - 首次当前 skill 执行登录或真机操作时，至少提供账户和密码；未提供时不要假设默认凭据
 - 首次使用需执行 `login`，后续命令优先复用本地保存的 session
+- 如需管理多台 NAS，可为命令显式传 `--profile <name>`，让 session 按 profile 隔离保存和读取
 
 ## 连接配置
 
@@ -82,6 +92,7 @@ trim-cli 是 TRIM NAS（fnOS）的命令行客户端。通过 WebSocket 与 NAS 
 ```
 --host <host>    NAS 地址（默认 localhost）
 --port <port>    WebSocket 端口（显式传入时优先）
+--profile <name> 选择命名 session profile
 --scheme auto|ws|wss
                  WebSocket 协议选择（默认 auto）
 --allow-insecure-ws
@@ -95,6 +106,7 @@ trim-cli 是 TRIM NAS（fnOS）的命令行客户端。通过 WebSocket 与 NAS 
 - `--scheme auto` 且未显式传 `--port` 时，loopback 默认 `ws:5666`，远程 IP 默认 `wss:5667`，远程域名默认 `wss:443`
 - 显式传 `--port` 时端口优先，CLI 只解析协议选择
 - 如果命令没有显式传连接参数，CLI 会优先复用本地已保存 session 的 `host`、`port`、`scheme` 和 TLS 设置
+- 如果传了 `--profile <name>`，上述 session 回落与读写都只作用于该 profile
 - 内网或自签证书 WSS 目标可能需要显式传 `--tls-insecure`
 - 远程明文 `ws://` 需要显式传 `--allow-insecure-ws`
 - Session 默认使用平台安全存储：macOS Keychain、Linux 加密文件、Windows DPAPI 加密文件
@@ -121,8 +133,10 @@ NAS 文件路径使用 canonical fnOS 格式：`/vol{v}/...`
 
 - 存储池目标使用 uuid 或 `trim_*` 形式标识，例如 `trim_pool` 或 RFC UUID
 - 磁盘目标使用纯设备名，例如 `sda`、`nvme0n1`
+- 创建存储池前优先用 `storage free-disks` 看候选项；如果系统盘剩余空间返回 `sys: 1` 且带 `part`，`storage create --disks` 应传 `part` 值而不是整盘 `name`
 - `storage format` 的 `--partition` 使用非负整数，默认 `0`
 - `storage create` / `storage resize` 的 `--level` 仅支持 `0`、`1`、`4`、`5`、`6`、`10`
+- `storage create` 会按 level 校验磁盘数量：`0` 至少 2 块，`5` 至少 3 块，`6` 和 `10` 至少 4 块，`10` 还要求偶数块
 
 ## 命令参考
 
@@ -134,10 +148,16 @@ NAS 文件路径使用 canonical fnOS 格式：`/vol{v}/...`
 
 ```
 trim-cli --host <host> --port <port> login [-u <username>] [-p <password>]
+trim-cli --profile home --host <host> --port <port> login -u <user>
+trim-cli --host <host> --port <port> login -u <user> -p <password> --totp-code <code>
 ```
 
 - `-u, --username <username>`：用户名；省略则交互输入
 - `-p, --password <password>`：密码；省略则交互输入
+- `--profile <name>`：可作为全局参数或 `login` 子命令参数传入；成功后写入对应 profile session
+- `--totp-code <code>`：账号需要 2FA 时传 6 位 TOTP；省略则交互输入
+- `--trust-device`：2FA 验证成功后信任当前 CLI 设备
+- `--did <deviceId>`：覆盖默认生成的稳定设备 ID
 
 #### logout
 
@@ -145,7 +165,26 @@ trim-cli --host <host> --port <port> login [-u <username>] [-p <password>]
 
 ```
 trim-cli --host <host> --port <port> logout
+trim-cli --profile home logout
 ```
+
+- 未传 `--profile` 时清理默认 session
+- 传 `--profile <name>` 时只清理该 profile session
+- 远端登出是 best-effort；本地清理总会继续执行
+
+#### raw
+
+复用已保存 session 发送任意已认证 WebSocket 请求。
+
+```
+trim-cli --profile home raw appcgi.system.getInfo --json '{"language":"zh-CN"}'
+trim-cli --profile home raw appcgi.network.ssh.switch --json '{"enable":true}' --yes
+```
+
+- `req` 必须是 canonical endpoint 标识，不允许空白、控制字符、URL 语法或空段
+- `--json` 必须是 JSON object；CLI 会自动补 `req` 和 `reqid`
+- 命中 mutation-like 关键字的 endpoint 必须显式传 `--yes`
+- `raw` 需要已保存 session，且当前命令目标必须与该 session 记录的 `host:port` 一致
 
 ### Shortcut
 
@@ -201,6 +240,28 @@ trim-cli --host <host> --port <port> monitor cpu
 trim-cli --host <host> --port <port> monitor memory
 ```
 
+### 电源管理
+
+#### power reboot / poweroff
+
+重启或关闭 NAS。两者都会中断设备服务，默认需要确认；自动化场景传 `--yes`。
+
+```
+trim-cli --host <host> --port <port> power reboot --yes
+trim-cli --host <host> --port <port> power poweroff --yes
+```
+
+### 网络管理
+
+#### network ssh switch
+
+开启或关闭 SSH 服务。开启 SSH 是安全敏感操作，默认需要确认；确认用户授权后可加 `--yes`。
+
+```
+trim-cli --host <host> --port <port> network ssh switch --enable
+trim-cli --host <host> --port <port> network ssh switch --disable --yes
+```
+
 ### 文件操作
 
 #### file ls [path]
@@ -229,6 +290,48 @@ trim-cli --host <host> --port <port> file search report /vol1/1000 /vol2/1000/do
 trim-cli --host <host> --port <port> file search-others .txt
 ```
 
+#### file prop / size / download-url <path>
+
+查看文件或目录属性、大小，或请求下载 URL。路径必须为 `/vol{v}/...` 格式。
+
+```
+trim-cli --host <host> --port <port> file prop /vol1/1000/a.txt
+trim-cli --host <host> --port <port> file size /vol1/1000/a.txt
+trim-cli --host <host> --port <port> file download-url /vol1/1000/a.txt
+```
+
+#### file ls-dir / calc / access / cancel
+
+列出目录、统计文件空间、查看当前用户访问权限，或取消文件任务。取消任务需要 `--yes`。
+
+```
+trim-cli --host <host> --port <port> file ls-dir /vol1/1000
+trim-cli --host <host> --port <port> file calc /vol1/1000/a.txt
+trim-cli --host <host> --port <port> file access /vol1/1000/a.txt
+trim-cli --host <host> --port <port> file cancel <taskId> --yes
+```
+
+#### file compress / extract
+
+压缩或解压文件。两者都是写操作，需要 `--yes`；命令会输出后端任务响应。
+
+```
+trim-cli --host <host> --port <port> file compress /vol1/1000/archive.zip /vol1/1000/a.txt --level 6 --yes
+trim-cli --host <host> --port <port> file extract /vol1/1000/archive.zip /vol1/1000/out --overwrite rename --yes
+```
+
+#### file team
+
+查看团队空间和团队回收站。团队回收站文件列表可带具体团队回收站路径；恢复和清空是写操作，需要 `--yes`。
+
+```
+trim-cli --host <host> --port <port> file team list
+trim-cli --host <host> --port <port> file team trash-list-trashbin
+trim-cli --host <host> --port <port> file team trash-list vol1/team/demo/.@#local/trash
+trim-cli --host <host> --port <port> file team trash-restore vol1/team/demo/a.txt --yes
+trim-cli --host <host> --port <port> file team trash-clear 1 demo-team --yes
+```
+
 #### file acl get <path>
 
 查看指定路径的 ACL。可选 `--prop` 额外带出文件属性信息。
@@ -236,6 +339,24 @@ trim-cli --host <host> --port <port> file search-others .txt
 ```
 trim-cli --host <host> --port <port> file acl get /vol1/1000/docs
 trim-cli --host <host> --port <port> file acl get /vol1/1000/docs --prop
+```
+
+#### file acl set / chown
+
+设置 TrimACL 或修改所有者。两者都是权限写操作，需要 `--yes`；`acl set --permset` 必须是 JSON 数组。
+
+```
+trim-cli --host <host> --port <port> file acl set /vol1/1000/a.txt --permset '[]' --sub 0 --yes
+trim-cli --host <host> --port <port> file chown /vol1/1000/a.txt --uid 1000 --yes
+```
+
+#### file trimacl
+
+执行 POSIX ACL 到 TrimACL 的转换，或导出转换报告。两者都是权限相关写操作，需要 `--yes`。
+
+```
+trim-cli --host <host> --port <port> file trimacl conv 1 --csv-path /vol1/1000/acl.csv --yes
+trim-cli --host <host> --port <port> file trimacl report 1 /vol1/1000/report.csv --yes
 ```
 
 #### file share info <path>
@@ -308,6 +429,14 @@ trim-cli --host <host> --port <port> file share del /vol1/1000/share --sub --acl
 trim-cli --host <host> --port <port> file mkdir /vol2/1106/new-dir
 ```
 
+#### file rename <path> <newName>
+
+重命名文件或目录。`newName` 只能是名称片段，不能包含 `/`；写操作需要 `--yes`。
+
+```
+trim-cli --host <host> --port <port> file rename /vol2/1106/old.txt new.txt --yes
+```
+
 #### file check-upload <path> <size>
 
 上传前检查目标文件路径是否可用。路径必须是完整目标文件路径，`size` 为字节数。
@@ -326,10 +455,51 @@ trim-cli --host <host> --port <port> file upload /vol2/1106/photos ./new.jpg --o
 
 #### file rm <path>
 
-删除文件或目录。路径必须为 `/vol{v}/...` 格式。
+删除文件或目录。路径必须为 `/vol{v}/...` 格式；写操作需要 `--yes`。
 
 ```
-trim-cli --host <host> --port <port> file rm /vol2/1106/old-dir
+trim-cli --host <host> --port <port> file rm /vol2/1106/old-dir --yes
+```
+
+#### file trash list / restore / clear
+
+列出、搜索、恢复或清空当前用户回收站。恢复和清空需要 `--yes`。
+
+```
+trim-cli --host <host> --port <port> file trash list
+trim-cli --host <host> --port <port> file trash search report --uid 1000
+trim-cli --host <host> --port <port> file trash restore /vol2/1106/old.txt --yes
+trim-cli --host <host> --port <port> file trash clear --yes
+```
+
+#### file search-cancel <taskId>
+
+取消 finder 搜索任务，需要 `--yes`。
+
+```
+trim-cli --host <host> --port <port> file search-cancel <taskId> --yes
+```
+
+#### file fav / recent
+
+查看或更新收藏夹和最近文件。更新类命令需要 `--yes`。
+
+```
+trim-cli --host <host> --port <port> file fav list
+trim-cli --host <host> --port <port> file fav add /vol1/1000/a.txt --yes
+trim-cli --host <host> --port <port> file recent list
+trim-cli --host <host> --port <port> file recent clear --yes
+```
+
+#### file app-dir-list / sys-part-info / is-mount-point / usage
+
+查看应用文件目录、系统分区信息、挂载点状态和存储空间用量。
+
+```
+trim-cli --host <host> --port <port> file app-dir-list
+trim-cli --host <host> --port <port> file sys-part-info
+trim-cli --host <host> --port <port> file is-mount-point /vol1/1000
+trim-cli --host <host> --port <port> file usage 1
 ```
 
 #### file cp <src> <destDir>
@@ -348,6 +518,41 @@ trim-cli --host <host> --port <port> file cp /vol1/a.txt /vol2/backup
 trim-cli --host <host> --port <port> file mv /vol1/a.txt /vol2/archive
 ```
 
+### 相册
+
+Photos 复用当前 fnOS 登录 session。预览 URL 在浏览器中打开时，浏览器也需要已登录 fnOS。
+
+```bash
+trim-cli photos folders
+trim-cli photos search IMG --limit 20
+trim-cli photos search 北京 --filter file_type=photo
+trim-cli photos info 8965
+trim-cli photos preview 8965 --size m
+```
+
+`photos search` 输出中的 `additional.thumbnail` URL 会转换为绝对地址。`photos preview`
+输出选定尺寸的 `previewUrl`，可加 `--open` 在浏览器打开。
+
+### 影视
+
+Media 使用独立登录态。CLI 会用当前 profile 的 fnOS session 自动完成 OAuth，并将 Media
+token 保存到同一安全 session；通常无需手工执行 `media login`。
+
+```bash
+trim-cli media login
+trim-cli media status
+trim-cli media libraries
+trim-cli media stats
+trim-cli media list --type movie --limit 20
+trim-cli media search 流浪地球
+trim-cli media info <movieGuid>
+trim-cli media play <itemGuid>
+```
+
+`media stats` 的 `data.movie` 是电影数量，`data.total` 是全部媒体项数量。`media search`
+只返回匹配列表，不能把列表长度描述为全库精确总数。`media play` 输出的 `castUrl` 已附带
+免 cookie 播放所需授权参数，等同 bearer 凭据，不要转发、记录或长期保存。
+
 ### 应用中心
 
 应用中心命令复用普通登录态。写操作必须显式传 `--yes`。
@@ -360,6 +565,14 @@ trim-cli --host <host> --port <port> file mv /vol1/a.txt /vol2/archive
 trim-cli --host <host> --port <port> app list
 ```
 
+#### app base-data
+
+查看 App Center 基础侧边栏、来源和标签数据。
+
+```
+trim-cli --host <host> --port <port> app base-data
+```
+
 #### app status <appName>
 
 查看单个已安装应用记录。
@@ -368,41 +581,132 @@ trim-cli --host <host> --port <port> app list
 trim-cli --host <host> --port <port> app status trim.alist
 ```
 
+#### app store list / search / detail / latest-release
+
+查看应用商店列表、搜索应用、查看应用详情或最新发布应用。
+
+```
+trim-cli --host <host> --port <port> app store list
+trim-cli --host <host> --port <port> app store search alist
+trim-cli --host <host> --port <port> app store detail trim.alist --source-id 265 --version 3.0.13
+trim-cli --host <host> --port <port> app store latest-release
+```
+
+#### app common / task / cancel helpers
+
+查询或设置 App Center 记住的安装卷，查询或取消 App Center 任务。写操作和取消任务需要 `--yes`。
+
+```
+trim-cli --host <host> --port <port> app common volume
+trim-cli --host <host> --port <port> app common volume --set 2 --yes
+trim-cli --host <host> --port <port> app task-status <taskId>
+trim-cli --host <host> --port <port> app task-cancel <taskId> --yes
+trim-cli --host <host> --port <port> app download cancel <downloadTaskId> --yes
+trim-cli --host <host> --port <port> app install-cancel <taskId> --yes
+trim-cli --host <host> --port <port> app update-cancel <taskId> --yes
+```
+
+#### app check-update / config / service / entry / shortcut / risk / operation / sac
+
+查看 App Center 的更新检查、配置、服务入口、快捷方式、风险和运营配置。
+
+```
+trim-cli --host <host> --port <port> app check-update
+trim-cli --host <host> --port <port> app check-update --post --yes
+trim-cli --host <host> --port <port> app config sys
+trim-cli --host <host> --port <port> app config detail trim.alist
+trim-cli --host <host> --port <port> app service list
+trim-cli --host <host> --port <port> app entry list --only-hidden
+trim-cli --host <host> --port <port> app shortcut list
+trim-cli --host <host> --port <port> app risk last
+trim-cli --host <host> --port <port> app risk list
+trim-cli --host <host> --port <port> app operation settings
+trim-cli --host <host> --port <port> app sac app-store-list
+```
+
+#### app config write / shortcut write / guide
+
+更新 App Center 配置、桌面快捷方式，或执行引导检查。写操作必须传 `--yes`；复杂配置字段通过 `--fields` 传 JSON 对象。
+
+`app config set-sys` 会按 App Center 设置页规则校验常用字段：`downloadAndInstallVolumeID` 只能为 `-1` 或正整数；`globalAutoUpdate` 启用或提供时间时，`updateStartTime` / `updateEndTime` 必须是 `HH:MM` 且时间窗口至少 1 小时；`cloudSecuritySync.strategy` 只能是 `strict`、`balanced`、`lenient`；`autoRunNewApp` 必须是布尔值。`autoCreateDesktopIcon` 默认拒绝发送，确认后端兼容时才传 `--allow-desktop-icon-field`。
+
+```
+trim-cli --host <host> --port <port> app config set-sys --fields '{"autoRunNewApp":true}' --yes
+trim-cli --host <host> --port <port> app config set-sys --fields '{"autoCreateDesktopIcon":true}' --allow-desktop-icon-field --yes
+trim-cli --host <host> --port <port> app config set trim.alist --fields '{"services":[],"extraAuthorizationPath":[]}' --yes
+trim-cli --host <host> --port <port> app config auto-update trim.alist --enable --yes
+trim-cli --host <host> --port <port> app config proxy-access trim.alist --allowed --yes
+trim-cli --host <host> --port <port> app config post-wizard trim.alist --fields '{"customParameters":[]}' --yes
+trim-cli --host <host> --port <port> app shortcut add trim.alist desktop web --yes
+trim-cli --host <host> --port <port> app shortcut del trim.alist desktop web --yes
+trim-cli --host <host> --port <port> app guide check-installed trim.media trim.photos
+trim-cli --host <host> --port <port> app guide batch-download-install 2 trim.media trim.photos --yes
+```
+
 #### app install <appName>
 
-下载并安装应用中心指定版本。`--volume-id` 必填，默认安装后立即启动。知道应用中心 `sourceID` 时建议传 `--source-id`。
+下载并安装应用中心指定版本。推荐明确传 `--volume-id`；省略时 CLI 会读取 App Center 默认下载/安装存储空间，缺失或不可用则拒绝并提示传 `--volume-id`。默认安装后立即启动。知道应用中心 `sourceID` 时建议传 `--source-id`。加 `--dry-run` 时只下载/解析云端安装包、读取安装信息并执行安全 guard，不启动安装任务。需要自定义安装向导时，可显式传 `--custom-parameters '<jsonArray>'` 和 `--api-scope '<jsonObject>'`；需要确认许可证时必须显式传 `--accept-license`。任务失败后如希望 CLI 尝试取消后端任务，可传 `--cancel-on-failure`。
 
 ```
+trim-cli --host <host> --port <port> app install trim.alist --version 3.0.13 --source-id 265 --volume-id 2 --dry-run --yes
 trim-cli --host <host> --port <port> app install trim.alist --version 3.0.13 --source-id 265 --volume-id 2 --yes
+trim-cli --host <host> --port <port> app install trim.alist --version 3.0.13 --volume-id 2 --custom-parameters '[{"key":"port","value":8080}]' --api-scope '{"API.User.FileAccess":true}' --yes
+trim-cli --host <host> --port <port> app install trim.alist --version 3.0.13 --volume-id 2 --accept-license --cancel-on-failure --yes
 ```
 
-#### app install-fpk <localFile>
+#### app install-fpk <localFile> / --remote-path <path>
 
-上传并安装本地 `.fpk` 文件。需要选择安装卷。
+上传并安装本地 `.fpk` 文件，或安装已在 NAS 上的 `.fpk` 文件。推荐明确传 `--volume-id`；省略时读取 App Center 默认下载/安装存储空间。`--remote-path` 必须是具体 `/vol.../*.fpk` 路径，且远端文件大小不能超过 10GB。需要自定义安装向导时，同样可传 `--custom-parameters` 和 `--api-scope`；需要确认许可证时传 `--accept-license`，失败时需要尝试取消任务时传 `--cancel-on-failure`。
 
 ```
 trim-cli --host <host> --port <port> app install-fpk ~/Downloads/demo.fpk --volume-id 2 --dry-run --yes
 trim-cli --host <host> --port <port> app install-fpk ~/Downloads/demo.fpk --volume-id 2 --yes
+trim-cli --host <host> --port <port> app install-fpk --remote-path /vol1/1000/demo.fpk --volume-id 2 --dry-run --yes
 ```
 
-`--dry-run` 会上传并解析本地 FPK、读取安装信息和安全 guard，但不会启动真正的安装任务；输出 JSON 计划，适合危险写操作前检查。
+`--dry-run` 会解析 FPK、读取安装信息和安全 guard，但不会启动真正的安装任务；本地 FPK 会先上传，远端 FPK 会先通过文件属性检查大小再由 App Center 解析。输出 JSON 计划，适合危险写操作前检查。
 
 #### app update <appName>
 
-下载并更新应用到指定版本。CLI 会从已安装列表解析 `sourceID`。
+下载并更新应用到指定版本。CLI 会从已安装列表解析 `sourceID`。加 `--dry-run` 时只下载/解析更新包、读取更新信息并执行安全 guard，不启动更新任务。需要自定义升级向导时，可显式传 `--custom-parameters` 和 `--api-scope`；需要确认许可证时传 `--accept-license`，失败时需要尝试取消任务时传 `--cancel-on-failure`。
 
 ```
+trim-cli --host <host> --port <port> app update trim.alist --version 3.0.14 --volume-id 2 --dry-run --yes
 trim-cli --host <host> --port <port> app update trim.alist --version 3.0.14 --volume-id 2 --yes
 ```
 
-#### app start / stop / uninstall
+#### app openapi authorization
 
-启动、停用或卸载应用。
+处理应用内用户授权路径流程。新增授权路径需要 `--yes`，路径必须是具体 `/vol...`。
+
+```
+trim-cli --host <host> --port <port> app openapi app-detail trim.alist
+trim-cli --host <host> --port <port> app openapi allow-user-auth-paths trim.alist
+trim-cli --host <host> --port <port> app openapi add-user-auth-path trim.alist /vol1/1000/docs --yes
+trim-cli --host <host> --port <port> app openapi add-user-auth-inherit-file trim.alist /vol1/1000/docs/file.txt --yes
+```
+
+#### app start / stop / restart / uninstall
+
+启动、停用、重启或卸载应用。
 
 ```
 trim-cli --host <host> --port <port> app start trim.alist --yes
 trim-cli --host <host> --port <port> app stop trim.alist --yes
+trim-cli --host <host> --port <port> app restart trim.alist --yes
 trim-cli --host <host> --port <port> app uninstall trim.alist --yes
+```
+
+### Docker
+
+Docker 命令复用普通登录态。写操作默认会要求确认；传 `--yes` 可跳过确认。
+
+#### docker request <endpoint>
+
+调用 Docker 模块下尚未固化为专用命令的接口。`endpoint` 必须以 `appcgi.dockermgr.` 开头，`--json` 必须是 JSON 对象，不能覆盖协议保留字段。
+
+```
+trim-cli --host <host> --port <port> docker request appcgi.dockermgr.networkList --json '{}' --yes
 ```
 
 ### 下载任务
@@ -491,6 +795,14 @@ trim-cli --host <host> --port <port> download rm 42 43
 trim-cli --host <host> --port <port> download stat
 ```
 
+#### download request <endpoint>
+
+调用下载中心下尚未固化为专用命令的接口。`endpoint` 必须以 `appcgi.downloadcenter.` 开头，`--json` 必须是 JSON 对象，不能覆盖协议保留字段。
+
+```
+trim-cli --host <host> --port <port> download request appcgi.downloadcenter.config.getDefaultSaveDir --json '{}' --yes
+```
+
 ### 日志中心
 
 #### logger list
@@ -545,6 +857,24 @@ trim-cli --host <host> --port <port> logger archive set --switch <0|1> --file-pa
 
 ```
 trim-cli --host <host> --port <port> logger archive query
+```
+
+#### logger debuglog copy-start
+
+复制诊断日志到设备侧已挂载存储空间或外挂盘目录。`--srv-type` 可重复传入，也可用逗号分隔。
+
+```
+trim-cli --host <host> --port <port> logger debuglog copy-start --output-dir /vol1/<dir> [--srv-type <0|1|2>]...
+trim-cli --host <host> --port <port> diagnostic-log export --output-dir /vol1/<dir> [--srv-type <0|1|2>]...
+```
+
+#### logger debuglog copy-stop
+
+取消诊断日志复制任务。
+
+```
+trim-cli --host <host> --port <port> logger debuglog copy-stop --task-id <taskId>
+trim-cli --host <host> --port <port> diagnostic-log stop --task-id <taskId>
 ```
 
 ### 用户与用户组
@@ -722,6 +1052,14 @@ trim-cli --host <host> --port <port> user group-add-users <group> --users <user>
 trim-cli --host <host> --port <port> user group-del-users <group> --users <user> [--users <user> ...] [-y]
 ```
 
+#### user request <endpoint>
+
+调用用户模块下尚未固化为专用命令的接口。`endpoint` 必须以 `user.` 开头，`--json` 必须是 JSON 对象，不能覆盖协议保留字段。
+
+```
+trim-cli --host <host> --port <port> user request user.isAdmin --json '{}' --yes
+```
+
 ### 存储管理
 
 存储命令复用登录态。写操作默认会要求确认；传 `-y, --yes` 可跳过确认。高风险操作可通过 `--password <password>` 传入密码，省略时会按提示交互输入。
@@ -754,6 +1092,14 @@ trim-cli --host <host> --port <port> storage pools
 
 ```
 trim-cli --host <host> --port <port> storage disks
+```
+
+#### storage free-disks
+
+列出可用于创建存储池的候选磁盘或分区。系统盘剩余空间可用时，返回项通常带 `sys: 1`、`part`、`partSize`；创建时 `--disks` 传 `part`。
+
+```
+trim-cli --host <host> --port <port> storage free-disks
 ```
 
 #### storage removable
@@ -806,7 +1152,7 @@ trim-cli --host <host> --port <port> storage umount trim_pool [--password <passw
 
 #### storage create
 
-创建存储池。`--disks` 可重复传入，也可用逗号分隔；`--level` 必填。
+创建存储池。`--disks` 可重复传入，也可用逗号分隔；`--level` 必填，并按 RAID 级别校验磁盘数量。
 
 ```
 trim-cli --host <host> --port <port> storage create --level 5 --disks sda --disks sdb --fstype btrfs [--comment <comment>] [--check-disk] [--password <password>] [-y]
@@ -895,3 +1241,38 @@ trim-cli --host <host> --port <port> storage eject sdz [--password <password>] [
 
 - API 文档位于 `./reference/`
 - 字段级详情遵循 `_conventions.md` 定义的 agent-first 文档格式
+
+---
+
+## fnOS 应用内使用（Hermes Agent / 飞牛操作员强化）
+
+### 调用方式
+
+- 在 Hermes Agent（fnOS 应用）环境中，通过 skill 内置 wrapper 调用：`${DATA_DIR}/skills/trim-cli/scripts/trim-cli`（Linux NAS 用 `scripts/trim-cli`；Windows 用 `scripts/trim-cli.cmd` / `scripts/trim-cli.ps1`）
+- 首次使用先执行 `login`（需要 NAS 账号密码；管理多台 NAS 用 `--profile <name>` 隔离 session）
+- 登录后复用本地安全存储 session（Keychain / Linux 加密文件 / Windows DPAPI），无需重复输入密码
+- 2FA/TOTP 场景：登录时按提示输入一次性验证码
+
+### 高频任务速查（飞牛操作员）
+
+| 领域 | 命令 |
+|---|---|
+| 应用中心 | `app list` / `app search` / `app install` / `app update` / `app stop` / `app start` / `app uninstall` / `app install-fpk <path>`（FPK 手动安装）/ `app grant`（配置与授权路径） |
+| 相册 | `photos folders` / `photos search` / `photos info` / `photos preview <id> --size m` / `photos magic-search`（AI 搜图，非 `photos search` 别名） |
+| 影视库 | `media libraries`（媒体库统计）/ `media search` / `media info` / `media play-url`（播放/投屏链接） |
+| 网络与电源 | `network ssh switch --json '{"enable":true}'` / `power reboot` / `power poweroff` |
+| 文件管理 | `file ls` / `file search` / `file upload` / `file rename` / `file compress` / `file extract` / `file trash` / `file star` / `file acl get|set` / `file chown` / `file team` / `file mount` / `file usage` |
+| 存储 | `storage pool` / `storage disk` / `storage free-disks`（空闲磁盘）/ `storage create`（RAID 校验：level 0≥2 块、5≥3 块、6/10≥4 块且 10 须偶数） |
+| 日志监控 | `log`（含 debuglog copy）/ `monitor cpu` / `monitor memory` / `monitor resmon`（监控参考）/ `system info` |
+| Docker | `docker ps` / `docker images` / `docker pull` / `docker run` / `docker compose` / `docker inspect` |
+
+### 安全纪律（重要，不可违反）
+
+- **破坏性操作**（卸载应用、格式化、删除文件、重启/关机、SSH 开关、RAID 变更）执行前必须说明影响并二次确认，给出备份/回滚方案
+- `raw` 请求命中 mutation 类端点必须显式加 `--yes`
+- 输出自动脱敏（密码/token/secret/授权头/敏感 URL），禁止尝试绕过
+- 内网或自签证书 WSS 目标：显式传 `--tls-insecure`；远程明文 ws：显式传 `--allow-insecure-ws`（仅必要场景）
+- 路径一律使用 `/vol{n}/...` canonical 格式；写操作不接受聚合根
+- 下载任务的 `saveDir` 必须用 `/vol{v}/...` 路径
+- 创建存储池前先 `storage free-disks` 看候选项；系统盘返回 `sys: 1` 且带 `part` 时，`storage create --disks` 应传 `part` 值
+- 不确定时先查 `./reference/` 对应文档再执行，禁止凭记忆拼接参数

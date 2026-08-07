@@ -8,6 +8,7 @@
     "darwin-x64": "bin/trim-cli-darwin-x64",
     "linux-arm64": "bin/trim-cli-linux-arm64",
     "linux-x64": "bin/trim-cli-linux-x64",
+    "windows-arm64": "bin/trim-cli-windows-arm64.exe",
     "windows-x64": "bin/trim-cli-windows-x64.exe"
   },
   "reference": "reference/",
@@ -18,7 +19,10 @@
     "entries/trim-download.md",
     "entries/trim-file.md",
     "entries/trim-log.md",
+    "entries/trim-media.md",
     "entries/trim-monitor.md",
+    "entries/trim-network.md",
+    "entries/trim-photos.md",
     "entries/trim-shared.md",
     "entries/trim-storage.md",
     "entries/trim-system.md",
@@ -31,6 +35,9 @@
     "docker-management",
     "download-tasks",
     "system-monitoring",
-    "user-management"
+    "network-management",
+    "user-management",
+    "photo-library",
+    "media-library"
   ]
 }

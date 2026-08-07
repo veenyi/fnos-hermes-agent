@@ -24,6 +24,7 @@ description: 涉及下载任务列表、搜索、创建、控制、统计或任�
 - 统计数据通过 `download stat` 获取，命令输出不是某个单文件的条目
 - 控制命令 `download pause|resume|retry|rm <id...>` 只改变已存在任务，命令不会自动补路径
 - `download info` / `download files` 返回的路径字段直接映射 fnOS 卷定义，不要二次推演
+- 固定命令缺失的 `appcgi.downloadcenter.*` 端点使用 `download request`；JSON 中不要写 `req` 或 `reqid`
 
 ## 常用命令
 
@@ -39,4 +40,5 @@ description: 涉及下载任务列表、搜索、创建、控制、统计或任�
 ./scripts/trim-cli download retry <id...>
 ./scripts/trim-cli download rm <id...>
 ./scripts/trim-cli download stat
+./scripts/trim-cli download request appcgi.downloadcenter.tracker.query --json '{}' --yes
 ```

@@ -8,7 +8,9 @@
 - 注意登录请求中历史文档与实际行为之间的字段名差异。
 - 认证生命周期为 `user.login` -> `user.authToken` / `user.tokenLogin` -> 可选 `user.active` -> `user.logout`，固件特定行为需注意兼容。
 - `appcgi.usersrv.authUser` 是高风险命令的密码验证端点，不用于创建会话或刷新令牌。
-- 当历史文档与实际实现冲突时，以实际实现的字段名和可选性为���。
+- 当历史文档与实际实现冲突时，以实际实现的字段名和可选性为准。
+- profile 名必须非空，最长 64 字节，只允许 ASCII 字母、数字、`_`、`-`、`.`。
+- 共享输入 guard 会拒绝控制字符、空值和过长值；CLI 不会静默改写输入。
 
 ## 端点索引
 - 认证/会话生命周期:
@@ -16,7 +18,7 @@
   - `user.authToken`
   - `appcgi.usersrv.authUser`
   - `user.tokenLogin`
-  - `user.active` (未实现)
+  - `user.active`（通过 `user request`）
   - `user.logout`
   - `user.isAdmin`
 - 用户管理:
@@ -46,6 +48,15 @@
   - `user.kickLoginDevice`
   - `user.2fa.loginVerify`
   - `user.2fa.resetPassword`
+  - `appcgi.tfa.security.v1.login.totpVerify`
+
+未封装为固定子命令的 `user.*` 端点通过以下入口调用：
+
+```bash
+trim-cli user request user.<name> --json '<object>' --yes
+```
+
+`--json` 必须是 JSON object，不能包含 `req` 或 `reqid`。默认需要确认；管理员、登录设备和 2FA 相关写操作应先确认当前账号权限和目标用户。
 
 ## 端点详情
 ### user.login
@@ -60,13 +71,19 @@
 已实现命令:
 - `trim-cli --host <host> --port <port> login`
 - `trim-cli --host <host> --port <port> login -u <username> -p <password>`
+- `trim-cli --profile home --host <host> --port <port> login -u <user>`
+- `trim-cli --host <host> --port <port> login -u <username> -p <password> --totp-code <code>`
 
 CLI 行为:
 - 省略用户名/密码参数时使用交互式提示。
+- 全局 `--profile <name>` 和 `login --profile <name>` 都支持；若同时出现，以 `login --profile <name>` 为准。
 - 未显式传连接参数时，CLI 会优先复用已保存 session 的 `host`、`port`、`scheme` 和 TLS 设置。
 - `--scheme auto` 下，loopback 默认 `ws:5666`，远程 IP 默认 `wss:5667`，远程域名默认 `wss:443`；显式 `--port` 优先。
 - 内网或自签证书 WSS 目标可能需要 `--tls-insecure`；远程明文 `ws://` 需要 `--allow-insecure-ws`。
-- 成功后，CLI 将会话材料（`token`、可选 `longToken`、可选 `backId`、可选 `secret`）和连接设置持久化到配置目录的会话文件中。
+- 如果账号需要 2FA，CLI 会提示输入 6 位验证码；也可用 `--totp-code <code>` 传入。
+- `--trust-device` 会在已绑定 TOTP 的验证成功后信任当前 CLI 设备。
+- `--did <deviceId>` 可覆盖默认生成的稳定设备 ID。
+- 成功后，CLI 将会话材料（`token`、可选 `longToken`、可选 `backId`、可选 `secret`）和连接设置持久化到默认 session 或指定 profile session 中。
 
 #### Request
 | Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
@@ -78,6 +95,7 @@ CLI 行为:
 | `stay` | body | yes | number | 保持登录提示 | 固定值 `1` | `1` |
 | `deviceName` | body | yes | string | 设备标签 | 标识为 `fnOS CLI` | `fnOS CLI` |
 | `deviceType` | body | yes | string | 设备类型标签 | 标识为 `CLI` | `CLI` |
+| `did` | body | yes | string | 稳定设备 ID | 默认自动生成并保存；可用 `--did` 覆盖 | `trim-cli-...` |
 
 #### Response
 | Field | Always Present | Type | Meaning | Conditions / Notes | Example |
@@ -87,20 +105,97 @@ CLI 行为:
 | `longToken` | no | string | 长期令牌 | 可选；用于后备恢复 | `ey...` |
 | `backId` | no | string | 请求 ID backId 分量 | 可选，用于 reqid 生成器上下文 | `69ba2df8000004c4` |
 | `secret` | no | string | HMAC 签名密钥 (base64) | 可选；启用签名请求 | `c2VjcmV0LXNlZWQ=` |
+| `isTwofaEnforced` | no | boolean | 是否强制 2FA | 与绑定状态一起决定是否进入 2FA 流程 | `true` |
+| `isBindTwofaSecret` | no | boolean | 是否已绑定 TOTP | 已绑定且设备未信任时需要验证码 | `true` |
+| `isTrustedDevice` | no | boolean | 当前设备是否已信任 | 已绑定且已信任时可直接完成登录 | `false` |
+| `accessToken` | no | string | 临时 2FA 登录凭据 | 2FA 后续请求必需 | `ey...` |
+| `twofaSecret` | no | string | TOTP 密钥 | 强制绑定时 CLI 会展示给用户 | `JBSWY3DPEHPK3PXP` |
+| `otpauth` | no | string | Authenticator URI | 强制绑定时 CLI 会展示给用户 | `otpauth://totp/...` |
 | `errno` | no | number | 数字错误码 | 失败和某些终结响应中出现 | `65534` |
 | `errmsg` | no | string | 错误描述 | 后端报告失败详情时出现 | `invalid credentials` |
 
 #### Protocol Notes
 - `user.login` 在当前协议层是直通请求：登录前无 HMAC 包装。
 - 成功的登录响应用于持久化会话并设置请求签名上下文。
+- 2FA 登录时，`user.login` 可能只返回 `accessToken` 而不返回 `token`；CLI 会完成验证码流程后再保存 session。
 
 #### Field Semantics
 - `user` 是当前实现中用户名的字段名。
 - `secret` 是 base64 编码，用作后续非直通请求的 HMAC 密钥。
+- `did` 是信任设备判断所用的客户端设备 ID，应保持稳定。
 
 #### Errors
 - 登录失败返回终结失败（`result: fail` 和/或 `errno`/`errmsg`）。
 - CLI 使用统一消息格式化器包装失败并以非零退出码退出。
+
+---
+
+### user.2fa.loginVerify
+
+#### Endpoint
+`user.2fa.loginVerify`
+
+#### Purpose
+当 `user.login` 要求 2FA 时，使用临时 `accessToken` 完成验证码校验并换取正式 session。
+
+#### Trim CLI Mapping
+此端点由 `trim-cli login` 内部调用：
+
+```bash
+trim-cli login -u <username> -p <password> --totp-code <code>
+trim-cli login -u <username> -p <password> --totp-code <code> --trust-device
+```
+
+省略 `--totp-code` 时，CLI 会交互式提示输入验证码。
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | 端点选择器 | 固定值 `user.2fa.loginVerify` | `user.2fa.loginVerify` |
+| `reqid` | body | yes | string | 请求关联 ID | 每请求生成 | `69ba234069ba2df8000004c40004` |
+| `accessToken` | body | yes | string | 临时 2FA 登录凭据 | 来自 `user.login` | `ey...` |
+| `code` | body | conditional | string | 6 位 TOTP 验证码 | 已绑定 TOTP 时发送 | `123456` |
+| `isTrustedDevice` | body | yes | boolean | 是否信任当前设备 | `--trust-device` 控制 | `false` |
+| `stay` | body | yes | number | 保持登录提示 | 固定值 `1` | `1` |
+| `deviceName` | body | yes | string | 设备标签 | `fnOS CLI` | `fnOS CLI` |
+| `deviceType` | body | yes | string | 设备类型 | `CLI` | `CLI` |
+| `did` | body | yes | string | 稳定设备 ID | 必须与 `user.login` 使用的 ID 一致 | `trim-cli-...` |
+
+#### Response
+成功后返回与普通登录相同的 session 材料：`token`、可选 `longToken`、可选 `backId`、可选 `secret`、可选 `uid`、可选 `admin`。
+
+#### Protocol Notes
+- 该请求会通过设备的加密请求通道发送；调用者不需要手工组装加密包。
+- 返回的 `secret` 会在保存 session 前转换成后续签名请求使用的 HMAC 密钥。
+- 信任设备不需要在本地保存单独的信任 token；设备端信任关系由稳定 `did` 识别。保留 CLI 本地配置即可保持同一设备身份。
+
+#### Errors
+- `135168` / `102570104`：验证码错误。
+- `102570109`：临时登录凭据过期，需要重新执行密码登录。
+
+---
+
+### appcgi.tfa.security.v1.login.totpVerify
+
+#### Endpoint
+`appcgi.tfa.security.v1.login.totpVerify`
+
+#### Purpose
+管理员强制开启 2FA 但当前用户还没绑定 TOTP 时，先校验用户刚绑定的第一组 TOTP 验证码。
+
+#### Trim CLI Mapping
+由 `trim-cli login` 内部调用。CLI 会展示 `otpauth` 或 `twofaSecret`，用户添加到身份验证器后输入 6 位验证码。
+
+#### Request
+| Field | Location | Required | Type | Meaning | Constraints / Notes | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `req` | body | yes | string | 端点选择器 | 固定值 `appcgi.tfa.security.v1.login.totpVerify` | `appcgi.tfa.security.v1.login.totpVerify` |
+| `reqid` | body | yes | string | 请求关联 ID | 每请求生成 | `69ba234069ba2df8000004c40005` |
+| `data.accessToken` | body | yes | string | 临时 2FA 登录凭据 | 来自 `user.login` | `ey...` |
+| `data.code` | body | yes | string | 6 位 TOTP 验证码 | 来自 `--totp-code` 或交互输入 | `123456` |
+
+#### Response
+成功后 CLI 会继续调用 `user.2fa.loginVerify` 获取正式 session。
 
 ---
 
@@ -133,7 +228,7 @@ CLI 行为:
 | `token` | no | string | 刷新/确认的短令牌 | 用于更新存储的会话 | `ey...` |
 | `longToken` | no | string | 刷新的长令牌 | 可选 | `ey...` |
 | `backId` | no | string | backId 值 | 可选，更新 reqid 上下文 | `69ba2df8000004c5` |
-| `secret` | no | string | HMAC 密钥 | 可选，更���签名上下文 | `c2VjcmV0LXNlZWQ=` |
+| `secret` | no | string | HMAC 密钥 | 可选，更新签名上下文 | `c2VjcmV0LXNlZWQ=` |
 | `errno` | no | number | 数字错误码 | 失败时出现 | `65534` |
 | `errmsg` | no | string | 错误描述 | 失败时出现 | `token expired` |
 
@@ -256,8 +351,10 @@ CLI 行为:
 #### Trim CLI Mapping
 已实现命令:
 - `trim-cli --host <host> --port <port> logout`
+- `trim-cli --profile home logout`
 
 CLI 行为:
+- 未传 `--profile` 时清理默认 session；传全局 `--profile <name>` 时只清理该 profile session。
 - 如果没有匹配的已保存会话，命令跳过远程登出，仍清理本地状态。
 - 如果存在已保存会话，CLI 获取 `si`，通过 `user.authToken` 恢复短令牌会话，然后发送 `user.logout`。
 - 即使远程登出或预登出重认证失败，本地会话清理仍会执行。
@@ -287,6 +384,36 @@ CLI 行为:
 #### Errors
 - 远程登出失败对命令的主要保证（本地会话移除）是有意的非致命行为。
 - 仅当本地清理本身抛出异常时，命令才以非零退出码退出。
+
+---
+
+### raw authenticated request
+
+#### Purpose
+在没有专门子命令时，复用当前已保存 session 发送任意已认证 WebSocket 请求。
+
+#### Trim CLI Mapping
+已实现命令:
+- `trim-cli --profile home raw appcgi.system.getInfo --json '{"language":"zh-CN"}'`
+- `trim-cli --profile home raw appcgi.network.ssh.switch --json '{"enable":true}' --yes`
+
+CLI 行为:
+- `req` 必须通过 endpoint guard：非空、最长 256 字节、不能带 URL 语法、空白、控制字符或空段。
+- `--json` 必须是 JSON object；CLI 自动补 `req` 与 `reqid`，因此输入里不能包含这两个字段。
+- `raw` 会复用当前 session/profile 的认证材料，不绕过现有签名、传输和重认证规则。
+- 当前目标 `host:port` 必须与已保存 session 一致；不一致会直接报错。
+- 命中 mutation-like 关键字的 endpoint 必须显式传 `--yes`。
+
+#### Auth Chain
+1. 读取当前默认 session 或 `--profile <name>` 对应 session。
+2. 发送 `util.getSI`。
+3. 发送 `user.authToken` 恢复活跃短令牌会话。
+4. 使用刷新后的 `secret` / `backId` 发送目标 `req`。
+
+#### Errors
+- 没有已保存 session 时，命令直接失败。
+- endpoint 或 `--json` 非法时，会在任何网络请求前直接失败。
+- 对 mutation-like endpoint 未传 `--yes` 时，会在任何 session 读取或网络请求前直接失败。
 
 ---
 
@@ -371,7 +498,7 @@ CLI 行为:
 | `errmsg` | no | string | 错误描述 | 失败时出现 | `permission denied` |
 
 #### Protocol Notes
-- 省略 `user` 返回当前用户，仅���理员可查询其他用户。
+- 省略 `user` 返回当前用户，仅管理员可查询其他用户。
 - 当前 CLI 将授权交由后端处理，不在本地预检管理员权限。
 
 ---
@@ -799,7 +926,7 @@ CLI 行为:
 `user.groupMod`
 
 #### Purpose
-修���现有 TRIM 组的选定字段。
+修改现有 TRIM 组的选定字段。
 
 #### Trim CLI Mapping
 已实现命令:
