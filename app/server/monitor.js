@@ -5172,8 +5172,9 @@ async function handleFetch(req) {
     if (_activeProfileCache) return _activeProfileCache;
     // 方式1：解析 hermes profile list 输出（活跃 profile 带 ◆ 前缀）
     // 实际格式: " ◆default         sensenova-6.7-flash-lite     running      —            —"
+    // 注意：必须注入 HERMES_HOME=DATA_DIR，否则 hermes 找 $HOME/.hermes 解析为空 → 面板 GET 读错 store
     try {
-      const r = spawnSync(HERMES_BIN, ["profile", "list"], { stdout: "pipe", stderr: "pipe", timeout: 8000 });
+      const r = spawnSync(HERMES_BIN, ["profile", "list"], { stdout: "pipe", stderr: "pipe", timeout: 8000, env: { ...process.env, HERMES_HOME: DATA_DIR } });
       const out = (r.stdout || "").toString();
       if (r.status === 0 && out.trim()) {
         const lines = out.split("\n");
@@ -7607,6 +7608,16 @@ async function handleFetch(req) {
     } catch { return []; }
   }
 
+  // cron CLI 统一注入「活跃 profile home」：hermes 0.20 起 cron 按 profile 隔离
+  // （profiles/<p>/cron/jobs.json，issue #4707 安全边界）。面板创建/操作任务必须
+  // 与对话（gateway）写入同一 store，否则出现「面板任务与对话任务两套」——
+  // 此前固定 HERMES_HOME=DATA_DIR 锚定全局，面板任务写全局而 GET 读 profile，读写错位。
+  function _cronCliEnv() {
+    const prof = _getActiveProfile() || "default";
+    const home = (prof === "default") ? DATA_DIR : `${DATA_DIR}/profiles/${prof}`;
+    return { ...process.env, HERMES_HOME: home };
+  }
+
   if (path === "/api/cron-jobs" && req.method === "GET") {
     try {
       const jobs = _readCronJobs();
@@ -7659,7 +7670,7 @@ async function handleFetch(req) {
       if (deliverArg) args.push("--deliver", deliverArg);
       if (body.repeat) args.push("--repeat", String(body.repeat));
       if (Array.isArray(body.skills)) body.skills.forEach(sk => { if (sk) args.push("--skill", sk); });
-      const r = spawnSync(HERMES_BIN, args, { stdout: "pipe", stderr: "pipe", timeout: 15000, env: { ...process.env, HERMES_HOME: DATA_DIR } });
+      const r = spawnSync(HERMES_BIN, args, { stdout: "pipe", stderr: "pipe", timeout: 15000, env: _cronCliEnv() });
       const stdout = (r.stdout || "").toString().trim();
       const stderr = (r.stderr || "").toString().trim();
       if (r.status !== 0) {
@@ -7692,7 +7703,7 @@ async function handleFetch(req) {
       const action = String(body.action || "").trim();
       const validActions = ["pause", "resume", "run", "remove"];
       if (!validActions.includes(action)) return new Response(JSON.stringify({ ok: false, error: "无效操作: " + action }), { status: 400, headers: jsonHeaders() });
-      const r = spawnSync(HERMES_BIN, ["cron", action, jobId], { stdout: "pipe", stderr: "pipe", timeout: 15000, env: { ...process.env, HERMES_HOME: DATA_DIR } });
+      const r = spawnSync(HERMES_BIN, ["cron", action, jobId], { stdout: "pipe", stderr: "pipe", timeout: 15000, env: _cronCliEnv() });
       const stdout = (r.stdout || "").toString().trim();
       const stderr = (r.stderr || "").toString().trim();
       if (r.status !== 0) {
@@ -10311,14 +10322,27 @@ function _writeCronWebhooks(map) {
     log(`[cron-webhook] 写配置失败: ${e?.message || e}`);
   }
 }
-// 模块级轻量活跃 profile 解析（webhook 轮询用；优先内存缓存，其次 .active_profile 文件，
-// 避免每次 tick 拉起 venv CLI）。注：_getActiveProfile 定义在 handleFetch 闭包内，模块级不可用。
+// 模块级轻量活跃 profile 解析（webhook 轮询用；优先 hermes profile list ◆ 标记，
+// 其次 .active_profile 文件——与 handleFetch 内 _getActiveProfile 保持同一判定，
+// 避免「面板读 profile store、webhook 轮询读 .active_profile」不一致导致任务两套。
+// 注：_getActiveProfile 定义在 handleFetch 闭包内，模块级不可用，故此处独立解析。
 function _cronProfileName() {
   if (_activeProfileCache) return _activeProfileCache;
   try {
+    const r = spawnSync(HERMES_BIN, ["profile", "list"], { stdout: "pipe", stderr: "pipe", timeout: 8000, env: { ...process.env, HERMES_HOME: DATA_DIR } });
+    const out = (r.stdout || "").toString();
+    if (r.status === 0 && out.trim()) {
+      const line = out.split("\n").find(function(l){ return l.includes("◆"); });
+      if (line) {
+        const name = line.replace(/^[\s◆]+/, "").trim().split(/\s+/)[0];
+        if (name) { _activeProfileCache = name; return name; }
+      }
+    }
+  } catch {}
+  try {
     const raw = readFileSync(`${DATA_DIR}/.active_profile`, "utf8");
     const name = raw.trim();
-    if (name) return name;
+    if (name) { _activeProfileCache = name; return name; }
   } catch {}
   return "default";
 }
