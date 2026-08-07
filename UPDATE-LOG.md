@@ -6,13 +6,15 @@
 
 ## v0.21.95（2026-08-07）
 
-**飞牛操作员全面强化（trim-cli 官方 v2 Skill）**：
+**飞牛操作员全面强化（trim-cli 官方 v2 Skill）+ 官方升级流程对齐**：
 - **trim-cli Skill 升级官方 v2**：命令域从 10 个扩到 13 个——新增**相册**（目录/搜索/详情/预览/AI 搜图 magic-search）、**影视库**（媒体库统计/搜索/详情/播放投屏链接）、**网络与电源**（SSH 开关/重启/关机）；认证与连接增强（2FA/TOTP、信任设备、多 NAS profile、WS/WSS 自动选择、自签证书、session 安全存储、输出脱敏）；文件管理扩展（上传/重命名/压缩解压/回收站/收藏/ACL/owner/团队目录/挂载点/用量）；存储（空闲磁盘/RAID 创建校验）；Docker（镜像/容器/Compose）
-- **SKILL.md 强化**：追加「fnOS 应用内使用」章节——调用方式、高频任务速查表（应用中心/相册/影视/网络电源/文件/存储/日志监控/Docker）、安全纪律（破坏性操作二次确认、脱敏、路径规范）
-- **飞牛操作员（fnos_operator）SOUL 强化**：结合 trim-cli 全量能力重写运维专家 persona，并绑定 trim-cli skill（102/249 已部署验证）
-- **修复历史 bug**：init/（知识整合模板：记忆/知识/技能/mirror 脚本）此前从未被打包进 FPK（fnpack 只打标准目录）——"安装即部署知识整合"实际未生效；build-slim 现已将 init/ 并入 app/ 随包分发
+- **SKILL.md 强化**：追加「fnOS 应用内使用」章节——调用方式、高频任务速查表、安全纪律
+- **飞牛操作员（fnos_operator）SOUL 强化**并绑定 trim-cli skill（102/249 已部署）
+- **官方开发文档知识库**：完整学习 llms-full.txt（5219 行）沉淀为《飞牛官方开发文档速查》（生命周期脚本契约/Manifest/TRIM_*环境变量/权限模型/统一网关/开放 API/wizard），随包部署
+- **自动更新对齐官方升级流程**：覆盖后新增 **upgrade_callback 式权限修复**（sudo -n chown -R APP_DIR/VAR_DIR + chmod，模拟 TRIM_APP_STATUS=UPGRADE 语义），防覆盖后权限漂移导致启动失败；102 实测通过
+- **修复历史 bug**：init/（知识整合模板）此前从未被打包进 FPK，现已随包分发
 
-- 安装包：fnos-hermes-agent_v0.21.95.fpk（43.9MB）
+- 安装包：fnos-hermes-agent_v0.21.95.fpk（67.4MB，含 trim-cli 全平台二进制）
 
 ## v0.21.94（2026-08-07）
 
