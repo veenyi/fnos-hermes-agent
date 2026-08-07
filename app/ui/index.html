@@ -372,6 +372,7 @@
     .input-wrap .send svg{width:20px;height:20px;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
 
     .toolbar{display:flex;align-items:center;gap:6px;padding-left:2px;position:relative}
+    .toolbar-toggle{display:none}
     .tool-btn{width:32px;height:32px;border-radius:var(--radius-md);border:1px solid transparent;background:transparent;color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;position:relative}
     .tool-btn:hover{background:var(--bg3);color:var(--text)}
     .tool-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
@@ -532,11 +533,10 @@
       .toolbar::-webkit-scrollbar{display:none}
       .tool-btn{flex-shrink:0;width:30px;height:30px}
       .tool-btn svg{width:16px;height:16px}
-      /* 手机端精简：隐藏低频/桌面功能按钮，减少顶栏与头部拥挤（语音设置按钮保留：语音对话/打断/音色入口） */
+      /* 手机端精简：隐藏低频/桌面功能按钮，减少顶栏与头部拥挤（工作区/多会话按钮保留：工作区面板手机端可用） */
       .global-topbar .right .glob-btn[onclick*="openNewWindow"],
       .global-topbar .right .glob-btn[onclick*="openGitHub"],
-      #btnThemeAuto,
-      #wsPanelToggle{display:none}
+      #btnThemeAuto{display:none}
       .mini-popup{position:fixed;left:8px!important;right:8px!important;top:8px!important;bottom:8px!important;width:auto!important;max-width:none!important;height:auto!important;border-radius:14px;z-index:2000}
       .mini-popup::after{display:none}
       .mini-popup-body{max-height:calc(100vh - 110px)!important}
@@ -546,6 +546,28 @@
       .cmd-cell .title{font-size:12px}
       .cmd-cell .sub{font-size:10px}
       .connector-grid{grid-template-columns:1fr}
+      /* 知识库手机端：文件树与内容纵向堆叠（文件树上、内容下），不再左右挤压 */
+      #kbLayout{flex-direction:column;gap:8px}
+      #kbLayout .kb-tree-pane{width:100%!important;max-height:32vh;flex-shrink:0}
+      #kbLayout .kb-viewer-pane{flex:1;min-height:0}
+      #kbViewer{padding:12px 10px!important}
+      /* 多会话标签手机端紧凑（标题可读且不挤） */
+      .session-tab{min-width:112px;max-width:150px;padding:6px 8px 6px 10px;font-size:11px;gap:5px}
+      .session-tab .tab-title{max-width:82px}
+      /* 会话区标题截断防溢出 */
+      .global-topbar .left .title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:38vw}
+      /* 输入框工具条：加号折叠（+ 展开 / − 收起） */
+      .toolbar-toggle{display:none}
+      .toolbar{display:none}
+      .toolbar.visible{display:flex}
+      .toolbar-toggle{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg1);color:var(--text2);font-size:18px;line-height:1;flex-shrink:0;cursor:pointer}
+      /* 用量统计手机端：卡片与模型行紧凑、防溢出 */
+      .usage-summary{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+      .usage-card{padding:12px}
+      .usage-card-value{font-size:20px}
+      .usage-model-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .usage-model-stats{min-width:auto;font-size:11px}
+      .usage-model-row{flex-wrap:wrap;gap:6px}
       .page-body{padding:14px}
       .ov-grid{grid-template-columns:1fr !important;gap:10px}
       .ov-card{padding:12px;gap:8px;min-width:0;border-radius:10px}
@@ -1235,6 +1257,7 @@
                   </button>
                 </div>
               </div>
+              <div class="toolbar-toggle" id="toolbarToggle" onclick="toggleToolbar()" title="工具">＋</div>
               <div class="toolbar" id="toolbar">
                 <button class="tool-btn" data-tip="选择模型" onclick="openMini(this,'model')" id="btnModel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></button>
                 <button class="tool-btn" data-tip="连接器" onclick="openMini(this,'connector')" id="btnConnector"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
@@ -1822,14 +1845,14 @@
               <button class="ov-actbtn" onclick="kbLoadTree()">↻ 刷新</button>
             </div>
           </div>
-          <div style="display:flex;gap:12px;flex:1;min-height:0;margin-top:12px">
+          <div id="kbLayout" style="display:flex;gap:12px;flex:1;min-height:0;margin-top:12px">
             <!-- 左：文件树 -->
-            <div style="width:230px;flex-shrink:0;border:1px solid var(--border);border-radius:10px;background:var(--bg1);display:flex;flex-direction:column;min-height:0;overflow:hidden">
+            <div class="kb-pane kb-tree-pane" style="width:230px;flex-shrink:0;border:1px solid var(--border);border-radius:10px;background:var(--bg1);display:flex;flex-direction:column;min-height:0;overflow:hidden">
               <div style="padding:8px 10px;font-size:12px;font-weight:600;color:var(--text2);border-bottom:1px solid var(--border)">📂 笔记库</div>
               <div id="kbTree" style="flex:1;overflow-y:auto;padding:6px;font-size:13px"></div>
             </div>
             <!-- 右：笔记内容 -->
-            <div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--bg1);display:flex;flex-direction:column;min-height:0;overflow:hidden">
+            <div class="kb-pane kb-viewer-pane" style="flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--bg1);display:flex;flex-direction:column;min-height:0;overflow:hidden">
               <div id="kbViewer" style="flex:1;overflow-y:auto;padding:18px 20px"></div>
             </div>
           </div>
@@ -6524,7 +6547,19 @@ function openTab(sid) {
 
 /* 切换激活标签：流式后台继续（并行多会话）。切换前保存当前 chatBody → _chatHTML[currentSession]，切回时仍优先用缓存（流式最新） */
 function switchTab(sid) {
-  if (!sid || sid === currentSession) return;
+  if (!sid) return;
+  if (sid === currentSession) {
+    // 点击当前激活标签：收起标签栏（省出聊天空间），再点按钮可重新展开
+    var _tabs = document.querySelector('.page-container .session-tabs');
+    if (_tabs && _tabs.classList.contains('visible')) {
+      _tabs.classList.remove('visible');
+      _tabsManuallyHidden = true;
+      _multiTabsForced = false;
+      var _btn = document.getElementById('multiTabsBtn');
+      if (_btn) _btn.classList.remove('active');
+    }
+    return;
+  }
   var body = document.getElementById('chatBody');
   if (body && currentSession) _chatHTML[currentSession] = body.innerHTML;
   currentSession = sid;
@@ -6663,11 +6698,15 @@ function syncTabs() {
 
 /* 同步标签栏可见性：多会话按钮强制开启 > 移动端始终显示 > 桌面端仅 rail 折叠时显示 */
 var _multiTabsForced = false;
+var _tabsManuallyHidden = false;   // 用户手动收起过标签栏（移动端：收起后保持，直到再次点击按钮）
 function toggleSessionTabsBar(){
   _multiTabsForced = !_multiTabsForced;
+  if(_multiTabsForced) _tabsManuallyHidden = false;
+  else _tabsManuallyHidden = true;
   var btn=document.getElementById('multiTabsBtn');
   if(btn) btn.classList.toggle('active', _multiTabsForced);
-  syncSessionTabsVisibility();
+  var tabs = document.querySelector('.page-container .session-tabs');
+  if(tabs) tabs.classList.toggle('visible', _multiTabsForced);
 }
 function syncSessionTabsVisibility() {
   var tabs = document.querySelector('.page-container .session-tabs');
@@ -6676,8 +6715,10 @@ function syncSessionTabsVisibility() {
   if (!rail) return;
   if (_multiTabsForced) {
     tabs.classList.add('visible');  // 多会话按钮强制开启
+  } else if (_tabsManuallyHidden && window.innerWidth <= 768) {
+    tabs.classList.remove('visible');  // 移动端：用户手动收起后保持收起
   } else if (window.innerWidth <= 768) {
-    tabs.classList.add('visible');  // 移动端：始终显示
+    tabs.classList.add('visible');  // 移动端：默认显示
   } else if (rail.classList.contains('hidden')) {
     tabs.classList.add('visible');  // 桌面端：仅 rail 折叠时显示
   } else {
@@ -8570,20 +8611,42 @@ function toggleRail(){
  * 「停止」按钮，点击 onSendOrStop → chatStop()
  * （POST /api/chat/stop 通知网关中断 + ws.close + AbortController.abort 全链路停止）。 */
 var _genTimerInt = null, _genTimerStart = 0, _genLastEventTs = 0; // 长静默「仍在工作」提示：最后一次内容/工具事件时间
+/* 发送/停止按钮模式切换：send=发送（含纠偏发送），stop=停止生成 */
+function _setSendBtnMode(btn, mode){
+  if(!btn) return;
+  if(mode==='send'){
+    btn.classList.remove('stop');
+    btn.title='发送纠偏（redirect）';
+    btn.disabled=false;
+    btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>';
+  } else {
+    btn.classList.add('stop');
+    btn.title='停止生成（直接中断当前进度）';
+    btn.disabled=false;
+    btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>';
+  }
+}
 function onSendOrStop(){
-  if(_msgState.streaming){ chatStop(); return; }
+  if(_msgState.streaming){
+    // 流式回复中：已输入内容 = 发送纠偏（redirect）；未输入 = 停止生成
+    var ta=document.getElementById('chatInput');
+    if(ta && ta.value.trim()){ sendChat(); return; }
+    chatStop();
+    return;
+  }
   sendChat();
 }
 function setSendState(streaming){
   var btn=document.getElementById('sendBtn'); if(!btn) return;
   var ta=document.getElementById('chatInput');
   if(streaming){
-    if(btn.classList.contains('stop')) return;
-    btn.classList.add('stop');
-    btn.disabled=false;
-    btn.title='停止生成（直接中断当前进度）';
-    btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>';
-    if(ta && ta.placeholder.indexOf('纠偏')<0){ ta.setAttribute('data-ph', ta.placeholder); ta.placeholder='回复中…可输入消息实时纠偏（redirect）'; }
+    if(btn.classList.contains('stop') && !(ta && ta.value.trim())) return;
+    if(ta && ta.value.trim()){
+      _setSendBtnMode(btn, 'send');   // 已有输入 → 发送纠偏
+    } else {
+      _setSendBtnMode(btn, 'stop');   // 未输入 → 停止
+    }
+    if(ta && ta.placeholder.indexOf('纠偏')<0){ ta.setAttribute('data-ph', ta.placeholder); ta.placeholder='回复中，可输入消息纠偏'; }
   } else {
     btn.classList.remove('stop');
     btn.title='发送';
@@ -8649,7 +8712,19 @@ function genBarDone(mode, text, holdMs){
 }
 function autoResize(t){
   t.style.height='auto'; t.style.height=t.scrollHeight+'px';
-  var btn=document.getElementById('sendBtn'); if(btn && !_msgState.streaming) btn.disabled=!t.value.trim() && _pendingAttachments.length===0;
+  var btn=document.getElementById('sendBtn'); if(!btn) return;
+  if(_msgState.streaming){
+    _setSendBtnMode(btn, t.value.trim() ? 'send' : 'stop');   // 流式：有输入=发送纠偏，无输入=停止
+  } else {
+    btn.disabled=!t.value.trim() && _pendingAttachments.length===0;
+  }
+}
+/* 手机端工具条加号折叠：＋ 展开 / − 收起（桌面端隐藏按钮不受影响） */
+function toggleToolbar(){
+  var tb=document.getElementById('toolbar'), tg=document.getElementById('toolbarToggle');
+  if(!tb) return;
+  var show=tb.classList.toggle('visible');
+  if(tg) tg.textContent = show ? '−' : '＋';
 }
 function onKey(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); } }
 function sendChat(){
@@ -8941,7 +9016,7 @@ function sendRaw(text){
         // 流式进行中（有运行中的工具）保持展开；全部完成后折叠
         // 尊重设置：tools_collapse 开启时始终折叠，tools_hidden 开启时保持隐藏
         var _chat = (PV.Store.load().chat) || {};
-        if(running && !_chat.tools_collapse && !_chat.tools_hidden) toolBox.setAttribute('data-collapsed','false');
+        if(running && !_chat.tools_hidden) toolBox.setAttribute('data-collapsed', _chat.tools_collapse ? 'true' : 'false');
         if(_chat.tools_hidden) toolBox.style.display='none';
         body.scrollTop=body.scrollHeight;
         _chatHTML[sid] = body.innerHTML;
@@ -8973,10 +9048,11 @@ function sendRaw(text){
         infoEl.style.display = 'none';
         // 生成状态条：显示“回答完成 / 已停止”，短暂停留后恢复默认
         genBarDone(aborted?'stopped':'done', aborted?'已停止':'回答完成');
-        // 完成后折叠工具区（Issue #8）；若仍有运行中的工具则保持展开
+        // 完成后折叠工具区（Issue #8）；若仍有运行中的工具则保持展开（除非「始终折叠」开启）
         if(toolBox){
           var anyRunning = toolList.querySelector('.tool-call.running');
-          if(!anyRunning){ toolBox.setAttribute('data-collapsed','true'); updateToolSummary(); }
+          var _ch2 = (PV.Store.load().chat) || {};
+          if(!anyRunning || _ch2.tools_collapse){ toolBox.setAttribute('data-collapsed','true'); updateToolSummary(); }
           else { toolBox.setAttribute('data-collapsed','false'); updateToolSummary(); }
         }
         hideScrollBtn();
@@ -10030,14 +10106,18 @@ function kbLoadTree(){
     kbRenderTree();
   });
 }
+var _kbExpandedDirs = {};   // 目录路径 → 是否展开（kbRenderTree 重建 DOM 后保留展开状态）
 function kbRenderTree(){
   var el=document.getElementById('kbTree'); if(!el) return;
-  function render(items, depth){
+  function dirKey(it, parent){ return parent ? parent+'/'+it.name : it.name; }
+  function render(items, depth, parent){
     var html='';
     (items||[]).forEach(function(it){
       if(it.type==='dir'){
-        html += '<div class="kb-dir" data-d="'+depth+'" onclick="kbToggleDir(this)"><span class="kb-caret">▸</span> 📁 <span class="kb-name">'+esc(it.name)+'</span></div>'+
-          '<div class="kb-children" style="display:none">'+render(it.children||[], depth+1)+'</div>';
+        var k = dirKey(it, parent);
+        var open = !!_kbExpandedDirs[k];
+        html += '<div class="kb-dir" data-d="'+depth+'" data-path="'+esc(k)+'" onclick="kbToggleDir(this)"><span class="kb-caret">'+(open?'▾':'▸')+'</span> 📁 <span class="kb-name">'+esc(it.name)+'</span></div>'+
+          '<div class="kb-children" style="display:'+(open?'block':'none')+'">'+render(it.children||[], depth+1, k)+'</div>';
       } else {
         var active = (_kbCurrent===it.path);
         html += '<div class="kb-file'+(active?' active':'')+'" data-d="'+depth+'" onclick="kbOpenNote(\''+esc(it.path).replace(/'/g,"\\'")+'\')">📄 <span class="kb-name">'+esc(it.name.replace(/\.md$/i,''))+'</span></div>';
@@ -10045,11 +10125,16 @@ function kbRenderTree(){
     });
     return html;
   }
-  el.innerHTML = render(_kbTree, 0) || '<div class="empty-state" style="padding:12px;font-size:12px">暂无笔记<br>点「＋ 新建笔记」开始沉淀</div>';
+  el.innerHTML = render(_kbTree, 0, '') || '<div class="empty-state" style="padding:12px;font-size:12px">暂无笔记<br>点「＋ 新建笔记」开始沉淀</div>';
 }
 function kbToggleDir(el){
   var ch=el.nextElementSibling, caret=el.querySelector('.kb-caret');
-  if(ch){ ch.style.display = (ch.style.display==='block') ? 'none':'block'; }
+  var key = el.getAttribute('data-path') || '';
+  if(ch){
+    var open = (ch.style.display==='block');
+    ch.style.display = open ? 'none':'block';
+    if(key) _kbExpandedDirs[key] = !open;
+  }
   if(caret) caret.textContent = (ch && ch.style.display==='block') ? '▾':'▸';
 }
 function kbOpenNote(path){
@@ -13064,12 +13149,16 @@ function renderCronJobs(){
       var name = j.name || j.prompt || '未命名任务';
       if(name.length > 60) name = name.slice(0,60) + '…';
       var schedule = j.schedule || j.cron || '';
+      // schedule 可能为对象（{kind,expr/at}）或异常值（"[object Object]"），统一提取为可读字符串
+      if(schedule && typeof schedule === 'object'){ schedule = schedule.expr || schedule.at || schedule.cron || schedule.kind || ''; }
+      if(typeof schedule !== 'string' || !schedule || schedule === '[object Object]' || schedule === 'undefined' || schedule === 'null') schedule = '';
       var paused = j.paused || j.status === 'paused';
       var skills = j.skills || j.attached_skills || [];
       var _dv = j.deliver_to != null ? j.deliver_to : j.delivery;
       var deliver = (typeof _dv === 'string') ? (_dv || 'local')
         : (_dv && typeof _dv === 'object') ? String(_dv.channel || _dv.name || _dv.type || _dv.kind || 'local')
         : 'local';
+      if(deliver === '[object Object]' || deliver === 'undefined' || deliver === 'null') deliver = 'local';
       var nextRun = j.next_run_at ? new Date(j.next_run_at).toLocaleString('zh-CN') : '';
       var lastRun = j.last_run_at ? new Date(j.last_run_at).toLocaleString('zh-CN') : '';
       var lastStatus = j.last_status || '';
@@ -13092,8 +13181,8 @@ function renderCronJobs(){
       }
       return '<div class="mcp-card'+(paused?' disabled':'')+'" style="border-left:3px solid '+accent+'">' +
         '<div class="mcp-card-head"><div class="mcp-name">⏰ '+esc(name)+'</div><div class="mcp-badges">'+statusPill+'</div></div>' +
-        '<div class="mcp-detail" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px">'+
-          '<code style="font-size:11px;background:var(--bg1);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:monospace">'+esc(schedule)+'</code>'+
+        '<div class="mcp-detail" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px;min-width:0">'+
+          '<code style="font-size:11px;background:var(--bg1);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-family:monospace;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle">'+esc(schedule)+'</code>'+
           '<span style="font-size:11px;color:var(--text3)">'+(delIcons[deliver]||'📨')+' 投递: '+esc(deliver)+'</span>'+
         '</div>' +
         (skills.length ? '<div class="mcp-tools-info" style="margin-top:4px">📚 技能: '+esc(skills.join(', '))+'</div>' : '') +
@@ -13515,7 +13604,7 @@ function renderUsagePage(){
         var info = u.by_model[m];
         var pct = maxSessions > 0 ? Math.round(info.sessions / maxSessions * 100) : 0;
         return '<div class="usage-model-row">' +
-          '<div class="usage-model-name">'+esc(m)+'</div>' +
+          '<div class="usage-model-name">'+esc(m==='unknown'?'未知模型':m)+'</div>' +
           '<div class="usage-model-bar"><div class="usage-model-bar-fill" style="width:'+pct+'%"></div></div>' +
           '<div class="usage-model-stats">'+info.sessions+' 会话 · '+info.messages+' 消息</div>' +
           '</div>';
