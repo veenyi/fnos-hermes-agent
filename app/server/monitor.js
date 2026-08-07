@@ -4441,27 +4441,62 @@ async function handleFetch(req) {
       const _verTag = String(version || "").replace(/^fnos-hermes-agent_v|^v/, "");
       const _shareFile = _verTag ? `fnos-hermes-agent_v${_verTag}.fpk` : "";
       let dl = null;
+      let buf = null;
       if (_shareFile) {
-        try {
-          const shareUrl = `${_shareBase}/p/${_shareCode}/${_shareFile}`;
-          log(`[app-update] 尝试从 alist 分享直链下载: ${shareUrl}`);
-          dl = await fetch(shareUrl, { signal: AbortSignal.timeout(60000) });
-          if (!dl.ok) { log(`[app-update] 分享直链下载失败 HTTP ${dl.status}，切换 GitHub`); dl = null; }
-        } catch (e) { log(`[app-update] 分享直链下载异常: ${e.message}，切换 GitHub`); dl = null; }
+        // ① WebDAV（用户内部更新通道，凭证从 data/.env 读取，不硬编码）
+        const _envCfg = (() => { try { const t = readFileSync(`${DATA_DIR}/.env`, "utf8"); const g = k => { const m = t.match(new RegExp("^" + k + "\\s*=\\s*(.+)$", "m")); return m ? m[1].trim() : ""; }; return { u: g("HERMES_WD_USER"), p: g("HERMES_WD_PASS"), b: g("HERMES_WD_BASE") }; } catch { return { u: "", p: "", b: "" }; } })();
+        const _wdBase = (_envCfg.b || "http://nas.aio.run:5244/dav/FnosAPP").replace(/\/+$/, "");
+        if (_envCfg.u && _envCfg.p) {
+          try {
+            const wdUrl = `${_wdBase}/${_shareFile}`;
+            log(`[app-update] 尝试从 WebDAV 下载: ${wdUrl}`);
+            dl = await fetch(wdUrl, { headers: { Authorization: "Basic " + Buffer.from(`${_envCfg.u}:${_envCfg.p}`).toString("base64") }, signal: AbortSignal.timeout(60000) });
+            if (dl.ok) {
+              const _b0 = Buffer.from(await dl.arrayBuffer());
+              if (_b0.length > 0 && (_b0[0] === 0x1f && _b0[1] === 0x8b)) { buf = _b0; log(`[app-update] WebDAV 下载成功 ${(buf.length/1048576).toFixed(1)}MB`); }
+              else { log(`[app-update] WebDAV 内容非 FPK，切换下一源`); dl = null; }
+            } else { log(`[app-update] WebDAV 下载失败 HTTP ${dl.status}，切换下一源`); dl = null; }
+          } catch (e) { log(`[app-update] WebDAV 下载异常: ${e.message}`); dl = null; }
+        }
+        // ② alist 分享直链（公众通道，免认证）
+        if (!dl && !buf) {
+          try {
+            const shareUrl = `${_shareBase}/p/${_shareCode}/${_shareFile}`;
+            log(`[app-update] 尝试从 alist 分享直链下载: ${shareUrl}`);
+            dl = await fetch(shareUrl, { signal: AbortSignal.timeout(60000) });
+            if (dl.ok) {
+              const _b1 = Buffer.from(await dl.arrayBuffer());
+              if (_b1.length > 0 && (_b1[0] === 0x1f && _b1[1] === 0x8b)) { buf = _b1; log(`[app-update] 分享直链下载成功 ${(buf.length/1048576).toFixed(1)}MB`); }
+              else { log(`[app-update] 分享直链内容非 FPK（可能是预览页），切换下一源`); dl = null; }
+            } else { log(`[app-update] 分享直链下载失败 HTTP ${dl.status}`); dl = null; }
+          } catch (e) { log(`[app-update] 分享直链下载异常: ${e.message}`); dl = null; }
+        }
+        // ③ GitHub 加速镜像（大陆中继）
+        if (!dl && !buf) {
+          try {
+            const _ghp = (process.env.HERMES_GHPROXY || "https://ghproxy.net/").replace(/\/+$/, "");
+            log(`[app-update] 尝试 GitHub 加速镜像下载`);
+            dl = await fetch(`${_ghp}/${url.replace(/^https?:\/\//, "")}`, { signal: AbortSignal.timeout(120000) });
+            if (dl.ok) {
+              const _b2 = Buffer.from(await dl.arrayBuffer());
+              if (_b2.length > 0 && (_b2[0] === 0x1f && _b2[1] === 0x8b)) { buf = _b2; log(`[app-update] 加速镜像下载成功 ${(buf.length/1048576).toFixed(1)}MB`); }
+              else { log(`[app-update] 加速镜像内容非 FPK，切换 GitHub 直连`); dl = null; }
+            } else { log(`[app-update] 加速镜像下载失败 HTTP ${dl.status}`); dl = null; }
+          } catch (e) { log(`[app-update] 加速镜像下载异常: ${e.message}`); dl = null; }
+        }
       }
-      if (!dl) {
+      // ④ GitHub 直连（兜底）
+      if (!dl && !buf) {
         dl = await fetch(url, { signal: AbortSignal.timeout(600000) });
+        if (dl.ok) {
+          const _b3 = Buffer.from(await dl.arrayBuffer());
+          if (_b3.length > 0 && (_b3[0] === 0x1f && _b3[1] === 0x8b)) { buf = _b3; log(`[app-update] GitHub 下载成功 ${(buf.length/1048576).toFixed(1)}MB`); }
+          else throw new Error("GitHub 下载内容不是有效的 FPK 包（gzip）");
+        } else throw new Error(`GitHub 下载失败: HTTP ${dl.status}`);
       }
       // 下载后校验 gzip 头：分享服务对完整请求可能返回 HTML 预览页（HTTP 200 但非文件），
       // 非 gzip 时自动切换到 GitHub 兜底下载
-      let buf = Buffer.from(await dl.arrayBuffer());
-      if (buf.length > 0 && (buf[0] !== 0x1f || buf[1] !== 0x8b)) {
-        log(`[app-update] 分享直链内容非 FPK（可能是预览页 HTML），切换 GitHub 下载`);
-        dl = await fetch(url, { signal: AbortSignal.timeout(600000) });
-        if (!dl.ok) throw new Error(`GitHub 下载失败: HTTP ${dl.status}`);
-        buf = Buffer.from(await dl.arrayBuffer());
-      }
-      if (!buf.length) throw new Error("安装包为空");
+      if (!buf) throw new Error("安装包为空");
       const fpkPath = `/tmp/hermes-agent-update.fpk`;
       writeFileSync(fpkPath, buf);
       log(`[app-update] FPK 已下载: ${(buf.length / 1048576).toFixed(1)}MB → ${fpkPath}`);
@@ -4875,7 +4910,7 @@ async function handleFetch(req) {
     if (!hasRealProvider) {
       return new Response(JSON.stringify({ ok: false, error: "请先在设置中添加至少一个模型服务商" }), { status: 400, headers: jsonHeaders() });
     }
-    const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run"]);
+    const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run", "--replace"]);
     const r2 = spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
     return new Response(JSON.stringify({ gateway: r1, dashboard: r2 }), { headers: jsonHeaders() });
   }
@@ -4902,7 +4937,7 @@ async function handleFetch(req) {
       await forceKillHermes();
       resetGatewayCrashLoop();
       await new Promise(r => setTimeout(r, 1500));
-      const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run"]);
+      const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run", "--replace"]);
       const r2 = spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
       return { gateway: r1, dashboard: r2 };
     } catch (e) {
@@ -8240,7 +8275,7 @@ async function handleFetch(req) {
         await forceKillHermes();
         resetGatewayCrashLoop();
         await new Promise(r => setTimeout(r, 1500));
-        const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run"]);
+        const r1 = spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run", "--replace"]);
         const r2 = spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
         log(`[gw-restart] ${tag}: 重启完成 gateway=${JSON.stringify(r1)} dashboard=${JSON.stringify(r2)}`);
       } catch (e) {
@@ -10170,7 +10205,7 @@ function maybeAutoStartServices() {
       return;
     }
     log("Auto-starting gateway & dashboard (provider config detected) ...");
-    spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run"]);
+    spawnHermes("gateway",   PID_GATEWAY,   ["gateway", "run", "--replace"]);
     spawnHermes("dashboard", PID_DASHBOARD, ["dashboard", "--host", DASHBOARD_BIND, "--port", String(DASHBOARD_PORT), "--no-open", "--insecure"]);
   } catch (err) {
     log(`Auto-start error: ${err?.message || err}`);

@@ -1,3 +1,31 @@
+# fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.88)
+
+---
+
+
+
+# v0.21.88 — 紧急修复：大量用户安装失败（set -e/trap ERR 阻断多源重试 + 官方源首选）
+
+> 用户反馈：非常多用户安装报「无法安装 hermes-agent：脚本出错(L378): unsatisfiable，hint: 清华镜像 403 Forbidden」。
+
+## 根因（两层）
+
+1. **install_callback 的  + **：editable 安装首次用清华镜像，uv 遇 403 返回非 0 → **trap ERR 立即中止脚本（L378 报错退出）** → 多源重试链（清华→官方→阿里云）**形同虚设、永远走不到**
+2. 清华镜像当前对大量请求返回 403（镜像侧问题）
+
+## 修复（cmd/install_callback）
+
+- editable 安装段**局部禁用 set -e / ERR trap**：uv 403/失败不再中断脚本，三源重试链走完后再统一判断（失败才 toast 明确「三源均失败」）
+- **重试顺序改为 官方 PyPI → 阿里云 → 清华**（官方最稳定；镜像仅作加速兜底）
+
+## 验证
+
+- install_callback 语法通过；打包 v0.21.88（含 v0.21.87 的多源下载 + gateway --replace 修复）
+
+---
+
+
+
 # fnos-hermes-agent CHANGELOG (v0.20.81 – v0.21.86)
 
 ---
