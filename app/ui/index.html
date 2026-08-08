@@ -1845,10 +1845,10 @@
     <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">下载安装包 (.fpk)</button>
     <button class="ov-actbtn start" id="appAutoBtnGh" style="display:none" onclick="autoAppUpdate('github')" title="从 GitHub Release 下载 FPK 更新（需能访问 GitHub）">⬇ GitHub Release 更新</button>
     <button class="ov-actbtn start" id="appAutoBtnWd" style="display:none" onclick="autoAppUpdate('webdav')" title="从 WebDAV（内部分发通道）下载 FPK 更新，国内网络更快">⚡ WebDAV 更新</button>
-  </div>
-  <div class="update-card" id="changelogCard" style="display:none">
-    <div class="update-title">更新说明</div>
-    <div class="update-changelog" id="changelogBody"></div>
+    <div id="changelogWrap" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:10px">
+      <div class="update-title" style="font-size:13px;margin-bottom:6px">本次更新说明</div>
+      <div class="update-changelog" id="changelogBody"></div>
+    </div>
   </div>
 </div>
 <div class="update-gh"><a class="gh-button" href="https://github.com/veenyi/fnos-hermes-agent/releases/latest" target="_blank">GitHub 下载页 →</a></div>
@@ -14484,19 +14484,21 @@ function confirmHermesUpdate(){
     })();
   }).catch(function(e){ toast('启动更新失败：'+e.message); });
 }
-/* 加载随包分发的更新说明（UPDATE-LOG.md → 更新页展示每次版本变更） */
+/* 加载「本次更新说明」：changelog?after=当前版本 → 只显示当前版本之后的各版本变更 */
 function loadChangelog(){
-  var card=document.getElementById('changelogCard'), body=document.getElementById('changelogBody');
-  if(!card || !body) return;
-  fetch(apiUrl('/api/app/changelog'), { headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+  var wrap=document.getElementById('changelogWrap'), body=document.getElementById('changelogBody');
+  if(!wrap || !body) return;
+  var cur=document.getElementById('appCurrent');
+  var curVer = cur ? cur.textContent.replace(/[^0-9.]/g,'') : '';
+  fetch(apiUrl('/api/app/changelog?after='+encodeURIComponent(curVer)), { headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
     .then(function(r){ return r.text(); })
     .then(function(t){
       if(t && t.indexOf('##')!==-1){
         try{ body.innerHTML = (window.marked && marked.parse) ? marked.parse(t) : t; }
         catch(e){ body.innerHTML = t; }
-        card.style.display='';
-      }
-    }).catch(function(){});
+        wrap.style.display='';
+      } else { wrap.style.display='none'; }
+    }).catch(function(){ wrap.style.display='none'; });
 }
 function checkAppUpdate(evt){
   var btn=_resolveCheckBtn(evt); if(btn){btn.disabled=true;btn.textContent='检查中…';}
@@ -14518,6 +14520,7 @@ function checkAppUpdate(evt){
         var btn3=document.getElementById('appUpdateBtn'); if(btn3) btn3.style.display='inline-flex';
         var abG=document.getElementById('appAutoBtnGh'); if(abG) abG.style.display='inline-flex';
         var abW=document.getElementById('appAutoBtnWd'); if(abW) abW.style.display='inline-flex';
+        loadChangelog();  // 检测到新版 → 显示「本次更新说明」（当前版本之后的变更）
         toast('发现新版本：v'+data.latest+'，可选「GitHub Release 更新」或「WebDAV 更新」');
       } else {
         lat.textContent='已是最新';
