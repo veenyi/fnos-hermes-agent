@@ -4,15 +4,6 @@
 
 ---
 
-## v0.21.97（2026-08-08）
-
-**修复：官方 Dashboard 聊天页（/proxy/dashboard/chat）白屏**：
-- 根因：monitor 此前把 /chat 路由主动拦截返回「页面不可用」——误判为"PTY 桥在门户代理下无法渲染"；实测官方 dashboard 对 /chat 是标准 SPA fallback（返回 index.html），资源/API/WebSocket 经门户代理均可正常渲染
-- 修复：移除 /chat 拦截，恢复代理转发（/system 页因上游 /api/system 在 0.20 不存在，保留中文提示）
-- 验证：249/254 实测 /proxy/dashboard/chat 正常返回 dashboard SPA（12800B），浏览器可正常打开官方聊天页
-
-- 安装包：fnos-hermes-agent_v0.21.97.fpk（40.1MB）
-
 ## v0.21.96（2026-08-07）
 
 **自动更新提速与兼容修复（254 实测驱动）**：
