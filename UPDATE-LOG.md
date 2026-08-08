@@ -4,16 +4,17 @@
 
 ---
 
-## v0.22.0（2026-08-08）
+## v0.21.97（2026-08-09）
 
-**Dashboard 全链路修复 + 体验增强（249 实测驱动）**：
-- **官方 Dashboard 代理全套修复**：/chat 不再误拦截；`__HERMES_BASE_PATH__` 注入修正（官方空值覆盖问题）；302 补前缀统一 URL；**移除 history.pushState 劫持**（此前导致菜单 SPA 导航黑屏的最终根因）；重建 web_dist（Vite 相对 base，动态 import chunk 不再 404）
-- **官方前端 12 处裸路径导航改相对**（sessions/plugins/profiles/config），反代下不再裸跳黑屏
+**Dashboard 全链路修复 + 全面汉化 + 会话重命名（249 实测驱动）**：
+- **官方 Dashboard 代理全套修复**：/chat 不再误拦截；`__HERMES_BASE_PATH__` 注入修正（官方空值覆盖问题）；302 补前缀统一 URL；**移除 history.pushState 劫持**（菜单 SPA 导航黑屏的最终根因）；重建 web_dist（Vite 相对 base，动态 import chunk 不再 404）
+- **官方前端 12 处裸路径导航改相对**，反代下不再裸跳黑屏；**BUILD 按钮无限追加后缀 bug 修复**（改回绝对路径，basename 注入后正确拼前缀）
 - **应用控制台 URL 直达**：`/sessions` `/files` `/models` 等路径自动跳转 `#/页面`（hash 路由 + SPA 302）
-- **「更新 Hermes」真正可用**：点击触发应用自动更新（多源下载最新版，等价官方 git 更新），不再报 "Not a git repository"
-- **运行时汉化增强**：默认中文翻译 + DICT 补充 100+ 条（会话/模型/插件/MCP/通讯/回调/配对/多AGENT/系统/看板页英文→中文）
+- **「更新 Hermes」恢复官方功能**：hermes-src 初始化为 git 仓库（fpk baseline + 官方 remote），点击执行官方 `hermes update`（git pull + 依赖重装），249 实测 21227 commits 更新成功
+- **全面汉化**（治本，React 原生中文）：官方 web 源码 13 页面 ~610 处英文→中文（系统/通讯/会话/模型/定时/技能/插件/MCP/回调/配对/多AGENT/配置）；通讯页 33 渠道描述数据层汉化（monitor 拦截 API）；更新确认弹窗汉化；运行时 DICT 兜底 200+ 条
+- **应用控制台会话重命名**：会话列表项与标签页 ✎ 按钮 → POST /api/sessions/rename（改会话 title + 缓存即时刷新）
 - **MCP 配置保存合并语义**：前端保存不再清空 CLI 添加的 mcp_servers（websearch 等保留）；嵌套 map（env: {KEY:value}）正确解析/序列化（无 [object Object]）
-- 安装包：fnos-hermes-agent_v0.22.0.fpk（40.1MB）
+- 安装包：fnos-hermes-agent_v0.21.97.fpk（40.2MB）
 
 ## v0.21.96（2026-08-07）
 
