@@ -10142,7 +10142,7 @@ function switchPage(name){
   if(name==='models') renderProviders();
   if(name==='extensions') renderExtensions();
   if(name==='experts') renderExpertsPage();
-  if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); loadChangelog(); }
+  if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); }
   if(name==='settings') renderSettings();
   if(name==='kb'){ kbLoadTree(); }
   if(name!=='chat'){ hideScrollBtn(); if(_channelViewActive){ _channelViewActive=false; var _rb=document.getElementById('chReturnBtn'); if(_rb) _rb.style.display='none'; } }
@@ -14501,6 +14501,7 @@ function loadChangelog(){
     }).catch(function(){ wrap.style.display='none'; });
 }
 function checkAppUpdate(evt){
+  var cw0=document.getElementById('changelogWrap'); if(cw0) cw0.style.display='none';  // 每次检查先隐藏「本次更新说明」，检测到新版再显示
   var btn=_resolveCheckBtn(evt); if(btn){btn.disabled=true;btn.textContent='检查中…';}
   apiGet('/api/app/update/check').then(function(data){
     if(!data || data.error){ var b=document.getElementById('appUpdateBtn'); if(b) b.style.display='none'; toast(data&&data.error?'检查失败：'+data.error:'检查应用更新失败'); return; }
@@ -14524,6 +14525,7 @@ function checkAppUpdate(evt){
         toast('发现新版本：v'+data.latest+'，可选「GitHub Release 更新」或「WebDAV 更新」');
       } else {
         lat.textContent='已是最新';
+        var cw=document.getElementById('changelogWrap'); if(cw) cw.style.display='none';
         var btn4=document.getElementById('appUpdateBtn'); if(btn4) btn4.style.display='none';
         var abG2=document.getElementById('appAutoBtnGh'); if(abG2) abG2.style.display='none';
         var abW2=document.getElementById('appAutoBtnWd'); if(abW2) abW2.style.display='none';
