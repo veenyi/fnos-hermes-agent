@@ -3754,7 +3754,9 @@ async function proxyDashboard(req) {
         n.nodeValue=t.replace(k,DICT[k]);
       }
     }
-    function run(){ if(getLoc()!=='zh'&&getLoc()!=='zh-hant')return; try{translate(document.body);}catch(e){} }
+    // 无条件翻译（DICT 仅含英→中，始终生效，不受语言切换/React 重渲染影响）；
+    // 定时兜底：SPA 路由切换/React 重渲染会覆盖 DOM 文本，每 600ms 强制翻译一次
+    function run(){ try{translate(document.body);}catch(e){} }
     var obs;
     function start(){
       if(obs)return;
@@ -3764,6 +3766,7 @@ async function proxyDashboard(req) {
         if(obs)obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
       });
       obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+      setInterval(function(){ try{translate(document.body);}catch(e){} }, 600);
     }
     if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){run();start();});}
     else{run();start();}
