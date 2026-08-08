@@ -3405,23 +3405,9 @@ async function proxyDashboard(req) {
   // 记录网关重启请求时刻 + 重启前的网关 pid：既用于后续判定重启是否已实际完成，
   // 也用于检测官方复用守卫是否发生「未真正重启」的空操作（返回 pid == 重启前 pid）。
   let restartPreGwPid = 0;
-  // fpk 应用环境的「更新 Hermes」：hermes 核心随应用版本升级（与官方 git 安装的 hermes update 等价），
-  // 这里触发应用自动更新（多源下载最新 FPK → 覆盖 → 自重启生效），而不是返回引导提示。
-  if (req.method === "POST" && subPath === "/api/hermes/update") {
-    try {
-      fetch(`http://127.0.0.1:${UI_PORT}/api/app/auto-update`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: "auto" }),
-      }).catch(() => {});
-      return new Response(JSON.stringify({
-        ok: true,
-        message: "已开始自动更新：正在下载最新版本，完成后服务将自动重启生效（进度可在应用控制台「更新」页查看）。",
-      }), { headers: { "Content-Type": "application/json; charset=utf-8" } });
-    } catch (e) {
-      return new Response(JSON.stringify({ ok: false, message: "触发更新失败: " + (e?.message || e) }), { headers: { "Content-Type": "application/json; charset=utf-8" } });
-    }
-  }
+  // 注：「更新 Hermes」（/api/hermes/update）不再由 monitor 拦截——hermes-src 已初始化为
+  // git 仓库（fpk bundled baseline + 官方 remote），放行到 dashboard 后端执行官方
+  // `hermes update`（git pull + 依赖重装），恢复官方更新功能。
   if (req.method === "POST" && subPath === "/api/gateway/restart") {
     lastGatewayRestartTs = Date.now();
     restartPreGwPid = findGatewayPid() || 0;
