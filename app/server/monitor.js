@@ -9448,6 +9448,30 @@ async function handleFetch(req) {
     return new Response(JSON.stringify(s), { headers: jsonHeaders() });
   }
 
+  // 会话重命名：改会话 JSON 的 title 并同步内存缓存（列表/标签页即时刷新）
+  if (path === "/api/sessions/rename" && req.method === "POST") {
+    const body = await req.json().catch(() => ({}));
+    const sid = String(body.id || "").trim();
+    const title = String(body.title || "").trim().slice(0, 200);
+    if (!sid || !title) {
+      return new Response(JSON.stringify({ ok: false, error: "id 和 title 必填" }), { status: 400, headers: jsonHeaders() });
+    }
+    const f = sessionFile(sid);
+    if (!existsSync(f)) {
+      return new Response(JSON.stringify({ ok: false, error: "会话不存在" }), { status: 404, headers: jsonHeaders() });
+    }
+    try {
+      const s = readJSON(f);
+      s.title = title;
+      s.updated_at = Date.now();
+      writeJSON(f, s);
+      if (_sessionMetaCache) _sessionMetaCache.map.set(s.id, _sessionMetaFromData(s));
+      return new Response(JSON.stringify({ ok: true, id: sid, title }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: "重命名失败: " + e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
   // 匹配 /api/sessions/:id/usage
   const usageMatch = path.match(/^\/api\/sessions\/([^/]+)\/usage$/);
   if (usageMatch && req.method === "GET") {

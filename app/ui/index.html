@@ -128,6 +128,9 @@
     .session-item .title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .session-item .del{opacity:0;color:var(--text3);font-size:13px}
     .session-item:hover .del{opacity:1}
+    .session-item .ren{opacity:0;color:var(--text3);font-size:11px;cursor:pointer;flex-shrink:0}
+    .session-item:hover .ren{opacity:1}
+    .session-item .ren:hover{color:var(--accent)}
     .session-item .si-body{display:flex;flex-direction:column;flex:1;min-width:0;line-height:1.3}
     .session-item .title{flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .session-item .meta{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
@@ -165,6 +168,9 @@
     .session-tab .tab-title{overflow:hidden;text-overflow:ellipsis;max-width:140px;flex:1;min-width:0}
     .session-tab .tab-close{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;color:var(--text3);font-size:14px;line-height:1;flex-shrink:0;margin-left:2px}
     .session-tab .tab-close:hover{background:rgba(239,68,68,.15);color:var(--red)}
+    .session-tab .tab-ren{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;color:var(--text3);font-size:11px;line-height:1;flex-shrink:0;margin-left:2px;opacity:0}
+    .session-tab:hover .tab-ren{opacity:1}
+    .session-tab .tab-ren:hover{background:rgba(107,92,231,.15);color:var(--accent)}
     .session-tab:hover{background:var(--bg3);color:var(--text)}
     .session-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
     .session-tab.active .tab-dot{background:var(--accent)}
@@ -6515,6 +6521,7 @@ function renderSessionTabs() {
     html += '<div class="session-tab' + (active ? ' active' : '') + (streaming ? ' streaming' : '') + '" title="' + esc(rawTitle) + '" onclick="switchTab(\'' + esc(sid) + '\')">' +
       '<span class="tab-dot"></span>' +
       '<span class="tab-title">' + esc(rawTitle) + '</span>' +
+      '<span class="tab-ren" title="重命名会话" onclick="event.stopPropagation();renameSession(\'' + esc(sid) + '\')">✎</span>' +
       '<span class="tab-close" onclick="event.stopPropagation();closeTab(\'' + esc(sid) + '\')" title="关闭标签">×</span>' +
       '</div>';
   });
@@ -6803,6 +6810,7 @@ function renderRail(){
         return '<div class="session-item '+sa+(streaming?' streaming':'')+'" onclick="switchSession(\''+esc(agent.id)+'\',\''+esc(s.id)+'\',event)">'+
           '<span class="dot'+(streaming?' streaming':'')+'"></span>'+
           '<span class="si-body"><span class="title">'+esc(title)+'</span>'+(meta?'<span class="meta">'+esc(meta)+'</span>':'')+'</span>'+
+          '<span class="ren" title="重命名会话" onclick="renameSession(\''+esc(s.id)+'\',event)">✎</span>'+
           '<span class="del" onclick="delSession(\''+esc(agent.id)+'\',\''+esc(s.id)+'\',event)">×</span></div>';
       }).join('');
     } else {
@@ -6954,6 +6962,27 @@ function delSession(aid, sid, e){
       else { var b = document.getElementById('chatBody'); if(b) b.innerHTML = '<div class="system-tip">没有打开的会话，点击右上角 + 新建</div>'; }
     })
     .catch(function(){ toast('删除会话失败'); });
+}
+/* 会话重命名：列表项 ✎ / 标签页 ✎ → prompt → POST /api/sessions/rename → 刷新列表与标签 */
+function renameSession(sid, e){
+  if(e && e.stopPropagation) e.stopPropagation();
+  var s = _sessions.find(function(x){ return x.id===sid; });
+  if(!s) return;
+  var old = (s.title && s.title!=='New Chat' && s.title!=='未命名会话') ? s.title : '';
+  var title = prompt('重命名会话：', old);
+  if(title===null) return;
+  title = title.trim();
+  if(!title || title===old) return;
+  apiPost('/api/sessions/rename', { id: sid, title: title }).then(function(r){
+    if(r && r.ok){
+      s.title = r.title;
+      renderRail(); renderSessionTabs(); updateHeader();
+      if(sid===currentSession){ var t=document.getElementById('chatTitle'); if(t) t.textContent=r.title; }
+      toast('已重命名为「'+r.title+'」');
+    } else {
+      toast((r && r.error) || '重命名失败');
+    }
+  }).catch(function(){ toast('重命名失败'); });
 }
 function newSession(){
   newTab();
