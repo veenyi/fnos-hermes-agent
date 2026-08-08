@@ -4,6 +4,15 @@
 
 ---
 
+## v0.21.98（2026-08-08）
+
+**真正修复：官方 Dashboard 聊天页白屏（JS 渲染层）**：
+- v0.21.97 只解决了 HTML 层（/chat 返回 SPA），但页面仍白屏——根因在 JS 渲染层：**官方 dashboard 前端的 API 请求基于 `window.__HERMES_BASE_PATH__` 拼接前缀，monitor 代理时未注入该全局变量** → 前端 fetch 出无前缀的 `/api/*` → 门户下 404 → API 全挂 → 白屏
+- 修复：monitor 代理 dashboard HTML 时注入 `window.__HERMES_BASE_PATH__`（=/app/hermes-agent/proxy/dashboard）与 `window.__HERMES_SESSION_TOKEN__`（免 401）——官方前端原生支持这两个变量（为门户/反代场景设计）
+- 验证：249/254 实测注入生效，`/proxy/dashboard/api/status` 200（前端 API 请求现带正确前缀）
+
+- 安装包：fnos-hermes-agent_v0.21.98.fpk（40.1MB）
+
 ## v0.21.97（2026-08-08）
 
 **修复：官方 Dashboard 聊天页（/proxy/dashboard/chat）白屏**：
