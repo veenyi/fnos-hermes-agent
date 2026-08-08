@@ -3546,11 +3546,7 @@ async function proxyDashboard(req) {
       html = html.replace(/<link(\s[^>]*)href="\/(?!\/)/g, (m, a) => `<link${a}href="${prefix}/`);
 
       // 注入 JS：智能前缀管理（pushState剥离+导航感知恢复+popstate拦截）
-      // 关键：注入 window.__HERMES_BASE_PATH__（官方 dashboard 前端 API 请求的前缀基准，
-      // 否则 fetch 拼出无前缀 /api/* 在门户下 404 → 白屏）与 __HERMES_SESSION_TOKEN__（免 401）。
       const inject = `<script>
-window.__HERMES_BASE_PATH__="${prefix}";
-window.__HERMES_SESSION_TOKEN__="${DASHBOARD_SESSION_TOKEN}";
 (function(){
   var P="${prefix}";
   function rw(u){
