@@ -960,6 +960,14 @@
 .ch-filter.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:600}
 .update-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
 .update-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-xl);padding:var(--sp-4);display:flex;flex-direction:column;gap:10px}
+    .update-changelog{max-height:420px;overflow:auto;font-size:12px;line-height:1.7;color:var(--text2)}
+    .update-changelog h1,.update-changelog h2,.update-changelog h3{font-size:13px;font-weight:700;color:var(--text);margin:12px 0 6px}
+    .update-changelog h2:first-child{margin-top:0}
+    .update-changelog ul{margin:4px 0 8px;padding-left:18px}
+    .update-changelog li{margin:2px 0}
+    .update-changelog code{background:var(--bg2);border-radius:4px;padding:1px 5px;font-size:11px}
+    .update-changelog pre{background:var(--bg2);border-radius:6px;padding:8px;overflow:auto}
+    .update-changelog a{color:var(--accent)}
 .update-title{font-size:15px;font-weight:600}
 .update-ver{font-size:13px;color:var(--text3)}
 .update-gh{margin-top:16px;font-size:13px;display:flex;justify-content:center}
@@ -1837,6 +1845,10 @@
     <button class="ov-actbtn start" id="appUpdateBtn" style="display:none" onclick="confirmAppUpdate()">下载安装包 (.fpk)</button>
     <button class="ov-actbtn start" id="appAutoBtnGh" style="display:none" onclick="autoAppUpdate('github')" title="从 GitHub Release 下载 FPK 更新（需能访问 GitHub）">⬇ GitHub Release 更新</button>
     <button class="ov-actbtn start" id="appAutoBtnWd" style="display:none" onclick="autoAppUpdate('webdav')" title="从 WebDAV（内部分发通道）下载 FPK 更新，国内网络更快">⚡ WebDAV 更新</button>
+  </div>
+  <div class="update-card" id="changelogCard" style="display:none">
+    <div class="update-title">更新说明</div>
+    <div class="update-changelog" id="changelogBody"></div>
   </div>
 </div>
 <div class="update-gh"><a class="gh-button" href="https://github.com/veenyi/fnos-hermes-agent/releases/latest" target="_blank">GitHub 下载页 →</a></div>
@@ -10130,7 +10142,7 @@ function switchPage(name){
   if(name==='models') renderProviders();
   if(name==='extensions') renderExtensions();
   if(name==='experts') renderExpertsPage();
-  if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); }
+  if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); loadChangelog(); }
   if(name==='settings') renderSettings();
   if(name==='kb'){ kbLoadTree(); }
   if(name!=='chat'){ hideScrollBtn(); if(_channelViewActive){ _channelViewActive=false; var _rb=document.getElementById('chReturnBtn'); if(_rb) _rb.style.display='none'; } }
@@ -14471,6 +14483,20 @@ function confirmHermesUpdate(){
       }).catch(function(){ if(tries<40) setTimeout(poll,2000); });
     })();
   }).catch(function(e){ toast('启动更新失败：'+e.message); });
+}
+/* 加载随包分发的更新说明（UPDATE-LOG.md → 更新页展示每次版本变更） */
+function loadChangelog(){
+  var card=document.getElementById('changelogCard'), body=document.getElementById('changelogBody');
+  if(!card || !body) return;
+  fetch(apiUrl('/api/app/changelog'), { headers: monitorToken?{'X-Monitor-Token':monitorToken}:{} })
+    .then(function(r){ return r.text(); })
+    .then(function(t){
+      if(t && t.indexOf('##')!==-1){
+        try{ body.innerHTML = (window.marked && marked.parse) ? marked.parse(t) : t; }
+        catch(e){ body.innerHTML = t; }
+        card.style.display='';
+      }
+    }).catch(function(){});
 }
 function checkAppUpdate(evt){
   var btn=_resolveCheckBtn(evt); if(btn){btn.disabled=true;btn.textContent='检查中…';}
