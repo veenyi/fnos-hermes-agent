@@ -3787,6 +3787,49 @@ async function proxyDashboard(req) {
 
       html = html.replace("</head>", inject + "\n" + injectZh + "\n</head>");
 
+      // ── 独立自包含汉化脚本（body 末尾注入，不依赖 injectZh，无条件执行）──
+      // injectZh 整体包在 try/catch 里，任何运行时错误都会静默吞掉导致翻译不生效；
+      // 这里提供第二套独立翻译：叶节点精确匹配 DICT + setInterval 500ms 持续兜底，
+      // 覆盖 React 重渲染与路由切换。
+      const _zhStandalone = `<script>
+(function(){
+  var D={${Object.entries({
+    "Prune old sessions":"清理旧会话","Total":"总计","Active in store":"存储中活跃","Archived":"已归档","Messages":"消息数","Sources":"来源","Overview":"概览","History":"历史","Import sessions":"导入会话","Any chat source":"任意聊天来源","Chat":"聊天","Automation":"自动化","All":"全部","Connected Platforms":"已连接平台",
+    "MODEL SETTINGS":"模型设置","MAIN MODEL":"主模型","AUXILIARY TASKS":"辅助任务","MIXTURE OF AGENTS":"多智能体混合","CHANGE":"更改","CONFIGURE":"配置","USE AS":"设为","applies to new sessions":"适用于新会话",
+    "GO":"前往","UPLOAD":"上传","DROP FILES HERE":"拖拽文件到此处","CHOOSE FILES":"选择文件","NAME":"名称","SIZE":"大小","MODIFIED":"修改时间","ACTIONS":"操作",
+    "SAVE MEMORY PROVIDER":"保存记忆提供方","SAVE CONTEXT ENGINE":"保存上下文引擎","Memory Provider":"记忆提供方","Context Engine":"上下文引擎","Installed Plugins":"已安装插件",
+    "Your MCP servers":"你的 MCP 服务器","ADD SERVER":"添加服务器","ADD MCP SERVER":"添加 MCP 服务器","Setup notes":"设置说明","No MCP servers configured.":"未配置 MCP 服务器。","Catalog":"目录","TRANSPORT":"传输方式","AUTHENTICATION":"认证","None":"无","HTTP/SSE":"HTTP/SSE","my-server":"我的服务器",
+    "NEW SUBSCRIPTION":"新建订阅","ENABLE WEBHOOKS":"启用 Webhook","Subscriptions":"订阅","No webhook subscriptions yet.":"暂无 Webhook 订阅。","Webhook receiver disabled":"Webhook 接收器已停用",
+    "Pending requests":"待处理请求","Approved users":"已批准用户","No pending pairing requests":"暂无待处理配对请求","No approved users":"暂无已批准用户",
+    "BUILD":"构建","Create":"创建","Active profile":"当前激活配置","Multi-Agent Configuration":"多智能体配置",
+    "Host":"主机","Nous Portal":"Nous 门户","Skill curator":"技能策展","Gateway":"网关","Check for updates":"检查更新","not configured":"未配置","not logged in":"未登录","Manage subscription":"管理订阅",
+    "Clear filters":"清除筛选","Orchestration":"编排","Orchestration settings":"编排设置","New Kanban":"新建看板","Trigger Scheduler":"触发调度器","Refresh":"刷新","Show Archived":"显示已归档","Group by Configuration":"按配置分组","Filter cards...":"筛选卡片...","All Tenants":"全部租户","All Configurations":"全部配置","No tasks":"无任务",
+    "Learn a skill":"学习技能","New skill":"新建技能","Toolsets":"工具集","BROWSE HUB":"浏览中心","Session":"会话","Sessions":"会话","Docs":"文档","Logs":"日志","Models":"模型","Plugins":"插件管理","MCP":"MCP","Config":"配置","Keys":"密钥","active":"启用","inactive":"停用","running":"运行中","enabled":"已启用","disabled":"已停用","Install":"安装","Enable":"启用","Disable":"停用",
+    "QUICK SETUP":"快速设置","recommended":"推荐","CREATE WITH QR":"扫码创建","USE YOUR OWN BOT":"使用自己的机器人","MANUAL SETUP":"手动设置","PAIR WITH QR":"扫码配对","MODE":"模式","Bot":"机器人","Self-chat":"私聊","ALLOWED WHATSAPP NUMBERS":"允许的 WhatsApp 号码","Test":"测试","Last updated":"最后更新",
+    "SKILLS (OPTIONAL)":"技能（可选）","ADVANCED FIELDS":"高级字段","PROVIDER":"提供方","MODEL":"模型","BASE URL OVERRIDE":"基础地址覆盖","SCRIPT":"脚本","WORKDIR":"工作目录","CONTEXT_FROM_JOB_IDS":"上下文任务ID","ENABLED_TOOLSETS":"启用工具集","Deliver To":"投递至","Local":"本地","Default":"默认","one job id per line":"每行一个任务ID",
+    "Categories":"分类","Toolset":"工具集","Enabled":"已启用","Installed":"已安装","Source":"来源","Auth":"认证","Status":"状态","Action":"操作","Language":"语言","Theme":"主题","Custom":"自定义","Hide":"隐藏","Show":"显示","Yes":"是","No":"否","Next":"下一步","Back":"返回","Submit":"提交","Close":"关闭","Confirm":"确认","Error":"错误","Success":"成功","Warning":"警告","Information":"信息","Delete":"删除","Edit":"编辑","Add":"添加","Save":"保存","Cancel":"取消","Apply":"应用","Reset":"重置","Search":"搜索","Loading":"加载中","General":"常规","Advanced":"高级","About":"关于","Settings":"设置","Update":"更新","Restart":"重启","Stop":"停止","Start":"启动"
+  }).map(([k,v])=>JSON.stringify(k)+":"+JSON.stringify(v)).join(",")} };
+  var SKIP={SCRIPT:1,STYLE:1,INPUT:1,TEXTAREA:1,PRE:1,CODE:1};
+  function tr(){
+    try{
+      var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false),n;
+      while((n=w.nextNode())){
+        var t=n.nodeValue; if(!t)continue;
+        var k=t.trim(); if(!k||!D[k]||k===D[k])continue;
+        var p=n.parentNode; if(!p||p.nodeType!==1)continue;
+        if(SKIP[p.tagName]||p.isContentEditable)continue;
+        n.nodeValue=t.replace(k,D[k]);
+      }
+    }catch(e){}
+  }
+  if(document.readyState!=='loading')tr();
+  document.addEventListener('DOMContentLoaded',tr);
+  window.addEventListener('load',tr);
+  setInterval(tr,500);
+})();
+<\/script>`;
+      html = html.replace("</body>", _zhStandalone + "\n</body>");
+
       respHeaders.delete("content-length");
       respHeaders.delete("content-encoding");
       return new Response(html, { status: upstream.status, headers: respHeaders });
@@ -9885,23 +9928,8 @@ async function handleFetch(req) {
     const subPath = path.replace(/^\/proxy\/dashboard/, "") || "/";
     if (subPath.includes("..")) return new Response("Forbidden", { status: 403 });
 
-    // 官方 dashboard 不适配页面（发行模式）：chat=PTY 桥在门户代理下无法渲染、
-    // system=上游 /api/system 不存在。返回中文提示引导应用内替代页，避免空白页误判为故障。
-    const _dashBadRoute = subPath.replace(/\/+$/, "");
-    // chat 页经 __HERMES_BASE_PATH__ 注入后可正常渲染（见上方 base path 替换），不再拦截；
-    // system 页上游 /api/system 在 0.20 不存在，保留提示。
-    if (_dashBadRoute === "/system" && req.method === "GET") {
-      return new Response(
-        '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>页面不可用</title>' +
-        '<style>body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#0d1117;color:#e6edf3;display:flex;align-items:center;justify-content:center;height:100vh;margin:0} .card{max-width:520px;padding:36px;border-radius:16px;background:#161b22;border:1px solid #30363d;text-align:center} h1{font-size:20px;margin:0 0 12px} p{font-size:14px;line-height:1.8;color:#8b949e;margin:6px 0} .tag{display:inline-block;background:#7c5cff22;color:#a99bff;border:1px solid #7c5cff55;border-radius:20px;padding:3px 12px;font-size:12px;margin-bottom:14px} a{color:#58a6ff;text-decoration:none} a:hover{text-decoration:underline}</style></head><body>' +
-        '<div class="card"><div class="tag">官方 Dashboard · 此页不适配</div>' +
-        '<h1>官方系统信息页不可用</h1>' +
-        '<p>官方 dashboard 的系统页调用的接口（/api/system）在 Hermes 0.20 中不存在（上游缺陷）。<br>系统信息请使用左侧「<b>概览</b>」页，信息完整。</p>' +
-        '<p style="margin-top:16px"><a href="' + (BASE_PATH || "") + '/" onclick="var p=location.pathname.split(\'/proxy/\')[0]||\'\';this.href=p+\'/\';return true;">返回应用 →</a></p>' +
-        '</div></body></html>',
-        { headers: { "Content-Type": "text/html; charset=utf-8" } }
-      );
-    }
+    // 官方 dashboard 不适配页面的拦截已全部移除：chat 与 system 页均放行渲染
+    // （system 页 /api/system 在 0.20 不存在由官方页面自行处理，不再显示拦截页）。
 
     // Dashboard 未运行时直接返回 503，不进入 proxy 避免打错误日志
     if (!readPid(PID_DASHBOARD)) {
