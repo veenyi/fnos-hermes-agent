@@ -10068,7 +10068,21 @@ function appendSystemMessage(text){
 }
 
 /* ============================ Router ============================ */
+/* URL 直达路由：hash 形式（#/sessions #/files #/models），由 monitor 把子路径 302 到 #/路径。
+   子路径下相对资源会解析错位，故页面目标一律走 hash（根路径加载）。 */
+function pageFromPath(p){
+  p = String(p||'/').split('?')[0].replace(/\/+$/,'') || '/';
+  var seg = (p.split('/').filter(Boolean)[0] || 'chat').toLowerCase();
+  var map = { overview:'overview', chat:'chat', sessions:'chat', files:'chat', experts:'experts', models:'models', extensions:'extensions', comm:'comm', tunnel:'tunnel', kb:'kb', connectors:'connectors', cron:'cron', memory:'memory', learning:'learning', usage:'usage', updates:'updates', settings:'settings', dashboard:'chat' };
+  return map[seg] || 'chat';
+}
+function pageFromHash(){
+  var h = (location.hash||'').replace(/^#\/?/, '').split('/')[0].toLowerCase();
+  return h ? pageFromPath('/'+h) : 'chat';
+}
 function switchPage(name){
+  // URL 同步：hash 路由（chat 为默认 → #/），刷新/直达保持页面
+  try { location.hash = (name==='chat') ? '#/' : '#/' + name; } catch(e){}
   document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
   var btn=Array.from(document.querySelectorAll('.nav-btn')).find(function(b){ return b.getAttribute('onclick') && b.getAttribute('onclick').includes("'"+name+"'"); });
   if(btn) btn.classList.add('active');
@@ -14578,7 +14592,9 @@ document.addEventListener('DOMContentLoaded', function(){
   if(inp){ inp.addEventListener('input', function(){ autoResize(this); }); autoResize(inp);
     inp.addEventListener('focus', function(){ setTimeout(function(){ try{ inp.scrollIntoView({block:'nearest'}); }catch(e){} }, 320); });
   }
-  switchPage('chat');
+  switchPage(pageFromHash());
+  // URL 直达：/files 打开工作区面板（文件功能在工作区）
+  if(/\/files\/?(\?|$)/.test(location.hash) || /^\/files\/?(\?|$)/.test(location.pathname)){ try{ setTimeout(toggleWorkspace, 600); }catch(e){} }
   // 恢复菜单栏/会话树折叠状态（两级折叠持久化）
   try { var _rs = parseInt(localStorage.getItem('fnos-rail-state')||'0',10); _railState = (_rs===1||_rs===2)?_rs:0; } catch(e){ _railState = 0; }
   applyRailState();

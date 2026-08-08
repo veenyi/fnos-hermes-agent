@@ -3405,15 +3405,22 @@ async function proxyDashboard(req) {
   // 记录网关重启请求时刻 + 重启前的网关 pid：既用于后续判定重启是否已实际完成，
   // 也用于检测官方复用守卫是否发生「未真正重启」的空操作（返回 pid == 重启前 pid）。
   let restartPreGwPid = 0;
-  // fpk 应用环境的「更新 Hermes」引导：hermes 核心随应用版本升级（auto-update 覆盖 hermes-src），
-  // 官方 git 更新方式不适用（非 git 仓库会报 "Not a git repository"）。前端原生支持
-  // {ok:false, message, update_command} 引导信封，直接返回指引用应用「更新」页的双通道自动更新。
+  // fpk 应用环境的「更新 Hermes」：hermes 核心随应用版本升级（与官方 git 安装的 hermes update 等价），
+  // 这里触发应用自动更新（多源下载最新 FPK → 覆盖 → 自重启生效），而不是返回引导提示。
   if (req.method === "POST" && subPath === "/api/hermes/update") {
-    return new Response(JSON.stringify({
-      ok: false,
-      message: "fpk 应用环境：Hermes 核心随应用版本升级，请使用应用控制台「更新」页的自动更新（GitHub Release / WebDAV 双通道），无需在此处更新。",
-      update_command: "",
-    }), { headers: { "Content-Type": "application/json; charset=utf-8" } });
+    try {
+      fetch(`http://127.0.0.1:${UI_PORT}/api/app/auto-update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "auto" }),
+      }).catch(() => {});
+      return new Response(JSON.stringify({
+        ok: true,
+        message: "已开始自动更新：正在下载最新版本，完成后服务将自动重启生效（进度可在应用控制台「更新」页查看）。",
+      }), { headers: { "Content-Type": "application/json; charset=utf-8" } });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, message: "触发更新失败: " + (e?.message || e) }), { headers: { "Content-Type": "application/json; charset=utf-8" } });
+    }
   }
   if (req.method === "POST" && subPath === "/api/gateway/restart") {
     lastGatewayRestartTs = Date.now();
@@ -3732,10 +3739,21 @@ async function proxyDashboard(req) {
       'Learn a skill':'学习技能','New skill':'新建技能','Toolsets':'工具集','BROWSE HUB':'浏览中心',
       'Session':'会话','Sessions':'会话','Docs':'文档','Logs':'日志','Models':'模型','Plugins':'插件管理',
       'MCP':'MCP','Config':'配置','Keys':'密钥','active':'启用','inactive':'停用','running':'运行中',
-      'enabled':'已启用','disabled':'已停用','Install':'安装','Enable':'启用','Disable':'停用'
+      'enabled':'已启用','disabled':'已停用','Install':'安装','Enable':'启用','Disable':'停用',
+      // ── MCP 弹窗 / 通讯页 ──
+      'ADD MCP SERVER':'添加 MCP 服务器','NAME':'名称','TRANSPORT':'传输方式','URL':'地址',
+      'AUTHENTICATION':'认证','None':'无','HTTP/SSE':'HTTP/SSE','my-server':'我的服务器',
+      'QUICK SETUP':'快速设置','recommended':'推荐','CREATE WITH QR':'扫码创建','USE YOUR OWN BOT':'使用自己的机器人',
+      'MANUAL SETUP':'手动设置','PAIR WITH QR':'扫码配对','MODE':'模式','Bot':'机器人','Self-chat':'私聊',
+      'ALLOWED WHATSAPP NUMBERS':'允许的 WhatsApp 号码','Test':'测试','Last updated':'最后更新',
+      // ── 模型/通用按钮 ──
+      'CHANGE':'更改','CONFIGURE':'配置','USE AS':'设为','Sessions count':'会话数','Number of models used':'使用模型数',
+      'Total sessions':'总会话数','Hide':'隐藏','Show':'显示','Custom':'自定义','solo':'独立'
     };
     var SKIP={INPUT:1,TEXTAREA:1,SCRIPT:1,STYLE:1,CODE:1,PRE:1};
-    function getLoc(){try{return localStorage.getItem('hermes-locale')||'en';}catch(e){return 'en';}}
+    // 默认按中文处理（DICT 仅含英→中映射；用户是中文环境）。若用户显式切英文界面，
+    // hermes-locale 存了 'en'，此时仍翻译（DICT 只翻英文文案，不影响其它语言内容）。
+    function getLoc(){try{return localStorage.getItem('hermes-locale')||'zh';}catch(e){return 'zh';}}
     function translate(root){
       if(!root)return;
       var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null,false),n;
