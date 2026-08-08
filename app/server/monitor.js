@@ -3734,7 +3734,10 @@ async function proxyDashboard(req) {
       'ALLOWED WHATSAPP NUMBERS':'允许的 WhatsApp 号码','Test':'测试','Last updated':'最后更新',
       // ── 模型/通用按钮 ──
       'CHANGE':'更改','CONFIGURE':'配置','USE AS':'设为','Sessions count':'会话数','Number of models used':'使用模型数',
-      'Total sessions':'总会话数','Hide':'隐藏','Show':'显示','Custom':'自定义','solo':'独立'
+      'Total sessions':'总会话数','Hide':'隐藏','Show':'显示','Custom':'自定义','solo':'独立',
+      // ── 文件页 ──
+      'GO':'前往','UPLOAD':'上传','DROP FILES HERE':'拖拽文件到此处','CHOOSE FILES':'选择文件',
+      'NAME':'名称','SIZE':'大小','MODIFIED':'修改时间','ACTIONS':'操作','Create':'创建','Files':'文件'
     };
     var SKIP={INPUT:1,TEXTAREA:1,SCRIPT:1,STYLE:1,CODE:1,PRE:1};
     // 默认按中文处理（DICT 仅含英→中映射；用户是中文环境）。若用户显式切英文界面，
