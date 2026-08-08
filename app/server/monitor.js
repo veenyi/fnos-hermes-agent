@@ -3405,6 +3405,16 @@ async function proxyDashboard(req) {
   // 记录网关重启请求时刻 + 重启前的网关 pid：既用于后续判定重启是否已实际完成，
   // 也用于检测官方复用守卫是否发生「未真正重启」的空操作（返回 pid == 重启前 pid）。
   let restartPreGwPid = 0;
+  // fpk 应用环境的「更新 Hermes」引导：hermes 核心随应用版本升级（auto-update 覆盖 hermes-src），
+  // 官方 git 更新方式不适用（非 git 仓库会报 "Not a git repository"）。前端原生支持
+  // {ok:false, message, update_command} 引导信封，直接返回指引用应用「更新」页的双通道自动更新。
+  if (req.method === "POST" && subPath === "/api/hermes/update") {
+    return new Response(JSON.stringify({
+      ok: false,
+      message: "fpk 应用环境：Hermes 核心随应用版本升级，请使用应用控制台「更新」页的自动更新（GitHub Release / WebDAV 双通道），无需在此处更新。",
+      update_command: "",
+    }), { headers: { "Content-Type": "application/json; charset=utf-8" } });
+  }
   if (req.method === "POST" && subPath === "/api/gateway/restart") {
     lastGatewayRestartTs = Date.now();
     restartPreGwPid = findGatewayPid() || 0;
@@ -3688,7 +3698,41 @@ async function proxyDashboard(req) {
       'Stopped':'已停止','Active':'启用','Inactive':'停用','Connected':'已连接','Disconnected':'未连接',
       'Loading':'加载中','Search':'搜索','Settings':'设置','Language':'语言','Update':'更新',
       'Restart':'重启','Install':'安装','Uninstall':'卸载','Stop':'停止','Start':'启动',
-      'General':'常规','Advanced':'高级','About':'关于'
+      'General':'常规','Advanced':'高级','About':'关于',
+      // ── 会话页 ──
+      'Prune old sessions':'清理旧会话','Total':'总计','Active in store':'存储中活跃','Archived':'已归档',
+      'Messages':'消息数','Sources':'来源','Overview':'概览','History':'历史','Import sessions':'导入会话',
+      'Any chat source':'任意聊天来源','Chat':'聊天','Automation':'自动化','All':'全部','Connected Platforms':'已连接平台',
+      // ── 模型页 ──
+      'MODEL SETTINGS':'模型设置','MAIN MODEL':'主模型','AUXILIARY TASKS':'辅助任务','MIXTURE OF AGENTS':'多智能体混合',
+      'CHANGE':'更改','CONFIGURE':'配置','USE AS':'设为','applies to new sessions':'适用于新会话',
+      // ── 插件页 ──
+      'SAVE MEMORY PROVIDER':'保存记忆提供方','SAVE CONTEXT ENGINE':'保存上下文引擎',
+      'Memory Provider':'记忆提供方','Context Engine':'上下文引擎','Installed Plugins':'已安装插件',
+      // ── MCP 页 ──
+      'Your MCP servers':'你的 MCP 服务器','ADD SERVER':'添加服务器','Setup notes':'设置说明',
+      'No MCP servers configured.':'未配置 MCP 服务器。','Catalog':'目录',
+      // ── 回调页 ──
+      'NEW SUBSCRIPTION':'新建订阅','ENABLE WEBHOOKS':'启用 Webhook','Subscriptions':'订阅',
+      'No webhook subscriptions yet.':'暂无 Webhook 订阅。','Webhook receiver disabled':'Webhook 接收器已停用',
+      // ── 配对页 ──
+      'Pending requests':'待处理请求','Approved users':'已批准用户',
+      'No pending pairing requests':'暂无待处理配对请求','No approved users':'暂无已批准用户',
+      // ── 多AGENT ──
+      'BUILD':'构建','Create':'创建','Active profile':'当前激活配置','Multi-Agent Configuration':'多智能体配置',
+      // ── 系统页 ──
+      'Host':'主机','Nous Portal':'Nous 门户','Skill curator':'技能策展','Gateway':'网关',
+      'Check for updates':'检查更新','not configured':'未配置','not logged in':'未登录','Manage subscription':'管理订阅',
+      // ── 看板 ──
+      'Clear filters':'清除筛选','Orchestration':'编排','Orchestration settings':'编排设置',
+      'New Kanban':'新建看板','Trigger Scheduler':'触发调度器','Refresh':'刷新','Show Archived':'显示已归档',
+      'Group by Configuration':'按配置分组','Filter cards...':'筛选卡片...','All Tenants':'全部租户',
+      'All Configurations':'全部配置','No tasks':'无任务','新建看板':'新建看板',
+      // ── 技能/其他 ──
+      'Learn a skill':'学习技能','New skill':'新建技能','Toolsets':'工具集','BROWSE HUB':'浏览中心',
+      'Session':'会话','Sessions':'会话','Docs':'文档','Logs':'日志','Models':'模型','Plugins':'插件管理',
+      'MCP':'MCP','Config':'配置','Keys':'密钥','active':'启用','inactive':'停用','running':'运行中',
+      'enabled':'已启用','disabled':'已停用','Install':'安装','Enable':'启用','Disable':'停用'
     };
     var SKIP={INPUT:1,TEXTAREA:1,SCRIPT:1,STYLE:1,CODE:1,PRE:1};
     function getLoc(){try{return localStorage.getItem('hermes-locale')||'en';}catch(e){return 'en';}}
