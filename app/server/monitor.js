@@ -9831,19 +9831,18 @@ async function handleFetch(req) {
     const subPath = path.replace(/^\/proxy\/dashboard/, "") || "/";
     if (subPath.includes("..")) return new Response("Forbidden", { status: 403 });
 
-    // 官方 dashboard 不适配页面（发行模式）：chat=PTY 桥在门户代理下无法渲染、
-    // system=上游 /api/system 不存在。返回中文提示引导应用内替代页，避免空白页误判为故障。
+    // 官方 dashboard 不适配页面（发行模式）：system=上游 /api/system 不存在，返回中文提示。
+    // 注：chat 页此前被误判为「PTY 桥在门户代理下无法渲染」而拦截（白屏根因）——
+    // 实测 dashboard 对 /chat 是标准 SPA fallback（返回 index.html），资源/API/WS 经门户代理均可正常
+    // 渲染，故不再拦截 /chat，直接转发。
     const _dashBadRoute = subPath.replace(/\/+$/, "");
-    if ((_dashBadRoute === "/chat" || _dashBadRoute === "/system") && req.method === "GET") {
-      const isChat = _dashBadRoute === "/chat";
+    if (_dashBadRoute === "/system" && req.method === "GET") {
       return new Response(
         '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>页面不可用</title>' +
         '<style>body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#0d1117;color:#e6edf3;display:flex;align-items:center;justify-content:center;height:100vh;margin:0} .card{max-width:520px;padding:36px;border-radius:16px;background:#161b22;border:1px solid #30363d;text-align:center} h1{font-size:20px;margin:0 0 12px} p{font-size:14px;line-height:1.8;color:#8b949e;margin:6px 0} .tag{display:inline-block;background:#7c5cff22;color:#a99bff;border:1px solid #7c5cff55;border-radius:20px;padding:3px 12px;font-size:12px;margin-bottom:14px} a{color:#58a6ff;text-decoration:none} a:hover{text-decoration:underline}</style></head><body>' +
         '<div class="card"><div class="tag">官方 Dashboard · 此页不适配</div>' +
-        '<h1>' + (isChat ? '官方聊天页（PTY 终端）在门户下不可用' : '官方系统信息页不可用') + '</h1>' +
-        '<p>' + (isChat
-          ? '官方 dashboard 的聊天页依赖 PTY 终端桥，在应用门户（8650 代理）下无法渲染。<br>请使用左侧「<b>对话</b>」——功能完整（流式对话、语音、纠偏、知识库）。'
-          : '官方 dashboard 的系统页调用的接口（/api/system）在 Hermes 0.20 中不存在（上游缺陷）。<br>系统信息请使用左侧「<b>概览</b>」页，信息完整。') + '</p>' +
+        '<h1>官方系统信息页不可用</h1>' +
+        '<p>官方 dashboard 的系统页调用的接口（/api/system）在 Hermes 0.20 中不存在（上游缺陷）。<br>系统信息请使用左侧「<b>概览</b>」页，信息完整。</p>' +
         '<p style="margin-top:16px"><a href="' + (BASE_PATH || "") + '/" onclick="var p=location.pathname.split(\'/proxy/\')[0]||\'\';this.href=p+\'/\';return true;">返回应用 →</a></p>' +
         '</div></body></html>',
         { headers: { "Content-Type": "text/html; charset=utf-8" } }
