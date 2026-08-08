@@ -4,6 +4,17 @@
 
 ---
 
+## v0.22.0（2026-08-08）
+
+**Dashboard 全链路修复 + 体验增强（249 实测驱动）**：
+- **官方 Dashboard 代理全套修复**：/chat 不再误拦截；`__HERMES_BASE_PATH__` 注入修正（官方空值覆盖问题）；302 补前缀统一 URL；**移除 history.pushState 劫持**（此前导致菜单 SPA 导航黑屏的最终根因）；重建 web_dist（Vite 相对 base，动态 import chunk 不再 404）
+- **官方前端 12 处裸路径导航改相对**（sessions/plugins/profiles/config），反代下不再裸跳黑屏
+- **应用控制台 URL 直达**：`/sessions` `/files` `/models` 等路径自动跳转 `#/页面`（hash 路由 + SPA 302）
+- **「更新 Hermes」真正可用**：点击触发应用自动更新（多源下载最新版，等价官方 git 更新），不再报 "Not a git repository"
+- **运行时汉化增强**：默认中文翻译 + DICT 补充 100+ 条（会话/模型/插件/MCP/通讯/回调/配对/多AGENT/系统/看板页英文→中文）
+- **MCP 配置保存合并语义**：前端保存不再清空 CLI 添加的 mcp_servers（websearch 等保留）；嵌套 map（env: {KEY:value}）正确解析/序列化（无 [object Object]）
+- 安装包：fnos-hermes-agent_v0.22.0.fpk（40.1MB）
+
 ## v0.21.96（2026-08-07）
 
 **自动更新提速与兼容修复（254 实测驱动）**：
