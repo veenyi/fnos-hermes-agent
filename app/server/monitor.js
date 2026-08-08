@@ -4274,6 +4274,17 @@ async function handleFetch(req) {
     });
   }
 
+  // 更新说明（随包分发的 UPDATE-LOG.md）：更新页展示每次版本变更内容
+  if (path === "/api/app/changelog" && req.method === "GET") {
+    const _cl = `${APP_DIR}/UPDATE-LOG.md`;
+    if (existsSync(_cl)) {
+      return new Response(readFileSync(_cl, "utf8"), {
+        headers: { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "no-store" },
+      });
+    }
+    return new Response(JSON.stringify({ error: "无更新说明" }), { status: 404, headers: jsonHeaders() });
+  }
+
   // 实时探测 8742 网关健康状态，前端 chat 页用这个判断"是否连接"
   if (path === "/api/gateway/health") {
     const t0 = Date.now();
