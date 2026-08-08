@@ -3440,7 +3440,25 @@ async function proxyDashboard(req) {
             "Connect Hermes to DingTalk groups (钉钉).": "将 Hermes 连接到钉钉群组。",
             "Use Hermes inside Feishu / Lark.": "在飞书 / Lark 中使用 Hermes。",
             "Connect Hermes to Google Chat via Cloud Pub/Sub.": "通过 Cloud Pub/Sub 将 Hermes 连接到 Google Chat。",
-            "Send-only WeCom group bot via webhook.": "通过 Webhook 发送企业微信群机器人消息（仅发送）。"
+            "Send-only WeCom group bot via webhook.": "通过 Webhook 发送企业微信群机器人消息（仅发送）。",
+            "Two-way WeCom integration via callback app.": "通过回调应用进行双向企业微信集成。",
+            "Connect a personal WeChat account through Tencent's iLink Bot API.": "通过腾讯 iLink Bot API 连接个人微信账号。",
+            "Connect Hermes to a QQ Bot from the QQ Open Platform.": "从 QQ 开放平台将 Hermes 连接到 QQ 机器人。",
+            "Connect Hermes to Tencent Yuanbao.": "将 Hermes 连接到腾讯元宝。",
+            "Expose Hermes as an OpenAI-compatible HTTP API for tools like Open WebUI.": "将 Hermes 作为兼容 OpenAI 的 HTTP API 暴露，供 Open WebUI 等工具使用。",
+            "Receive events from GitHub, GitLab, and other webhook sources.": "接收来自 GitHub、GitLab 等 Webhook 源的事件。",
+            "No extra packages needed (stdlib only)": "无需额外包（仅标准库）",
+            "Requires the buzz CLI binary (https://github.com/block/buzz) on PATH or at BUZZ_CLI_PATH": "需要 buzz CLI 二进制文件（https://github.com/block/buzz）位于 PATH 或 BUZZ_CLI_PATH",
+            "Use Hermes through iMessage via Photon's managed Spectrum platform.": "通过 Photon 托管的 Spectrum 平台经 iMessage 使用 Hermes。",
+            "Relay messages between an IRC channel (or DMs) and Hermes.": "在 IRC 频道（或私信）与 Hermes 之间中继消息。",
+            "Use Hermes from LINE via the LINE Messaging API webhook.": "通过 LINE Messaging API Webhook 从 LINE 使用 Hermes。",
+            "Receive Microsoft Graph change notifications (Teams meetings, Outlook, …).": "接收 Microsoft Graph 变更通知（Teams 会议、Outlook 等）。",
+            "Connect Hermes to Microsoft Teams chats via the Bot Framework.": "通过 Bot Framework 将 Hermes 连接到 Microsoft Teams 聊天。",
+            "Chat with Hermes over ntfy push topics (ntfy.sh or self-hosted).": "通过 ntfy 推送主题（ntfy.sh 或自托管）与 Hermes 聊天。",
+            "Join a Raft workspace as an external agent.": "作为外部智能体加入 Raft 工作区。",
+            "Generic relay adapter fronted by the Hermes Relay connector.": "由 Hermes Relay 连接器提供前置的通用中继适配器。",
+            "Talk to Hermes over SimpleX Chat via a local simplex-chat daemon.": "通过本地 simplex-chat 守护进程在 SimpleX Chat 上与 Hermes 对话。",
+            "Use Hermes via Meta's hosted WhatsApp Cloud API (no local bridge).": "通过 Meta 托管的 WhatsApp Cloud API 使用 Hermes（无需本地桥）。"
           };
           let changed = false;
           _j.platforms.forEach(p => {
