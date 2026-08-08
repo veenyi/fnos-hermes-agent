@@ -3396,7 +3396,11 @@ async function proxyDashboard(req) {
     .replace(/^\/proxy\/dashboard/, "") || "/";
   const target  = `http://${DASHBOARD_BIND}:${DASHBOARD_PORT}${subPath}${url.search}`;
 
-  const prefix = `${BASE_PATH || ""}/proxy/dashboard`;
+  // 前缀动态适配实际访问 URL：门户访问（/app/hermes-agent/proxy/dashboard/...）与
+  // 直接访问（/proxy/dashboard/...）注入不同前缀，否则 __HERMES_BASE_PATH__/资源路径
+  // 与实际 URL 不匹配导致前端 API/WS 404、页面黑屏。
+  const _dashPrefixBase = (url.pathname.split("/proxy/dashboard")[0] || "").replace(/\/+$/, "");
+  const prefix = (_dashPrefixBase || (BASE_PATH || "").replace(/\/+$/, "")) + "/proxy/dashboard";
 
   // 记录网关重启请求时刻 + 重启前的网关 pid：既用于后续判定重启是否已实际完成，
   // 也用于检测官方复用守卫是否发生「未真正重启」的空操作（返回 pid == 重启前 pid）。
@@ -3560,54 +3564,10 @@ async function proxyDashboard(req) {
     if(u.indexOf(P)===0)return u.substring(P.length)||"/";
     return u;
   }
-  var _ps=history.pushState,_rs=history.replaceState;
-  var _pn=location.pathname;
-  /* ── 安全恢复前缀（微任务，比 rAF 更快恢复前缀） ── */
-  function sched(){
-    Promise.resolve().then(function(){
-      if(location.pathname===_pn){
-        var s=location.search||"",h=location.hash||"";
-        _rs.call(history,history.state,"",rw(_pn)+s+h);
-      }
-    });
-  }
-  /* ── 初始加载：清理 URL 让 SPA 路由启动 ── */
-  if(_pn.indexOf(P)===0){
-    var cl=_pn.substring(P.length)||"/";
-    _rs.call(history,history.state,"",cl+location.search+location.hash);
-    _pn=cl;
-    sched();
-  }
-  /* ── pushState：剥离前缀给路由，微任务恢复前缀给地址栏 ── */
-  history.pushState=function(s,t,u){
-    _pn=u?(u.split("?")[0].split("#")[0]):location.pathname;
-    var c=u?strip(u):u;
-    _ps.call(this,s,t,c);
-    if(u)sched();
-  };
-  history.replaceState=function(s,t,u){
-    _pn=u?(u.split("?")[0].split("#")[0]):location.pathname;
-    var c=u?strip(u):u;
-    _rs.call(this,s,t,c);
-    if(u)sched();
-  };
-  /* ── popstate：后退/前进时临时清理 URL ── */
-  var _ae=EventTarget.prototype.addEventListener;
-  EventTarget.prototype.addEventListener=function(type,fn,opt){
-    if(type==="popstate"&&fn){
-      var w=function(ev){
-        var cp=location.pathname;
-        var cl=cp.indexOf(P)===0?(cp.substring(P.length)||"/"):cp;
-        _rs.call(history,history.state,"",cl+location.search+location.hash);
-        _pn=cl;
-        fn.call(this,ev);
-        _rs.call(history,history.state,"",cp+location.search+location.hash);
-        _pn=cp;
-      };
-      return _ae.call(this,type,w,opt);
-    }
-    return _ae.call(this,type,fn,opt);
-  };
+  /* ── 注意：不再劫持 history.pushState/replaceState/popstate ──
+     官方 dashboard 用 <BrowserRouter basename={__HERMES_BASE_PATH__}>，导航由
+     react-router 原生处理（自动拼 basename）。此前的「剥离前缀给路由+微任务恢复」
+     劫持会让 Router 在 pushState 瞬间看到无前缀 URL → basename 不匹配 → 黑屏。 */
   /* ── fetch / XHR：添加前缀 ── */
   var _f=window.fetch;
   window.fetch=function(i,o){
@@ -3760,6 +3720,16 @@ async function proxyDashboard(req) {
   }catch(e){}
 })();
 <\/script>`;
+
+      // 官方 web_server 会按「剥前缀后的 URL」注入 window.__HERMES_BASE_PATH__（此时为空值），
+      // 该 script 位于 monitor 注入之前，会在运行时覆盖代理前缀 → 前端 API/WS 拼出无前缀路径，
+      // chat 页依赖的 gateway WS(/api/ws) 在门户下 404 → 黑屏。统一替换为正确代理前缀；
+      // 官方未注入该变量时兜底追加。
+      if (/window\.__HERMES_BASE_PATH__="[^"]*"/.test(html)) {
+        html = html.replace(/window\.__HERMES_BASE_PATH__="[^"]*"/, `window.__HERMES_BASE_PATH__="${prefix}"`);
+      } else {
+        html = html.replace("</head>", `<script>window.__HERMES_BASE_PATH__="${prefix}";</script></head>`);
+      }
 
       html = html.replace("</head>", inject + "\n" + injectZh + "\n</head>");
 
@@ -5779,6 +5749,7 @@ async function handleFetch(req) {
 
   // 替换/新增 config.yaml 顶层「映射」块（如 mcp_servers:）
   // 通过 _setTopLevelBlock 写入：兼容 inline（key: {}）与 block 形态，并清除重复顶层键
+  // 支持嵌套 map（如 env: {KEY: value}），不再序列化为 [object Object]
   function _setYamlMapBlock(content, key, obj){
     let block;
     const names = Object.keys(obj);
@@ -5792,6 +5763,14 @@ async function handleFetch(req) {
         Object.entries(entry).forEach(([k, v]) => {
           if (Array.isArray(v)){
             block += `    ${k}:\n` + v.map(x => `      - ${_yamlScalarSafe(x)}`).join("\n") + "\n";
+          } else if (v && typeof v === "object"){
+            // 嵌套 map（env: {KEY: value} 等）：逐键序列化，避免 [object Object]
+            block += `    ${k}:\n`;
+            Object.entries(v).forEach(([k2, v2]) => {
+              if (v2 !== undefined && v2 !== null && v2 !== ""){
+                block += `      ${_yamlScalarSafe(k2)}: ${_yamlScalarSafe(v2)}\n`;
+              }
+            });
           } else if (v !== undefined && v !== null && v !== ""){
             block += `    ${k}: ${_yamlScalarSafe(v)}\n`;
           }
@@ -5986,38 +5965,49 @@ async function handleFetch(req) {
   function _writeConnectorsState(obj){
     try { writeFileSync(CONNECTORS_STATE, JSON.stringify(obj, null, 2), { mode: 0o600 }); return true; } catch (e) { return false; }
   }
-  // 解析现有 mcp_servers 顶层映射块为 { name: {url, headers:{...}} }
+  // 解析现有 mcp_servers 顶层映射块为 { name: {url, headers:{...}, env:{...}} }
+  // 支持嵌套 map（headers/env 子块）与列表（args），自适应子块类型
   function _parseMcpServers(yml){
     const block = _yamlBlockOf(yml, "mcp_servers");
     const obj = {};
     if (!block.trim()) return obj;
     const lines = block.split("\n");
-    let curName = null, curEntry = null, inHeaders = false, inList = null;
+    let curName = null, curEntry = null, inMap = null;
     for (const line of lines){
+      // 顶层条目（2 空格缩进 name:）
       const nm = line.match(/^  ([A-Za-z0-9_-]+):\s*$/);
-      if (nm && !inHeaders){
+      if (nm){
         if (curName) obj[curName] = curEntry;
-        curName = nm[1]; curEntry = {}; inHeaders = false; inList = null; continue;
+        curName = nm[1]; curEntry = {}; inMap = null; continue;
       }
-      // list item (6-space indent + dash): collect into current list key
-      const li = line.match(/^      -\s*(.*)$/);
-      if (li && curEntry && inList){
-        let val = li[1].trim();
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
-        curEntry[inList].push(val);
-        continue;
-      }
+      // 4 空格 key:（条目字段；v 为空 → 子块，暂存 null 由后续行确定类型）
       const sk = line.match(/^    ([A-Za-z0-9_-]+):\s*(.*)$/);
       if (sk && curName && curEntry){
         const k = sk[1], v = sk[2].trim();
-        if (k === "headers"){ curEntry.headers = {}; inHeaders = true; inList = null; continue; }
-        inHeaders = false;
-        if (v === ""){ curEntry[k] = []; inList = k; } else { curEntry[k] = v; inList = null; }
+        inMap = null;
+        if (v === ""){ curEntry[k] = null; inMap = k; }
+        else { curEntry[k] = v; }
         continue;
       }
+      // 6 空格 key: value（子 map 成员：headers/env 等）
       const hk = line.match(/^      ([A-Za-z0-9_-]+):\s*(.*)$/);
-      if (hk && curEntry && curEntry.headers && typeof curEntry.headers === "object"){
-        curEntry.headers[hk[1]] = hk[2].trim(); inList = null;
+      if (hk && curEntry && inMap){
+        if (curEntry[inMap] === null || curEntry[inMap] === undefined) curEntry[inMap] = {};
+        else if (Array.isArray(curEntry[inMap])) curEntry[inMap] = {};
+        let hv = hk[2].trim();
+        if ((hv.startsWith('"') && hv.endsWith('"')) || (hv.startsWith("'") && hv.endsWith("'"))) hv = hv.slice(1, -1);
+        curEntry[inMap][hk[1]] = hv;
+        continue;
+      }
+      // 6 空格 - item（子列表成员：args 等）
+      const li = line.match(/^      -\s*(.*)$/);
+      if (li && curEntry && inMap){
+        if (curEntry[inMap] === null || curEntry[inMap] === undefined) curEntry[inMap] = [];
+        else if (!Array.isArray(curEntry[inMap])) curEntry[inMap] = [];
+        let val = li[1].trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
+        curEntry[inMap].push(val);
+        continue;
       }
     }
     if (curName) obj[curName] = curEntry;
@@ -8920,7 +8910,9 @@ async function handleFetch(req) {
             y2 = _setYamlListBlock(y2, "toolsets", mergedTs);
             // 检测是否有新增工具集（如启用专家团时开启 delegation）：网关需重启才能加载新工具
             _toolsetsChanged = mergedTs.some(t => !_beforeTs.has(t));
-            // mcp_servers
+            // mcp_servers：合并语义——保留 config.yaml 中已有的服务器（如 CLI 添加的 websearch），
+            // 仅更新/新增前端传入的条目。前端 UI 不认识的字段（不在 UI 配置项的 MCP 服务）
+            // 必须保留，否则前端保存一次配置就把磁盘上其它条目整体清空（覆盖语义 bug）。
             const mcpObj = {};
             (body.extensions.mcp_servers || []).forEach(s => {
               if (!s || !s.name) return;
@@ -8935,7 +8927,9 @@ async function handleFetch(req) {
               if (s.env && Object.keys(s.env).length) entry.env = s.env;
               mcpObj[s.name] = entry;
             });
-            y2 = _setYamlMapBlock(y2, "mcp_servers", mcpObj);
+            const _existingMcp = _parseMcpServers(y2);
+            Object.keys(mcpObj).forEach(k => { _existingMcp[k] = mcpObj[k]; });
+            y2 = _setYamlMapBlock(y2, "mcp_servers", _existingMcp);
             // skills.external_dirs
             y2 = _mergeSkillsExternalDirs(y2, body.extensions.skills_dirs || []);
             // memory 段
@@ -9827,6 +9821,12 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ error: `Preview failed: ${err.message}` }), { status: 500, headers: jsonHeaders() });
     }
   }
+  // 门户与直接访问统一：无 BASE_PATH 前缀的 /proxy/dashboard/* 请求 302 补前缀。
+  // 官方 dashboard（web 构建）用 <BrowserRouter basename={__HERMES_BASE_PATH__}>，
+  // basename 必须与浏览器 URL 前缀一致，否则 React Router 拒绝渲染（黑屏）。
+  if (BASE_PATH && BASE_PATH !== "/" && path.startsWith("/proxy/dashboard") && !url.pathname.startsWith(BASE_PATH + "/")) {
+    return new Response(null, { status: 302, headers: { Location: BASE_PATH + url.pathname + url.search } });
+  }
   if (path.startsWith("/proxy/dashboard")) {
     const subPath = path.replace(/^\/proxy\/dashboard/, "") || "/";
     if (subPath.includes("..")) return new Response("Forbidden", { status: 403 });
@@ -9834,16 +9834,15 @@ async function handleFetch(req) {
     // 官方 dashboard 不适配页面（发行模式）：chat=PTY 桥在门户代理下无法渲染、
     // system=上游 /api/system 不存在。返回中文提示引导应用内替代页，避免空白页误判为故障。
     const _dashBadRoute = subPath.replace(/\/+$/, "");
-    if ((_dashBadRoute === "/chat" || _dashBadRoute === "/system") && req.method === "GET") {
-      const isChat = _dashBadRoute === "/chat";
+    // chat 页经 __HERMES_BASE_PATH__ 注入后可正常渲染（见上方 base path 替换），不再拦截；
+    // system 页上游 /api/system 在 0.20 不存在，保留提示。
+    if (_dashBadRoute === "/system" && req.method === "GET") {
       return new Response(
         '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>页面不可用</title>' +
         '<style>body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#0d1117;color:#e6edf3;display:flex;align-items:center;justify-content:center;height:100vh;margin:0} .card{max-width:520px;padding:36px;border-radius:16px;background:#161b22;border:1px solid #30363d;text-align:center} h1{font-size:20px;margin:0 0 12px} p{font-size:14px;line-height:1.8;color:#8b949e;margin:6px 0} .tag{display:inline-block;background:#7c5cff22;color:#a99bff;border:1px solid #7c5cff55;border-radius:20px;padding:3px 12px;font-size:12px;margin-bottom:14px} a{color:#58a6ff;text-decoration:none} a:hover{text-decoration:underline}</style></head><body>' +
         '<div class="card"><div class="tag">官方 Dashboard · 此页不适配</div>' +
-        '<h1>' + (isChat ? '官方聊天页（PTY 终端）在门户下不可用' : '官方系统信息页不可用') + '</h1>' +
-        '<p>' + (isChat
-          ? '官方 dashboard 的聊天页依赖 PTY 终端桥，在应用门户（8650 代理）下无法渲染。<br>请使用左侧「<b>对话</b>」——功能完整（流式对话、语音、纠偏、知识库）。'
-          : '官方 dashboard 的系统页调用的接口（/api/system）在 Hermes 0.20 中不存在（上游缺陷）。<br>系统信息请使用左侧「<b>概览</b>」页，信息完整。') + '</p>' +
+        '<h1>官方系统信息页不可用</h1>' +
+        '<p>官方 dashboard 的系统页调用的接口（/api/system）在 Hermes 0.20 中不存在（上游缺陷）。<br>系统信息请使用左侧「<b>概览</b>」页，信息完整。</p>' +
         '<p style="margin-top:16px"><a href="' + (BASE_PATH || "") + '/" onclick="var p=location.pathname.split(\'/proxy/\')[0]||\'\';this.href=p+\'/\';return true;">返回应用 →</a></p>' +
         '</div></body></html>',
         { headers: { "Content-Type": "text/html; charset=utf-8" } }
@@ -9964,6 +9963,18 @@ async function handleFetch(req) {
               : ext === "html" ? "text/html; charset=utf-8"
               : "application/octet-stream";
     return serveFile(fp, ct);
+  }
+
+  // SPA 直达：未知路径的浏览器导航请求 302 到「根路径 + hash」（如 /sessions → /#/sessions）。
+  // 子路径下 index.html 的相对资源会解析错位（/sessions/js/... 404）导致黑屏，
+  // 因此必须回根路径加载，页面目标用 hash 传递（前端读 location.hash 切页）。
+  // 仅对浏览器导航请求（GET + Accept: text/html）生效，API/静态资源请求保持 404。
+  {
+    const _acc = String(req.headers.get("accept") || "");
+    if (req.method === "GET" && _acc.includes("text/html") && !path.startsWith("/api/")) {
+      const _root = (BASE_PATH ? BASE_PATH + "/" : "/");
+      return new Response(null, { status: 302, headers: { Location: _root + "#" + path } });
+    }
   }
 
   return new Response("Not Found", { status: 404 });
