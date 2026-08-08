@@ -3413,6 +3413,50 @@ async function proxyDashboard(req) {
     restartPreGwPid = findGatewayPid() || 0;
   }
 
+  // 通讯页渠道描述汉化：后端返回的渠道描述为英文，这里拦截翻译（数据层汉化）。
+  // 注意：此处位于 try 块外，init 变量不可用，需自行构造请求。
+  if (req.method === "GET" && subPath === "/api/messaging/platforms") {
+    try {
+      const _up = await fetch(target, {
+        method: "GET",
+        headers: { "X-Hermes-Session-Token": DASHBOARD_SESSION_TOKEN },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (_up.ok) {
+        const _j = await _up.json().catch(() => null);
+        if (_j && Array.isArray(_j.platforms)) {
+          const DESC = {
+            "Run Hermes from Telegram DMs, groups, and topics.": "通过 Telegram 私聊、群组和话题使用 Hermes。",
+            "Connect Hermes to Discord DMs, channels, and threads.": "将 Hermes 连接到 Discord 私聊、频道和帖子。",
+            "Use Hermes from Slack via Socket Mode. Add allowed Slack member IDs so connected bots can respond.": "通过 Socket Mode 从 Slack 使用 Hermes。添加允许的 Slack 成员 ID，连接的机器人即可响应。",
+            "Connect Hermes to Mattermost channels and direct messages.": "将 Hermes 连接到 Mattermost 频道和私信。",
+            "Use Hermes in Matrix rooms and direct messages.": "在 Matrix 房间和私信中使用 Hermes。",
+            "Use Hermes through the bundled WhatsApp bridge with QR-based auth.": "通过内置 WhatsApp 桥（二维码认证）使用 Hermes。",
+            "Connect through a signal-cli REST bridge.": "通过 signal-cli REST 桥连接。",
+            "Use Hermes through iMessage via a BlueBubbles server.": "通过 BlueBubbles 服务器经 iMessage 使用 Hermes。",
+            "Control your smart home from Hermes via Home Assistant.": "通过 Home Assistant 从 Hermes 控制智能家居。",
+            "Talk to Hermes through an IMAP/SMTP mailbox.": "通过 IMAP/SMTP 邮箱与 Hermes 对话。",
+            "Send and receive text messages via Twilio.": "通过 Twilio 收发短信。",
+            "Connect Hermes to DingTalk groups (钉钉).": "将 Hermes 连接到钉钉群组。",
+            "Use Hermes inside Feishu / Lark.": "在飞书 / Lark 中使用 Hermes。",
+            "Connect Hermes to Google Chat via Cloud Pub/Sub.": "通过 Cloud Pub/Sub 将 Hermes 连接到 Google Chat。",
+            "Send-only WeCom group bot via webhook.": "通过 Webhook 发送企业微信群机器人消息（仅发送）。"
+          };
+          let changed = false;
+          _j.platforms.forEach(p => {
+            if (p && p.description && DESC[p.description]) { p.description = DESC[p.description]; changed = true; }
+          });
+          if (changed) {
+            return new Response(JSON.stringify(_j), { headers: { "Content-Type": "application/json; charset=utf-8" } });
+          }
+        }
+      }
+      return _up;
+    } catch (e) {
+      // fallthrough to normal proxy on error
+    }
+  }
+
   try {
     const headers = new Headers(req.headers);
     headers.delete("host");
@@ -3807,7 +3851,8 @@ async function proxyDashboard(req) {
     "Learn a skill":"学习技能","New skill":"新建技能","Toolsets":"工具集","BROWSE HUB":"浏览中心","Session":"会话","Sessions":"会话","Docs":"文档","Logs":"日志","Models":"模型","Plugins":"插件管理","MCP":"MCP","Config":"配置","Keys":"密钥","active":"启用","inactive":"停用","running":"运行中","enabled":"已启用","disabled":"已停用","Install":"安装","Enable":"启用","Disable":"停用",
     "QUICK SETUP":"快速设置","recommended":"推荐","CREATE WITH QR":"扫码创建","USE YOUR OWN BOT":"使用自己的机器人","MANUAL SETUP":"手动设置","PAIR WITH QR":"扫码配对","MODE":"模式","Bot":"机器人","Self-chat":"私聊","ALLOWED WHATSAPP NUMBERS":"允许的 WhatsApp 号码","Test":"测试","Last updated":"最后更新",
     "SKILLS (OPTIONAL)":"技能（可选）","ADVANCED FIELDS":"高级字段","PROVIDER":"提供方","MODEL":"模型","BASE URL OVERRIDE":"基础地址覆盖","SCRIPT":"脚本","WORKDIR":"工作目录","CONTEXT_FROM_JOB_IDS":"上下文任务ID","ENABLED_TOOLSETS":"启用工具集","Deliver To":"投递至","Local":"本地","Default":"默认","one job id per line":"每行一个任务ID",
-    "Categories":"分类","Toolset":"工具集","Enabled":"已启用","Installed":"已安装","Source":"来源","Auth":"认证","Status":"状态","Action":"操作","Language":"语言","Theme":"主题","Custom":"自定义","Hide":"隐藏","Show":"显示","Yes":"是","No":"否","Next":"下一步","Back":"返回","Submit":"提交","Close":"关闭","Confirm":"确认","Error":"错误","Success":"成功","Warning":"警告","Information":"信息","Delete":"删除","Edit":"编辑","Add":"添加","Save":"保存","Cancel":"取消","Apply":"应用","Reset":"重置","Search":"搜索","Loading":"加载中","General":"常规","Advanced":"高级","About":"关于","Settings":"设置","Update":"更新","Restart":"重启","Stop":"停止","Start":"启动"
+    "Categories":"分类","Toolset":"工具集","Enabled":"已启用","Installed":"已安装","Source":"来源","Auth":"认证","Status":"状态","Action":"操作","Language":"语言","Theme":"主题","Custom":"自定义","Hide":"隐藏","Show":"显示","Yes":"是","No":"否","Next":"下一步","Back":"返回","Submit":"提交","Close":"关闭","Confirm":"确认","Error":"错误","Success":"成功","Warning":"警告","Information":"信息","Delete":"删除","Edit":"编辑","Add":"添加","Save":"保存","Cancel":"取消","Apply":"应用","Reset":"重置","Search":"搜索","Loading":"加载中","General":"常规","Advanced":"高级","About":"关于","Settings":"设置","Update":"更新","Restart":"重启","Stop":"停止","Start":"启动",
+    "Mcp Discovery Timeout":"MCP 发现超时","Mcp Single Query Discovery Timeout":"MCP 单次查询发现超时","Prefill Messages File":"预填充消息文件","Command Allowlist":"命令白名单","Hooks Auto Accept":"钩子自动接受","Live Probe Timeout":"实时探测超时","Curator":"策展","Database":"数据库","Desktop":"桌面","Monitoring":"监控","Proxy":"代理","Secrets":"密钥","Streaming":"流式","Wake_word":"唤醒词","Tools":"工具","Tool_output":"工具输出","Tool_loop_guardrails":"工具循环护栏","Session":"会话","Gateway":"网关","Model_catalog":"模型目录","X_search":"X 搜索","Moa":"多智能体混合","Lsp":"LSP","Assistant":"助手","Memory":"记忆","Security":"安全","Voice":"语音","Text to Speech":"文字转语音","Speech to Text":"语音转文字","Delegation":"委托","Compression":"压缩","Browser":"浏览器","Bedrock":"Bedrock","Vertex":"Vertex","Openrouter":"OpenRouter","Model Catalog":"模型目录","Search":"搜索","Web":"Web","Community":"社区","General":"通用","All":"全部","N/A":"不适用","Unknown":"未知","Optional":"可选","Required":"必填","recommended":"推荐"
   }).map(([k,v])=>JSON.stringify(k)+":"+JSON.stringify(v)).join(",")} };
   var SKIP={SCRIPT:1,STYLE:1,INPUT:1,TEXTAREA:1,PRE:1,CODE:1};
   function tr(){
