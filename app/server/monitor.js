@@ -4274,13 +4274,44 @@ async function handleFetch(req) {
     });
   }
 
-  // 更新说明（随包分发的 UPDATE-LOG.md）：更新页展示每次版本变更内容
+  // 更新说明（随包分发的 UPDATE-LOG.md）：支持 ?after=当前版本 → 只返回该版本之后的
+  // 各版本说明（本次更新内容），供更新页「本次更新说明」展示
   if (path === "/api/app/changelog" && req.method === "GET") {
     const _cl = `${APP_DIR}/UPDATE-LOG.md`;
     if (existsSync(_cl)) {
-      return new Response(readFileSync(_cl, "utf8"), {
-        headers: { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "no-store" },
-      });
+      try {
+        let txt = readFileSync(_cl, "utf8");
+        const _u = new URL(req.url);
+        const _after = (_u.searchParams.get("after") || "").trim();
+        if (_after) {
+          const _cmp = (a, b) => {
+            const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
+            for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+              const d = (pa[i] || 0) - (pb[i] || 0);
+              if (d) return d;
+            }
+            return 0;
+          };
+          // 按 "## vX.Y.Z" 切分版本段
+          const sections = [];
+          const lines = txt.split("\n");
+          let curVer = "", curSec = [];
+          const flush = () => { if (curVer && curSec.length) sections.push({ ver: curVer, text: curSec.join("\n") }); };
+          for (const ln of lines) {
+            const m = ln.match(/^##\s+v?(\d+\.\d+\.\d+)/);
+            if (m) { flush(); curVer = m[1]; curSec = [ln]; }
+            else if (curVer) curSec.push(ln);
+          }
+          flush();
+          const newer = sections.filter(s => _cmp(s.ver, _after) > 0).map(s => s.text).join("\n\n---\n\n");
+          txt = newer || "";
+        }
+        return new Response(txt, {
+          headers: { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "no-store" },
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: "解析更新说明失败" }), { status: 500, headers: jsonHeaders() });
+      }
     }
     return new Response(JSON.stringify({ error: "无更新说明" }), { status: 404, headers: jsonHeaders() });
   }
