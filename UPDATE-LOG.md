@@ -4,6 +4,13 @@
 
 ---
 
+## v0.21.98（2026-08-09）
+
+**安装提速（102 实测驱动）**：
+- **install_callback 去除 `--no-cache`**：启用 UV_CACHE_DIR（DATA_DIR/.uv-cache）持久缓存——首次安装全量下载后，**升级/重装复用缓存**，不再每次几百 MB 全量重下
+- 依赖安装保持清华 PyPI 镜像（UV_INDEX_URL），下载快
+- 说明：hermes[all,voice] 依赖较大（onnxruntime/av/ctranslate2/faster-whisper 等几百 MB），**首次安装需 5-15 分钟**属正常（非卡死）；升级后秒级完成
+
 ## v0.21.97（2026-08-09）
 
 **Dashboard 全链路修复 + 全面汉化 + 会话重命名（249 实测驱动）**：

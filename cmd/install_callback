@@ -401,14 +401,14 @@ if [ "${SKIP_INSTALL}" = "false" ]; then
         log_msg ">>> 正在从内置源码 editable 安装 hermes-agent[all]（多源重试：官方→阿里云→清华）..."
         # 第 1 源：官方 PyPI（最稳定）
         UV_INDEX_URL="https://pypi.org/simple" \
-            "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
+            "$UV" pip install --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
             2>>"${LOG_FILE}"
         # 第 2 源：阿里云镜像
         if [ ! -f "${HERMES}" ]; then
             log_msg ">>> 官方源失败，换阿里云镜像重试 ..."
             rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
             UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/" \
-                "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
+                "$UV" pip install --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
                 2>>"${LOG_FILE}"
         fi
         # 第 3 源：清华镜像
@@ -416,7 +416,7 @@ if [ "${SKIP_INSTALL}" = "false" ]; then
             log_msg ">>> 阿里云也失败，换清华镜像重试 ..."
             rm -rf "${VENV_DIR}"/lib/python*/site-packages/hermes* 2>/dev/null || true
             UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple" \
-                "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
+                "$UV" pip install --python "${VENV_DIR}/bin/python3" -e "${HERMES_SRC}[all,voice]" \
                 2>>"${LOG_FILE}"
         fi
         set -e
@@ -429,7 +429,7 @@ if [ "${SKIP_INSTALL}" = "false" ]; then
         # 兜底：无内置源码（旧包/热补丁场景）→ 退回 PyPI wheel 安装
         log_msg "WARNING: hermes-src 不存在（${HERMES_SRC}），退回 PyPI wheel 安装 hermes-agent[all]==${HERMES_VERSION}"
         UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple" \
-            "$UV" pip install --no-cache --python "${VENV_DIR}/bin/python3" "hermes-agent[all,voice]==${HERMES_VERSION}" \
+            "$UV" pip install --python "${VENV_DIR}/bin/python3" "hermes-agent[all,voice]==${HERMES_VERSION}" \
             2>>"${LOG_FILE}"
     fi
 
