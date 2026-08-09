@@ -4713,7 +4713,18 @@ async function handleFetch(req) {
         try {
           execSync(`sudo -n sudo -u postgres /usr/bin/psql -d appcenter -c "UPDATE app SET version='${_appVer}' WHERE app_name='hermes-agent'" 2>&1`, { timeout: 15000 });
           log(`[app-update] fnOS 应用中心版本已同步: ${_appVer}`);
-        } catch (e2) { log(`[app-update] 应用中心版本同步失败: ${e2.message}`); }
+        } catch (e2) {
+          log(`[app-update] 应用中心版本同步失败: ${e2.message}`);
+          // fallback：直接改写 /var/apps/hermes-agent/manifest 的 version（尽力同步显示）
+          try {
+            const _mf = "/var/apps/hermes-agent/manifest";
+            if (existsSync(_mf)) {
+              const _mt = readFileSync(_mf, "utf8").replace(/^version\s*=.*$/m, `version               = ${_appVer}`);
+              writeFileSync(_mf, _mt);
+              log(`[app-update] 已直接改写 manifest 版本为 ${_appVer}`);
+            }
+          } catch (e3) { log(`[app-update] manifest 版本改写失败: ${e3.message}`); }
+        }
       }
       log(`[app-update] 文件覆盖完成（version=${version || "?"}），服务即将自动重启生效`);
       // ── 官方对齐：upgrade_callback 式权限修复（防覆盖后权限漂移导致 EACCES/启动失败）──
