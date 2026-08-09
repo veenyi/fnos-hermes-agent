@@ -4,6 +4,14 @@
 
 ---
 
+## v0.21.100（2026-08-09）
+
+**修复：GitHub/WebDAV 更新后应用中心版本不刷新（102 实测驱动）**：
+- **根因**：部分机器（如 102）未配置 sudoers（hermes-agent 免密 sudo -u postgres psql）→ 更新后应用中心版本同步失败 → 代码已更新但版本显示旧版
+- **修复**：install_callback 自动写入 `/etc/sudoers.d/hermes-appcenter`（cp/chown/psql 免密，终端用户安装即生效）；auto-update 的 psql 同步失败时 fallback 直接改写 `/var/apps/hermes-agent/manifest` 版本
+- **WebDAV 无凭证行为**：明确提示"请确认 WebDAV 凭证已配置"，引导改用 GitHub 通道或手动下载——属预期行为（非 bug）
+- 102 实测：补 sudoers 后版本同步 0.21.99 成功
+
 ## v0.21.99（2026-08-09）
 
 **更新页新增「更新说明」展示**：
