@@ -11,6 +11,11 @@
 - **修复**：init/ 全部替换为**干净通用模板**（USER.md/MEMORY.md 为空白模板，用户安装后自行填写）；含内部信息的 8 个开发文档从打包中移除
 - 已安装的旧版本（≤v0.21.100）：如 memories 已被部署开发者信息，请手动清理 `数据目录/memories/` 下的 USER.md/MEMORY.md（替换为空白模板即可）
 
+**修复：企业微信/微信/Telegram/WhatsApp 扫码登录按钮消失**：
+- **根因**：前端通道定义（PV.connectors）缺少 `qrLogin:true` 标记（后端扫码 API/弹窗逻辑均完好）→ 列表按钮显示「配置」而非「扫码登录」，配置弹窗扫码区不渲染
+- **修复**：telegram/wecom/weixin/whatsapp 恢复 `qrLogin:true`，扫码登录（腾讯企业微信 AI 机器人扫码、微信 iLink 扫码、WhatsApp 扫码配对、Telegram 扫码）全部恢复
+- 249 实测热更验证通过
+
 ## v0.21.100（2026-08-09）
 
 **修复：GitHub/WebDAV 更新后应用中心版本不刷新（102 实测驱动）**：
