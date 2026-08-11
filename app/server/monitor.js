@@ -5699,6 +5699,13 @@ async function handleFetch(req) {
     if (id === "default") return { ok: false, error: "无法删除默认 profile（~/.hermes）" };
     const dir = `${PROFILES_DIR}/${id}`;
     if (!existsSync(dir)) return { ok: false, error: "profile not found" };
+    // 属主修正：profile 目录可能由部署/手动操作以其他用户创建（rmSync 报 EACCES 删除失败），
+    // 手动删除前先 chown 到当前用户（sudoers 已授 hermes-agent 免密 chown；无 sudo 时直 chown 兜底）
+    const _fixOwn = () => {
+      try {
+        execSync(`sudo -n chown -R "$(id -un):$(id -gn)" "${dir}" 2>/dev/null || chown -R "$(id -un):$(id -gn)" "${dir}"`, { timeout: 10000 });
+      } catch (e) { /* 忽略：chown 失败时 rmSync 仍会尝试并给出明确错误 */ }
+    };
     // 使用官方 CLI 删除（会停止网关、移除 systemd 服务、删除命令别名）
     try {
       const r = spawnSync(HERMES_BIN, ["profile", "delete", id, "--yes"], { stdout: "pipe", stderr: "pipe", timeout: 15000 });
@@ -5707,10 +5714,12 @@ async function handleFetch(req) {
       } else {
         const err = (r.stderr || "").toString().trim();
         log(`[profiles] hermes profile delete ${id} CLI 失败(${err})，手动删除目录`);
+        _fixOwn();
         rmSync(dir, { recursive: true, force: true });
       }
     } catch (e) {
       log(`[profiles] hermes profile delete 异常: ${e.message}，手动删除`);
+      _fixOwn();
       try { rmSync(dir, { recursive: true, force: true }); } catch (e2) { return { ok: false, error: e2.message }; }
     }
     if (_getActiveProfile() === id) _setActiveProfile("default");
