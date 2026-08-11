@@ -565,7 +565,8 @@ fi
 # 未配置时 auto-update 覆盖后应用中心版本不刷新（显示旧版本）。
 if [ -n "${TRIM_USERNAME:-}" ]; then
     _SUDOERS_FILE="/etc/sudoers.d/hermes-appcenter"
-    if [ ! -f "${_SUDOERS_FILE}" ] || ! grep -q 'hermes-agent' "${_SUDOERS_FILE}" 2>/dev/null; then
+    # 旧版 sudoers 可能只有 cp/psql（缺 chown）→ 内容不完整必须重写（含 chown 才算完整）
+    if [ ! -f "${_SUDOERS_FILE}" ] || ! grep -q 'chown' "${_SUDOERS_FILE}" 2>/dev/null; then
         log_msg ">>> 写入 sudoers 授权（${_SUDOERS_FILE}）..."
         printf 'hermes-agent ALL=(root) NOPASSWD: /bin/cp, /usr/bin/cp, /bin/chown, /usr/bin/chown, /usr/bin/sudo -u postgres /usr/bin/psql -d appcenter *\n' > /tmp/hermes-appcenter-sudoers
         chmod 440 /tmp/hermes-appcenter-sudoers
@@ -577,7 +578,7 @@ if [ -n "${TRIM_USERNAME:-}" ]; then
         fi
         rm -f /tmp/hermes-appcenter-sudoers
     else
-        log_msg "sudoers 已存在，跳过"
+        log_msg "sudoers 已存在且完整，跳过"
     fi
 fi
 

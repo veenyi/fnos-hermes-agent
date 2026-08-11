@@ -4,6 +4,13 @@
 
 ---
 
+## v0.21.102（2026-08-09）
+
+**修复：删除专家报 EACCES 权限错误（249 实测驱动）**：
+- **根因**：profile 目录可能由部署/手动操作以其他用户（root/veenyi）创建，属主不是 hermes-agent → 删除时 rmSync 报 EACCES
+- **修复**：① monitor 删除专家（_deleteProfile）手动删除前先 `sudo -n chown` 目标目录到当前用户（sudoers 已授 hermes-agent 免密 chown）；② install_callback 的 sudoers 写入校验改为"含 chown 才算完整"（旧版 sudoers 缺 chown 会自动重写）
+- 249 实测：chown 后删除成功 ✓
+
 ## v0.21.101（2026-08-09）
 
 **隐私修复（紧急）：init/ 知识整合模板清除开发者个人信息**：
