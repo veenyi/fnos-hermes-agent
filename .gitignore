@@ -37,3 +37,10 @@ pkg/
 # Local scratch/test files
 app/ui/_check*.js
 app/ui/_dup_test.js
+# v0.21.149 隐私加固：个人工作记忆/密码/内部备份/凭据文件绝不入库
+WORK-MEMORY.md
+init-pack.tgz
+_restore021/
+askpass*.cmd
+webdav-credentials
+*.private*

@@ -2,7 +2,7 @@
 import { spawn, spawnSync, execSync, execFile } from "child_process";
 import { createRequire } from "module";
 import { Readable } from "stream";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync } from "fs";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, statSync, symlinkSync, watch, chmodSync, chownSync, readdirSync, createReadStream, openSync, readSync, closeSync, rmSync, copyFileSync, appendFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { networkInterfaces } from "os";
 import { resolve as resolvePath, dirname, join } from "path";
@@ -493,15 +493,20 @@ const CHANNEL_DEFS = {
     ],
   },
   qqbot: {
-    name: "QQ 机器人 (QQBot)", icon: "🐧",
+    name: "QQ 机器人 (QQBot)", icon: "🐧", qrLogin: true,
     fields: [
-      { env: "QQ_APP_ID", path: "extra.app_id", label: "App ID", placeholder: "..." },
+      { env: "QQ_APP_ID", path: "extra.app_id", label: "App ID", placeholder: "q.qq.com 注册应用后获得" },
       { env: "QQ_CLIENT_SECRET", path: "extra.client_secret", label: "Client Secret", placeholder: "...", secret: true },
+      { env: "QQ_STT_API_KEY", path: "extra.stt.apiKey", label: "STT 语音转文字 Key (可选)", placeholder: "GLM-ASR 或 Whisper Key", secret: true },
+      { env: "QQ_STT_PROVIDER", path: "extra.stt.provider", label: "STT 提供商 (可选)", placeholder: "zai（GLM-ASR）/ openai" },
+      { env: "QQ_STT_BASE_URL", path: "extra.stt.baseUrl", label: "STT Base URL (可选)", placeholder: "https://open.bigmodel.cn/api/coding/paas/v4" },
+      { env: "QQ_STT_MODEL", path: "extra.stt.model", label: "STT 模型 (可选)", placeholder: "glm-asr" },
     ],
     toggles: [ { path: "allow_all_users", label: "允许所有用户" }, { path: "qq_markdown", label: "使用 Markdown 消息" } ],
     behavior: [
       { path: "allowed_users", label: "允许的用户 (多个用逗号分隔，留空=仅创建者)", placeholder: "openid1,openid2" },
     ],
+    note: "QQ 机器人：q.qq.com 注册应用获取 App ID/Secret；语音消息优先走 QQ 内置 ASR（免费），可配 GLM-ASR 备用。",
   },
   weixin: {
     name: "微信 (WeChat)", icon: "💬",
@@ -509,10 +514,24 @@ const CHANNEL_DEFS = {
     fields: [
       { env: "WEIXIN_TOKEN", path: "token", label: "Token", placeholder: "（扫码登录后自动填入）", secret: true },
       { env: "WEIXIN_ACCOUNT_ID", path: "extra.account_id", label: "Account ID", placeholder: "（扫码登录后自动填入）" },
-      { env: "WEIXIN_BASE_URL", path: "extra.base_url", label: "Base URL (可选)", placeholder: "（扫码登录后自动填入）" },
+      { env: "WEIXIN_BASE_URL", path: "extra.base_url", label: "Base URL (可选)", placeholder: "默认 https://ilinkai.weixin.qq.com" },
+      { env: "WEIXIN_CDN_BASE_URL", path: "extra.cdn_base_url", label: "CDN Base URL (可选)", placeholder: "默认 https://novac2c.cdn.weixin.qq.com/c2c" },
+      { env: "WEIXIN_DM_POLICY", path: "extra.dm_policy", label: "私信策略", placeholder: "open / allowlist / disabled / pairing" },
+      { env: "WEIXIN_GROUP_POLICY", path: "extra.group_policy", label: "群组策略", placeholder: "open / allowlist / disabled（默认 disabled）" },
+      { env: "WEIXIN_ALLOWED_USERS", path: "extra.allow_from", label: "私信白名单 (逗号分隔)", placeholder: "user_id1,user_id2（dm_policy=allowlist 时生效）" },
+      { env: "WEIXIN_GROUP_ALLOWED_USERS", path: "extra.group_allow_from", label: "群组白名单 (逗号分隔群 ID)", placeholder: "group_id1,group_id2（group_policy=allowlist 时生效）" },
+      { env: "WEIXIN_HOME_CHANNEL", path: "extra.home_channel", label: "Home Channel (cron/通知投递聊天 ID)", placeholder: "可选" },
+      { env: "WEIXIN_HOME_CHANNEL_NAME", path: "extra.home_channel_name", label: "Home Channel 名称", placeholder: "Home" },
     ],
-    toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
-    note: "微信个人号通过腾讯 iLink 扫码登录，无需自备 App。点击下方「微信扫码登录」完成关联。",
+    toggles: [
+      { path: "require_mention", label: "需 @提及 才回复" },
+      { path: "extra.split_multiline_messages", label: "多行回复拆分为多条消息（旧版行为）" },
+    ],
+    behavior: [
+      { path: "extra.dm_policy", label: "私信策略", placeholder: "open / allowlist / disabled / pairing" },
+      { path: "extra.group_policy", label: "群组策略", placeholder: "open / allowlist / disabled" },
+    ],
+    note: "微信个人号通过腾讯 iLink 扫码登录。支持图片/文件/视频/语音、Markdown、4000 字符分块、AES 加密 CDN。私信默认 open，群组默认 disabled（iLink 限制）。",
   },
   wecom: {
     name: "企业微信 (WeCom)", icon: "💼", qrLogin: true,
@@ -524,6 +543,106 @@ const CHANNEL_DEFS = {
     ],
     toggles: [ { path: "require_mention", label: "需 @提及 才回复" } ],
     note: "企业微信「AI 智能机器人」扫码授权：点下方「企业微信扫码登录」，用企业微信扫码后在手机端确认，Bot ID / Secret 自动填入（与 Octop 一致，无需自备 Corp ID）。",
+  },
+  signal: {
+    name: "Signal", icon: "🔐",
+    fields: [
+      { env: "SIGNAL_ACCOUNT", path: "extra.account", label: "Signal 账号/号码", placeholder: "+8613800000000" },
+      { env: "SIGNAL_HTTP_URL", path: "extra.http_url", label: "signal-cli REST API URL", placeholder: "http://127.0.0.1:8080" },
+      { env: "SIGNAL_ALLOWED_USERS", path: "extra.allowed_users", label: "私信白名单 (逗号分隔)", placeholder: "user_id1,user_id2" },
+      { env: "SIGNAL_GROUP_ALLOWED_USERS", path: "extra.group_allowed_users", label: "群组白名单 (逗号分隔)", placeholder: "group1,group2" },
+    ],
+    toggles: [ { path: "extra.reactions", label: "启用表情反应" }, { path: "extra.require_mention", label: "需 @提及 才回复" } ],
+    note: "Signal：需本地 signal-cli 服务（SIGNAL_HTTP_URL）。支持图片/文件/流式输出。",
+  },
+  yuanbao: {
+    name: "腾讯元宝", icon: "🧧",
+    fields: [
+      { env: "YUANBAO_DM_POLICY", path: "extra.dm_policy", label: "私信策略", placeholder: "open / allowlist / disabled" },
+      { env: "YUANBAO_GROUP_POLICY", path: "extra.group_policy", label: "群组策略", placeholder: "open / allowlist / disabled" },
+      { env: "YUANBAO_DM_ALLOW_FROM", path: "extra.dm_allow_from", label: "私信白名单", placeholder: "逗号分隔" },
+      { env: "YUANBAO_GROUP_ALLOW_FROM", path: "extra.group_allow_from", label: "群组白名单", placeholder: "逗号分隔" },
+      { env: "YUANBAO_HOME_CHANNEL", path: "extra.home_channel", label: "Home Channel", placeholder: "cron/通知投递目标" },
+    ],
+    toggles: [ { path: "extra.allow_all_users", label: "允许所有用户" } ],
+    note: "腾讯元宝渠道：支持语音/图片/文件/流式输出。",
+  },
+  bluebubbles: {
+    name: "BlueBubbles (iMessage)", icon: "💬",
+    fields: [
+      { env: "BLUEBUBBLES_SERVER_URL", path: "extra.server_url", label: "BlueBubbles Server URL", placeholder: "http://127.0.0.1:1234" },
+      { env: "BLUEBUBBLES_WEBHOOK_HOST", path: "extra.webhook_host", label: "Webhook Host", placeholder: "0.0.0.0" },
+      { env: "BLUEBUBBLES_WEBHOOK_PATH", path: "extra.webhook_path", label: "Webhook Path", placeholder: "/bluebubbles" },
+      { env: "BLUEBUBBLES_WEBHOOK_PORT", path: "extra.webhook_port", label: "Webhook Port", placeholder: "8099" },
+    ],
+    toggles: [ { path: "extra.require_mention", label: "需 @提及 才回复" } ],
+    note: "BlueBubbles：通过 BlueBubbles 接入 iMessage，支持图片/文件/表情反应。",
+  },
+  google_chat: {
+    name: "Google Chat", icon: "💬",
+    fields: [
+      { env: "GOOGLE_CHAT_SERVICE_ACCOUNT", path: "extra.service_account", label: "Service Account JSON 路径", placeholder: "/path/to/service-account.json" },
+      { env: "GOOGLE_CHAT_SPACE_ID", path: "extra.space_id", label: "Space ID", placeholder: "spaces/xxx" },
+    ],
+    note: "Google Chat：需 Google Cloud Service Account。支持图片/文件/线程。以 Hermes 官方文档为准。",
+  },
+  sms: {
+    name: "SMS (Twilio)", icon: "📱",
+    fields: [
+      { env: "TWILIO_ACCOUNT_SID", path: "extra.account_sid", label: "Twilio Account SID", placeholder: "AC..." },
+      { env: "TWILIO_AUTH_TOKEN", path: "extra.auth_token", label: "Twilio Auth Token", placeholder: "...", secret: true },
+      { env: "TWILIO_FROM", path: "extra.from_number", label: "发送号码", placeholder: "+1..." },
+    ],
+    note: "SMS：通过 Twilio 收发短信，基础文本消息。",
+  },
+  email: {
+    name: "Email", icon: "✉️",
+    fields: [
+      { env: "EMAIL_IMAP_HOST", path: "extra.imap_host", label: "IMAP 服务器", placeholder: "imap.qq.com" },
+      { env: "EMAIL_IMAP_PORT", path: "extra.imap_port", label: "IMAP 端口", placeholder: "993" },
+      { env: "EMAIL_IMAP_USER", path: "extra.imap_user", label: "IMAP 用户名", placeholder: "you@example.com" },
+      { env: "EMAIL_IMAP_PASSWORD", path: "extra.imap_password", label: "IMAP 密码/授权码", placeholder: "...", secret: true },
+      { env: "EMAIL_SMTP_HOST", path: "extra.smtp_host", label: "SMTP 服务器", placeholder: "smtp.qq.com" },
+      { env: "EMAIL_SMTP_PORT", path: "extra.smtp_port", label: "SMTP 端口", placeholder: "465" },
+      { env: "EMAIL_SMTP_USER", path: "extra.smtp_user", label: "SMTP 用户名", placeholder: "you@example.com" },
+      { env: "EMAIL_SMTP_PASSWORD", path: "extra.smtp_password", label: "SMTP 密码/授权码", placeholder: "...", secret: true },
+    ],
+    note: "Email：IMAP 收信 + SMTP 发信，支持图片/文件/线程。",
+  },
+  mattermost: {
+    name: "Mattermost", icon: "🔗",
+    fields: [
+      { env: "MATTERMOST_SERVER", path: "extra.server", label: "Mattermost 服务器", placeholder: "https://mattermost.example.com" },
+      { env: "MATTERMOST_TOKEN", path: "extra.token", label: "访问 Token", placeholder: "...", secret: true },
+      { env: "MATTERMOST_TEAM", path: "extra.team", label: "团队名", placeholder: "team" },
+      { env: "MATTERMOST_CHANNEL", path: "extra.channel", label: "默认频道", placeholder: "town-square" },
+    ],
+    note: "Mattermost：支持语音/图片/文件/线程。",
+  },
+  teams: {
+    name: "Microsoft Teams", icon: "🧩",
+    fields: [
+      { env: "TEAMS_APP_ID", path: "extra.app_id", label: "App ID", placeholder: "..." },
+      { env: "TEAMS_APP_PASSWORD", path: "extra.app_password", label: "App Password", placeholder: "...", secret: true },
+      { env: "TEAMS_TENANT_ID", path: "extra.tenant_id", label: "Tenant ID", placeholder: "..." },
+    ],
+    note: "Microsoft Teams：支持图片/线程/输入提示。",
+  },
+  homeassistant: {
+    name: "Home Assistant", icon: "🏠",
+    fields: [
+      { env: "HOME_ASSISTANT_URL", path: "extra.url", label: "HA 地址", placeholder: "http://homeassistant.local:8123" },
+      { env: "HOME_ASSISTANT_TOKEN", path: "extra.token", label: "长期访问 Token", placeholder: "...", secret: true },
+    ],
+    note: "Home Assistant：集成 HA，并提供 HA 设备控制工具。",
+  },
+  webhooks: {
+    name: "Webhooks", icon: "🔗",
+    fields: [
+      { env: "WEBHOOK_SECRET", path: "extra.secret", label: "Webhook Secret", placeholder: "...", secret: true },
+      { env: "WEBHOOK_PATH", path: "extra.path", label: "Webhook 路径", placeholder: "/webhook" },
+    ],
+    note: "Webhooks：接收 Webhook 消息，支持完整工具。",
   },
 };
 
@@ -560,6 +679,7 @@ const _whatsappPairings = new Map(); // pairing_id -> {proc, status, qr_payload,
 const _wecomQrCache = new Map();      // scode -> {ts, bot_id, secret}（腾讯 ai/qc 接口扫码结果缓存，3s TTL）
 let _gwRestartTimer = null;            // 网关重启防抖定时器（模块级，handleFetch 内声明会被每请求重置）
 let _gwRestartInProgress = false;      // 网关重启进行中标志（防止并发重启互相杀死对方）
+const _qqQrCache = new Map();               // QQ 扫码绑定任务缓存（模块级）
 
 // ─── 定时任务 Webhook 出站投递配置 ──────────────────────────────────────
 // hermes cron 原生 deliver 只支持内置通道（weixin/telegram/dingtalk/feishu/wecom 等），
@@ -788,8 +908,20 @@ try {
   // spawnSync 已在顶部从 child_process 导入。
   // 注意必须用 (cmd, args) 两参形式：早前误写成 spawnSync(["pkill", ...]) 数组形式，
   // 会把整个数组转成命令名导致 ENOENT 静默失败，旧 gateway/dashboard 杀不掉 → 更新后网关无法干净重启。
-  spawnSync("pkill", ["-SIGKILL", "-f", "hermes.*(gateway|dashboard)"]);
+  // v0.21.145：pkill 模式限定本应用路径（hermes-agent），避免误杀同机其他 Hermes 安装
+  //（如 /opt/hermes 的独立实例）——多实例抢连同一微信/QQ 账号是通道重复对话的根因。
+  spawnSync("pkill", ["-SIGKILL", "-f", "hermes-agent/.+(gateway|dashboard)"]);
 } catch {}
+// v0.21.145：多 Hermes 实例诊断——检测同机是否存在本应用以外的 gateway/dashboard 进程，
+// 存在时提示（可能抢连微信/QQ 等通道导致重复对话/消息丢失）
+try {
+  const _psOut = spawnSync("ps", ["-eo", "pid,cmd"], { timeout: 5000 });
+  const _lines = (_psOut.stdout || "").toString().split("\n").filter(l => /hermes .*(gateway|dashboard)/.test(l) && !/grep/.test(l));
+  const _others = _lines.filter(l => !l.includes("hermes-agent"));
+  if (_others.length) {
+    log(`[channel-lock] 检测到同机存在其他 Hermes gateway/dashboard 实例（可能抢连微信/QQ 通道）：\n${_others.join("\n")}`);
+  }
+} catch (e) {}
 for (const pidFile of [PID_GATEWAY, PID_DASHBOARD]) {
   const oldPid = readPidSync(pidFile);
   if (oldPid && pidAliveSync(oldPid)) {
@@ -1431,6 +1563,7 @@ function _buildSessionMetaMap() {
     files.forEach(f => {
       try {
         const s = readJSON(`${SESSIONS_DIR}/${f}`);
+        if (s && s.group) return; // v0.21.103: 群聊/工作流内部会话不进入主对话列表
         const meta = _sessionMetaFromData(s);
         if (meta.id) map.set(meta.id, meta);
       } catch { /* 忽略损坏/不可读文件 */ }
@@ -1806,19 +1939,35 @@ async function chatRequest(provider, message, history, reqSignal) {
   if (apiKey && apiKey !== "none") {
     headers["Authorization"] = `Bearer ${apiKey}`;
   }
-  const upstream = await fetch(`${providerBase}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: provider.model || "auto",
-      messages: history,
-      temperature: provider.temperature ?? 0.7,
-      max_tokens: resolveMaxTokens(provider),
-      stream: true,
-      stream_options: { include_usage: true },
-    }),
-    signal: reqSignal,
-  });
+  // 自动重试：上游/网关间歇性失败（hermes 更新后偶发）时自动重试一次，用户无需手动重发
+  let upstream = null;
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 800));
+    upstream = await fetch(`${providerBase}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: provider.model || "auto",
+        messages: history,
+        temperature: provider.temperature ?? 0.7,
+        max_tokens: resolveMaxTokens(provider),
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
+      signal: reqSignal,
+    });
+    if (upstream.ok && upstream.body) break;
+    if (attempt === 0) {
+      const errText = await upstream.text().catch(() => "");
+      log(`[Chat] 请求失败（第1次）HTTP ${upstream.status}: ${errText.slice(0, 120)}，自动重试...`);
+    }
+  }
+  // 请求详情日志：定位「gateway 空流」时 monitor 到底发了什么
+  try {
+    const _hist = history || [];
+    const _sys = _hist.find(m => m.role === "system");
+    log(`[Chat] 请求 provider=${provider.name} model=${provider.model || ""} msgs=${_hist.length} sysLen=${_sys ? String(_sys.content).length : 0}`);
+  } catch (e) {}
 
   if (!upstream.ok || !upstream.body) {
     const errText = await upstream.text().catch(() => "");
@@ -2083,14 +2232,21 @@ function finalizeAssistantMessage(sessionId, content, options = {}) {
   try {
     const session = getSession(sessionId);
     if (!session) return;
+    // 从 systemOverride 提取角色名（格式：【专家角色】xxx\n 或 【专家角色】 xxx）
+    var _sender = "Hermes";
+    if (options.systemOverride) {
+      var _m = String(options.systemOverride).match(/【专家角色】\s*(.+)/);
+      if (_m && _m[1]) _sender = _m[1].trim().split(/\s|\n/)[0];
+    }
     const last = session.messages[session.messages.length - 1];
     if (last && last.role === "assistant" && last._streaming) {
       last.content = content;
       last.ts = Date.now();
+      last.sender = _sender;
       delete last._streaming;
       if (options.tools) last.tools = options.tools;
     } else {
-      const msg = { role: "assistant", content, ts: Date.now() };
+      const msg = { role: "assistant", content, ts: Date.now(), sender: _sender };
       if (options.tools) msg.tools = options.tools;
       session.messages.push(msg);
     }
@@ -2244,6 +2400,12 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
               (toolEvent) => {
                 hadToolCalls = true;
                 sendJSON({ tool_progress: toolEvent });
+                try {
+                  const _tName = toolEvent.tool || toolEvent.label || toolEvent.command || "";
+                  if (_tName) {
+                    appendFileSync(`${DATA_DIR}/skill_usage.jsonl`, JSON.stringify({ ts: Date.now(), skill: String(_tName).slice(0, 100), session_id: sessionId, toolCallId: toolEvent.toolCallId || "", status: toolEvent.status || "done" }) + String.fromCharCode(10));
+                  }
+                } catch (e) {}
                 responseTools.push({
                   tool: toolEvent.tool,
                   toolCallId: toolEvent.toolCallId,
@@ -2306,7 +2468,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
         if (requestError !== null) {
           // 即使失败，也要把已生成的部分回复保存下来，避免用户消息白发
           const partialContent = fullReply || `(请求失败: ${requestError})`;
-          finalizeAssistantMessage(sessionId, partialContent);
+          finalizeAssistantMessage(sessionId, partialContent, { systemOverride });
           sendJSON({ error: `所有模型均失败: ${requestError}` });
           // SSE 路径也写入缓存
           const sseCache = _streamResultCache.get(sessionId) || { status: 'error', reply: '', tools: [], error: '', waiters: [] };
@@ -2323,7 +2485,7 @@ function createChatStream(sessionId, message, reqSignal, systemOverride, modelOv
         // 替换最近的 WS 助手消息（来自 WS→XHR 回退），使会话反映用户实际看到的内容
         //（即 XHR 响应），而非不完整的 WS 响应。
         const _assistantContent = fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）");
-        finalizeAssistantMessage(sessionId, _assistantContent, { tools: responseTools });
+        finalizeAssistantMessage(sessionId, _assistantContent, { tools: responseTools, systemOverride });
 
         if (session.title === "New Chat" && session.messages.length >= 2) {
           autoTitle(message, allProviders[0]).then(title => {
@@ -2578,11 +2740,11 @@ async function runChatWS(ws, sessionId, message, systemOverride, modelOverride) 
     clearInterval(checkpointInterval);
     if (requestError !== null) {
       const partialContent = fullReply || `(请求失败: ${requestError})`;
-      finalizeAssistantMessage(sessionId, partialContent);
+      finalizeAssistantMessage(sessionId, partialContent, { systemOverride });
       sendJSON({ error: `所有模型均失败: ${requestError}` });
       cacheEntry.status = 'error'; cacheEntry.error = requestError; cacheEntry.reply = fullReply;
     } else {
-      finalizeAssistantMessage(sessionId, fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）"), { tools: responseTools });
+      finalizeAssistantMessage(sessionId, fullReply || (hadToolCalls ? "（已执行工具，未生成文字回复）" : "（Gateway 连接失败）"), { tools: responseTools, systemOverride });
       cacheEntry.status = 'done'; cacheEntry.reply = fullReply; cacheEntry.tools = responseTools;
     }
 
@@ -2619,6 +2781,7 @@ function setupDashboardProxy(ws) {
   const { targetUrl } = ws.data;
   ws.data.sendQueue = [];
   ws.data.reconnectAttempts = 0;
+  ws.data.supersededCount = 0;   // v0.21.148：连续 4409（superseded）计数，防连接活锁
   ws.data.reconnectTimer = null;
   ws.data.closing = false;
 
@@ -2626,7 +2789,12 @@ function setupDashboardProxy(ws) {
     ws.data.closing = true;
     if (ws.data.reconnectTimer) { clearTimeout(ws.data.reconnectTimer); ws.data.reconnectTimer = null; }
     if (ws.data.kaTimer) { clearInterval(ws.data.kaTimer); ws.data.kaTimer = null; }
-    if (ws.data.upstream) { try { ws.data.upstream.terminate(); } catch {} ws.data.upstream = null; }
+    if (ws.data.upstream) {
+      // v0.21.148：先移除监听器再终止，防止旧连接 close/error 回调在 cleanup 后继续触发重连
+      try { ws.data.upstream.removeAllListeners(); } catch {}
+      try { ws.data.upstream.terminate(); } catch {}
+      ws.data.upstream = null;
+    }
   }
 
   function flushQueue() {
@@ -2657,6 +2825,15 @@ function setupDashboardProxy(ws) {
 
   function connectUpstream() {
     if (ws.data.closing || ws.readyState !== WebSocket.OPEN) return;
+    // v0.21.148：清理旧上游连接的监听器并终止，避免被替换的旧连接在 close/error 时
+    // 继续回调 connectUpstream → 多连接并发风暴（V8 堆累积到 GB 级的主因）
+    try {
+      const _old = ws.data.upstream;
+      if (_old) {
+        _old.removeAllListeners();
+        if (_old.readyState === WebSocket.OPEN || _old.readyState === WebSocket.CONNECTING) { try { _old.terminate(); } catch {} }
+      }
+    } catch {}
     try {
       const upstream = new WebSocket(targetUrl, {
         headers: {
@@ -2667,6 +2844,7 @@ function setupDashboardProxy(ws) {
       ws.data.upstream = upstream;
       upstream.on("open", () => {
         ws.data.reconnectAttempts = 0;
+        ws.data.supersededCount = 0;
         log(`[WS-PROXY] upstream connected`);
         flushQueue();
       });
@@ -2693,9 +2871,20 @@ function setupDashboardProxy(ws) {
         if (ws.data.closing || ws.readyState !== WebSocket.OPEN) return;
         if (code === 4409) {
           // 4409 = WS_CLOSE_SUPERSEDED：另一个 WebSocket Attach 到同一 PTY session。
-          // 直接重新 Attach，不要让浏览器感知断开，彻底避免重连风暴。
-          log(`[WS-PROXY] upstream superseded, re-attach to ${targetUrl}`);
-          connectUpstream();
+          // v0.21.148：修复"连接活锁"——此前无限递归 connectUpstream() 无次数限制，
+          // 多个前端（多 TUI + WebUI）attach 同一 session 时乒乓互踢 → V8 堆暴涨（实测 1.8GB）。
+          // 现在：连续 4 次 superseded 后放弃重连，通知浏览器自行处理（避免死循环）；期间指数退避。
+          const n = (ws.data.supersededCount || 0) + 1;
+          ws.data.supersededCount = n;
+          if (n >= 4) {
+            log(`[WS-PROXY] upstream superseded ${n} 次（多前端争抢同一会话），放弃重连，通知浏览器`);
+            cleanup();
+            try { ws.close(1011, "upstream superseded, give up"); } catch {}
+            return;
+          }
+          const delay = Math.min(500 * Math.pow(2, n - 1), 8000); // 0.5s → 1s → 2s
+          log(`[WS-PROXY] upstream superseded #${n}，${delay}ms 后重试`);
+          ws.data.reconnectTimer = setTimeout(() => connectUpstream(), delay);
           return;
         }
         // 1006（异常关闭）及 dashboard 偶发断连均尝试重连，而非直接断开浏览器客户端
@@ -2958,7 +3147,8 @@ async function stopPid(pidPath) {
 
 async function forceKillHermes() {
   try {
-    spawnSync("pkill", ["-SIGKILL", "-f", "hermes.*(gateway|dashboard)"]);
+    // v0.21.145：限定本应用路径，避免误杀同机其他 Hermes 安装的 gateway/dashboard
+    spawnSync("pkill", ["-SIGKILL", "-f", "hermes-agent/.+(gateway|dashboard)"]);
   } catch {}
   try { unlinkSync(PID_GATEWAY); } catch {}
   try { unlinkSync(PID_DASHBOARD); } catch {}
@@ -4620,18 +4810,33 @@ async function handleFetch(req) {
       if (_shareFile) {
         // ① WebDAV（用户内部更新通道，凭证从 data/.env 读取，不硬编码）
         const _envCfg = (() => { try { const t = readFileSync(`${DATA_DIR}/.env`, "utf8"); const g = k => { const m = t.match(new RegExp("^" + k + "\\s*=\\s*(.+)$", "m")); return m ? m[1].trim() : ""; }; return { u: g("HERMES_WD_USER"), p: g("HERMES_WD_PASS"), b: g("HERMES_WD_BASE") }; } catch { return { u: "", p: "", b: "" }; } })();
-        const _wdBase = (_envCfg.b || "http://nas.aio.run:5244/dav/FnosAPP").replace(/\/+$/, "");
-        if (source !== "github" && _envCfg.u && _envCfg.p) {
+        const _wdBase = (_envCfg.b || "https://fnos.aio.run").replace(/\/+$/, "");
+        const _wdPath = (_envCfg.p2 || "Fnosapp").replace(/^\/+|\/+$/g, "");
+        if (source !== "github") {
           try {
-            const wdUrl = `${_wdBase}/${_shareFile}`;
-            log(`[app-update] 尝试从 WebDAV 下载: ${wdUrl}`);
-            dl = await fetch(wdUrl, { headers: { Authorization: "Basic " + Buffer.from(`${_envCfg.u}:${_envCfg.p}`).toString("base64") }, signal: AbortSignal.timeout(60000) });
-            if (dl.ok) {
-              const _b0 = Buffer.from(await dl.arrayBuffer());
-              if (_b0.length > 0 && (_b0[0] === 0x1f && _b0[1] === 0x8b)) { buf = _b0; log(`[app-update] WebDAV 下载成功 ${(buf.length/1048576).toFixed(1)}MB`); }
-              else { log(`[app-update] WebDAV 内容非 FPK，切换下一源`); dl = null; }
-            } else { log(`[app-update] WebDAV 下载失败 HTTP ${dl.status}，切换下一源`); dl = null; }
-          } catch (e) { log(`[app-update] WebDAV 下载异常: ${e.message}`); dl = null; }
+            // 匿名调用 OpenList API 获取 raw_url（无需认证，公众下载通道）
+            const apiUrl = `${_wdBase}/api/fs/get`;
+            log(`[app-update] 尝试从 OpenList 获取下载直链: ${apiUrl}`);
+            const apiRes = await fetch(apiUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ path: `/${_wdPath}/${_shareFile}`, password: "" }),
+              signal: AbortSignal.timeout(15000),
+            });
+            if (apiRes.ok) {
+              const apiJson = await apiRes.json();
+              const rawUrl = apiJson?.data?.raw_url;
+              if (rawUrl) {
+                log(`[app-update] 获取到直链，开始下载`);
+                dl = await fetch(rawUrl, { signal: AbortSignal.timeout(120000) });
+                if (dl.ok) {
+                  const _b0 = Buffer.from(await dl.arrayBuffer());
+                  if (_b0.length > 0 && (_b0[0] === 0x1f && _b0[1] === 0x8b)) { buf = _b0; log(`[app-update] OpenList 下载成功 ${(buf.length/1048576).toFixed(1)}MB`); }
+                  else { log(`[app-update] OpenList 内容非 FPK，切换下一源`); dl = null; }
+                } else { log(`[app-update] OpenList 直链下载失败 HTTP ${dl.status}，切换下一源`); dl = null; }
+              } else { log(`[app-update] OpenList 未返回 raw_url，切换下一源`); dl = null; }
+            } else { log(`[app-update] OpenList API 失败 HTTP ${apiRes.status}，切换下一源`); dl = null; }
+          } catch (e) { log(`[app-update] OpenList 下载异常: ${e.message}`); dl = null; }
         }
         // ② alist 分享直链（公众通道，免认证）——仅 auto 通道使用
         if (source === "auto" && !dl && !buf) {
@@ -5175,9 +5380,9 @@ async function handleFetch(req) {
   if (path === "/api/dashboard/stop" && req.method === "POST") {
     const dbAlive = readPid(PID_DASHBOARD);
     await stopPid(PID_DASHBOARD);
-    // 强制杀掉残留的 dashboard 进程（PID 文件可能已失效）
+    // 强制杀掉残留的 dashboard 进程（PID 文件可能已失效）；v0.21.145 限定本应用路径
     try {
-      spawnSync("pkill", ["-SIGKILL", "-f", "hermes.*dashboard"]);
+      spawnSync("pkill", ["-SIGKILL", "-f", "hermes-agent/.+dashboard"]);
     } catch {}
     if (dbAlive) log("Dashboard stopped (pid=" + dbAlive + ")");
     return new Response(JSON.stringify({ ok: true }), { headers: jsonHeaders() });
@@ -5545,6 +5750,22 @@ async function handleFetch(req) {
       writeFileSync(`${dir}/config.yaml`, body.model ? `model:\n  default: ${body.model}\n` : "");
       writeFileSync(`${dir}/.env`, "");
     }
+    // v0.21.145：clone 复制来的 .env 可能带上主实例的平台通道凭据（WEIXIN_*/TELEGRAM_* 等），
+    // 子 profile 也持有通道配置 → 多实例抢连同一微信/QQ 账号（通道重复对话的根因之一）。
+    // 创建后统一剥离平台通道凭据，仅保留 LLM API 密钥类。
+    try {
+      const envFile = `${dir}/.env`;
+      if (existsSync(envFile)) {
+        const txt = readFileSync(envFile, "utf8");
+        const CHANNEL_PREFIXES = ["WEIXIN_", "TELEGRAM_", "QQ_", "DINGTALK_", "FEISHU_", "WECOM_", "SLACK_", "DISCORD_", "WHATSAPP_", "MATRIX_", "YUANBAO_", "SIGNAL_", "GOOGLE_CHAT_", "WECHAT_"];
+        const kept = txt.split("\n").filter(l => {
+          const k = String(l).split("=")[0].trim();
+          return !k || !CHANNEL_PREFIXES.some(p => k.startsWith(p));
+        }).join("\n");
+        if (kept.trim() !== txt.trim()) writeFileSync(envFile, kept);
+        log(`[profiles] ${id} 已剥离平台通道凭据（仅保留 LLM API 密钥）`);
+      }
+    } catch (e) {}
     // 写入 UI 元数据（emoji、显示名等，Hermes CLI 不管理这些）
     const meta = { name: body.name || id, emoji: body.emoji || "🤖", created_at: Date.now() };
     if (body.scene) meta.scene = String(body.scene).trim();
@@ -6158,7 +6379,8 @@ async function handleFetch(req) {
     try { writeFileSync(HERMES_ENV, content, { mode: 0o600 }); return true; } catch (e) { return false; }
   }
   function _getEnvValue(content, key){
-    const m = content.match(new RegExp("^" + key.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*=\\s*(.+)$", "m"));
+    // 用 [ \t] 替代 \s（避免 \s 匹配换行导致空值误读下一行键）；值排除换行
+    const m = content.match(new RegExp("^" + key.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "[ \\t]*=[ \\t]*([^\\n\\r]+)$", "m"));
     if (!m) return "";
     let v = m[1].trim();
     // 去除引号包裹
@@ -6245,10 +6467,20 @@ async function handleFetch(req) {
     _writeHermesConfig(yml);
   }
   function _readHermesConfig(){
+    // 优先读运行时 profile config（网关实际加载的配置）；回退顶层
+    try {
+      const rp = _runtimeConfigPath();
+      if (rp && existsSync(rp)) return readFileSync(rp, "utf8");
+    } catch (e) {}
     try { if (existsSync(HERMES_CONFIG)) return readFileSync(HERMES_CONFIG, "utf8"); } catch (e) {}
     return "";
   }
   function _writeHermesConfig(content){
+    // 写入运行时 profile config（保证网关重启后读到）；回退顶层
+    try {
+      const rp = _runtimeConfigPath();
+      if (rp) { writeFileSync(rp, content, { mode: 0o600 }); return true; }
+    } catch (e) {}
     try { writeFileSync(HERMES_CONFIG, content, { mode: 0o644 }); return true; } catch (e) { return false; }
   }
   // ── YAML 标量安全引用（保留 token 中的 : # 等字符）──
@@ -6300,8 +6532,17 @@ async function handleFetch(req) {
     return cur;
   }
   // 读取 config.yaml 中 platforms.<id> 下的嵌套键值（支持任意缩进深度）
+  function _runtimeConfigPath(){
+    try {
+      const ap = readFileSync(`${DATA_DIR}/.active_profile`, "utf8").trim();
+      const pp = `${DATA_DIR}/profiles/${ap}/config.yaml`;
+      if (ap && existsSync(pp)) return pp;
+    } catch (e) {}
+    return HERMES_CONFIG;
+  }
   function _readPlatformConfig(id){
-    const yml = _readHermesConfig();
+    let yml = "";
+    try { yml = readFileSync(_runtimeConfigPath(), "utf8"); } catch (e) {}
     const lines = yml.split("\n");
     // 1. 找到 platforms: 段
     let platHeader = -1;
@@ -6720,6 +6961,11 @@ async function handleFetch(req) {
         const v = body.config[p]; if (v != null) _setValByPath(cfg, p, v);
       });
     }
+    // qqbot：默认开启群消息（open），否则群里 @ 不回复
+    if (id === "qqbot") {
+      if (!_getValByPath(cfg, "extra.group_policy")) _setValByPath(cfg, "extra.group_policy", "open");
+      if (!_getValByPath(cfg, "extra.dm_policy")) _setValByPath(cfg, "extra.dm_policy", "open");
+    }
     // 确保 skills 始终为数组（YAML {} 会解析为空对象，导致前端 indexOf 崩溃）
     if (cfg.skills != null && !Array.isArray(cfg.skills)) {
       if (typeof cfg.skills === "object") cfg.skills = Object.keys(cfg.skills);
@@ -6829,8 +7075,8 @@ async function handleFetch(req) {
       if (!t) return { ok: false, error: "请先填写 Bot Token 再测试" };
       return _testTelegram(t);
     }
-    // 其余渠道：必填凭证齐全检查（label 含「(可选)」的跳过）
-    const required = (def.fields || []).filter(f => f.env && !/\(可选\)/.test(f.label));
+    // 其余渠道：必填凭证齐全检查（label 含「(可选)/（可选）」的跳过）
+    const required = (def.fields || []).filter(f => f.env && !/\(可选\)|（可选）/.test(f.label));
     const missing = required.map(f => (cred[f.env] || saved(f.env)) ? null : f.label).filter(Boolean);
     if (missing.length) return { ok: false, error: "缺少必填凭证：" + missing.join("、") + "，请填写后再测试" };
     const hasAny = (def.fields || []).some(f => f.env && (cred[f.env] || saved(f.env)));
@@ -8234,32 +8480,87 @@ async function handleFetch(req) {
   // ── 通道会话同步：从 Dashboard 拉取各平台会话，按 channel 分组返回给前端 ──
   if (path === "/api/channel-sessions" && req.method === "GET") {
     try {
-      if (!isPortListening(DASHBOARD_PORT)) {
-        return new Response(JSON.stringify({ ok: true, groups: {} }), { headers: jsonHeaders() });
-      }
-      const h = new Headers();
-      h.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
-      const r = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/sessions`, {
-        headers: h, signal: AbortSignal.timeout(8000),
-      });
-      if (!r.ok) return new Response(JSON.stringify({ ok: true, groups: {} }), { headers: jsonHeaders() });
-      const data = await r.json();
-      const sessions = Array.isArray(data) ? data : (data.sessions || data.items || []);
-      // 按 platform 分组
       const groups = {};
-      sessions.forEach(s => {
-        const platform = s.platform || s.source || s.channel || "api_server";
-        if (!groups[platform]) groups[platform] = [];
-        groups[platform].push({
-          id: s.id || s.session_id || "",
-          title: s.title || s.name || "未命名会话",
-          platform,
-          updated_at: s.updated_at || s.last_active || s.created_at || 0,
-          message_count: s.message_count || (s.messages ? s.messages.length : 0),
-          model: s.model || "",
+      // 1) 从 Dashboard API 拉取会话（两个端口：9219=Dashboard, 8742=Gateway）
+      // 9219 用 X-Hermes-Session-Token，返回 {sessions:[...]}（含 cron/tui）
+      // 8742 用 Authorization: Bearer <MONITOR_TOKEN>，返回 {data:[...]}（含 QQ/微信等通道）
+      try {
+        const dh = new Headers();
+        dh.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
+        const dr = await fetch(`http://${DASHBOARD_BIND}:9219/api/sessions`, { headers: dh, signal: AbortSignal.timeout(8000) });
+        if (dr.ok) {
+          const ddata = await dr.json();
+          const dsessions = Array.isArray(ddata) ? ddata : (ddata.sessions || ddata.data || ddata.items || []);
+          dsessions.forEach(s => {
+            const platform = s.platform || s.source || s.channel || "api_server";
+            if (platform === "api_server") return;
+            if (!groups[platform]) groups[platform] = [];
+            groups[platform].push({
+              id: s.id || s.session_id || "", title: s.title || s.name || "未命名会话", platform,
+              updated_at: s.updated_at || s.last_active || s.started_at || s.created_at || 0,
+              message_count: s.message_count || (s.messages ? s.messages.length : 0), model: s.model || "",
+              chat_id: s.chat_id || (s.extra && s.extra.chat_id) || (s.meta && s.meta.chat_id) || "",
+            });
+          });
+        }
+      } catch (e) {}
+      try {
+        const gh = new Headers();
+        gh.set("Authorization", "Bearer " + MONITOR_TOKEN);
+        const gr = await fetch(`http://${DASHBOARD_BIND}:${GATEWAY_PORT}/api/sessions`, { headers: gh, signal: AbortSignal.timeout(8000) });
+        if (gr.ok) {
+          const gdata = await gr.json();
+          const gsessions = Array.isArray(gdata) ? gdata : (gdata.data || gdata.sessions || gdata.items || []);
+          gsessions.forEach(s => {
+            const platform = s.platform || s.source || s.channel || "api_server";
+            if (platform === "api_server") return;
+            if (!groups[platform]) groups[platform] = [];
+            groups[platform].push({
+              id: s.id || s.session_id || "", title: s.title || s.name || "未命名会话", platform,
+              updated_at: s.updated_at || s.last_active || s.started_at || s.created_at || 0,
+              message_count: s.message_count || 0, model: s.model || "",
+              chat_id: s.chat_id || (s.extra && s.extra.chat_id) || (s.meta && s.meta.chat_id) || "",
+            });
+          });
+        }
+      } catch (e) {}
+      // 1.5) 双源去重（v0.21.144+145）：Dashboard(9219) 与 Gateway(8742) 会返回同一批通道会话，
+      //      此前各自 push 导致微信/QQ 等通道出现重复对话条目。
+      //      v0.21.145 增强：优先按 (platform, chat_id) 去重（同一聊天只保留一条，保留最新），
+      //      hermes 列表 API 未暴露 chat_id 时退化为 (platform, session id)。
+      try {
+        Object.keys(groups).forEach(k => {
+          const seen = new Map();
+          groups[k] = groups[k].filter(s => {
+            const chatId = String(s.chat_id || (s.extra && s.extra.chat_id) || (s.meta && s.meta.chat_id) || "").trim();
+            const key = chatId ? (k + "|" + chatId) : (k + "|" + (s.id || ""));
+            if (seen.has(key)) return false;
+            seen.set(key, s.updated_at || 0);
+            return true;
+          });
         });
-      });
-      // 每组按时间倒序
+      } catch (e) {}
+      // 2) 补充：已配置但暂无会话的通道也显示（让用户看到 QQ/微信等已绑定通道）
+      try {
+        const env = _readEnvFile();
+        const chMap = {
+          qqbot: ["QQ_APP_ID", "QQ_CLIENT_SECRET"],
+          weixin: ["WEIXIN_TOKEN", "WEIXIN_ACCOUNT_ID"],
+          wecom: ["WECOM_BOT_ID", "WECOM_SECRET"],
+          telegram: ["TELEGRAM_BOT_TOKEN"],
+          discord: ["DISCORD_BOT_TOKEN"],
+          slack: ["SLACK_BOT_TOKEN"],
+          whatsapp: ["WHATSAPP_ENABLED"],
+          feishu: ["FEISHU_APP_ID", "FEISHU_APP_SECRET"],
+          dingtalk: ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET"],
+          matrix: ["MATRIX_ACCESS_TOKEN"],
+        };
+        Object.keys(chMap).forEach(id => {
+          const keys = chMap[id];
+          const has = keys.some(k => _getEnvValue(env, k));
+          if (has && !groups[id]) groups[id] = [];
+        });
+      } catch (e) {}
       Object.keys(groups).forEach(k => groups[k].sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0)));
       return new Response(JSON.stringify({ ok: true, groups }), { headers: jsonHeaders() });
     } catch (e) {
@@ -8332,6 +8633,31 @@ async function handleFetch(req) {
       return new Response(JSON.stringify({ ok: false, error: e.message, messages: [] }), { status: 500, headers: jsonHeaders() });
     }
   }
+  // DELETE /api/channel-sessions/:id → 删除通道会话（cron/微信/QQ 等，读来自 hermes gateway）
+  // 优先 Gateway(8742) DELETE /api/sessions/:id；Dashboard(9219) 兜底。修复"cron/微信会话删不掉"。
+  const chSessDelMatch = path.match(/^\/api\/channel-sessions\/([^/]+)$/);
+  if (chSessDelMatch && req.method === "DELETE") {
+    try {
+      const sessionId = decodeURIComponent(chSessDelMatch[1]);
+      // ① Gateway 8742（hermes 会话主存储）
+      try {
+        const gh = new Headers();
+        gh.set("Authorization", "Bearer " + MONITOR_TOKEN);
+        const gr = await fetch(`http://${DASHBOARD_BIND}:${GATEWAY_PORT}/api/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE", headers: gh, signal: AbortSignal.timeout(10000) });
+        if (gr.ok) return new Response(JSON.stringify({ ok: true, via: "gateway" }), { headers: jsonHeaders() });
+      } catch (e) {}
+      // ② Dashboard 9219（兜底）
+      try {
+        const dh = new Headers();
+        dh.set("X-Hermes-Session-Token", DASHBOARD_SESSION_TOKEN);
+        const dr = await fetch(`http://${DASHBOARD_BIND}:${DASHBOARD_PORT}/api/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE", headers: dh, signal: AbortSignal.timeout(10000) });
+        if (dr.ok) return new Response(JSON.stringify({ ok: true, via: "dashboard" }), { headers: jsonHeaders() });
+      } catch (e) {}
+      return new Response(JSON.stringify({ ok: false, error: "删除失败：gateway 与 dashboard 均未确认删除" }), { status: 500, headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: jsonHeaders() });
+    }
+  }
   // POST /api/channels/:id/test → 通道「测试」按钮（对齐 Octop probe_channel：真实连接验证凭证）
   const chTestMatch = path.match(/^\/api\/channels\/([a-zA-Z0-9_]+)\/test$/);
   if (chTestMatch && req.method === "POST") {
@@ -8380,6 +8706,99 @@ async function handleFetch(req) {
     }
   }
   // 微信扫码登录：获取二维码（腾讯 iLink 公共接口，无需自备 App）
+  // ── 频道绑定：QQ 扫码（Hermes qqbot onboard：create_bind_task / poll_bind_result）──
+  if (path === "/api/channels/qqbot/qr" && req.method === "GET") {
+    try {
+      const key = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64");
+      const r = await fetch("https://q.qq.com/lite/create_bind_task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "HermesDashboard/1.0" },
+        body: JSON.stringify({ key }),
+        signal: AbortSignal.timeout(20000),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (data.retcode !== 0) throw new Error(data.msg || "create_bind_task failed");
+      const taskId = (data.data || {}).task_id;
+      if (!taskId) throw new Error("missing task_id");
+      _qqQrCache.set(taskId, { key, createdAt: Date.now() });
+      for (const [k, v] of _qqQrCache) if (Date.now() - v.createdAt > 600000) _qqQrCache.delete(k);
+      const qrUrl = "https://q.qq.com/qqbot/openclaw/connect.html?task_id=" + encodeURIComponent(taskId) + "&_wv=2&source=hermes";
+      return new Response(JSON.stringify({ ok: true, task_id: taskId, qrcode_url: qrUrl, use_render_qr: true }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message || String(e) }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+  if (path === "/api/channels/qqbot/qr/status" && req.method === "GET") {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      const taskId = u.searchParams.get("task_id") || "";
+      if (!taskId || !_qqQrCache.has(taskId)) return new Response(JSON.stringify({ ok: false, error: "unknown task" }), { status: 404, headers: jsonHeaders() });
+      const { key } = _qqQrCache.get(taskId);
+      const r = await fetch("https://q.qq.com/lite/poll_bind_result", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "HermesDashboard/1.0" },
+        body: JSON.stringify({ task_id: taskId }),
+        signal: AbortSignal.timeout(20000),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (data.retcode !== 0) throw new Error(data.msg || "poll failed");
+      const d = data.data || {};
+      const status = Number(d.status || 0);
+      if (status === 2) {
+        const slot = Number(u.searchParams.get("slot") || 1);
+        const enc = String(d.bot_encrypt_secret || "");
+        const keyBuf = Buffer.from(key, "base64");
+        const raw = Buffer.from(enc, "base64");
+        const iv = raw.slice(0, 12);
+        const ctTag = raw.slice(12);
+        const k = await crypto.subtle.importKey("raw", keyBuf, "AES-GCM", false, ["decrypt"]);
+        const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, k, ctTag);
+        const clientSecret = Buffer.from(pt).toString("utf8");
+        const appId = String(d.bot_appid || "");
+        const openid = String(d.user_openid || "");
+        let env = _readEnvFile();
+        const cfg = _readPlatformConfig("qqbot");
+        cfg.enabled = true;
+        cfg.extra = cfg.extra || {};
+        if (slot <= 1) {
+          // 机器人1（主账号）
+          env = _setEnvValue(env, "QQ_APP_ID", appId);
+          env = _setEnvValue(env, "QQ_CLIENT_SECRET", clientSecret);
+          cfg.extra.app_id = appId;
+          cfg.extra.client_secret = clientSecret;
+        } else {
+          // 机器人 N（2-5）：写入 slot 对应的 env + extra.accounts
+          env = _setEnvValue(env, "QQ_APP_ID_" + slot, appId);
+          env = _setEnvValue(env, "QQ_CLIENT_SECRET_" + slot, clientSecret);
+          if (!Array.isArray(cfg.extra.accounts)) cfg.extra.accounts = [];
+          while (cfg.extra.accounts.length < slot - 1) cfg.extra.accounts.push({});
+          cfg.extra.accounts[slot - 2] = { app_id: appId, client_secret: clientSecret };
+        }
+        _writeEnvFile(env);
+        cfg.extra.group_policy = "open";
+        cfg.extra.dm_policy = "open";
+        cfg.updated_at = Date.now();
+        _writeHermesConfig(_setPlatformConfig("qqbot", cfg));
+        // 自动设置 home channel（消除首次对话提示；cron/跨平台消息投递默认目标）
+        try {
+          if (openid) {
+            const hcCfg = _readPlatformConfig("qqbot");
+            hcCfg.home_channel = { platform: "qqbot", chat_id: openid, name: "QQ 绑定会话", user_id: openid };
+            _writeHermesConfig(_setPlatformConfig("qqbot", hcCfg));
+            log("[QQBot] 已自动设置 home_channel: " + openid);
+          }
+        } catch (e) { log("[QQBot] home_channel 设置失败: " + e.message); }
+        _triggerGatewayRestart("qqbot-bind");
+        _qqQrCache.delete(taskId);
+        return new Response(JSON.stringify({ ok: true, status: "confirmed", app_id: appId, user_openid: openid }), { headers: jsonHeaders() });
+      }
+      if (status === 3) return new Response(JSON.stringify({ ok: true, status: "expired" }), { headers: jsonHeaders() });
+      return new Response(JSON.stringify({ ok: true, status: "wait" }), { headers: jsonHeaders() });
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, error: e.message || String(e) }), { status: 500, headers: jsonHeaders() });
+    }
+  }
+
   if (path === "/api/channels/weixin/qr" && req.method === "GET") {
     try {
       const res = await fetch("https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3", { signal: AbortSignal.timeout(15000) });
@@ -9847,6 +10266,25 @@ async function handleFetch(req) {
         headers: jsonHeaders(),
       });
     }
+    // v0.30: 会话 model 回写 + trace 埋点（供用量/轨迹页）
+    try {
+      const _sf = sessionFile(session_id);
+      if (existsSync(_sf)) {
+        const _sd = JSON.parse(readFileSync(_sf, "utf8"));
+        let _chg = false;
+        if (model && _sd.model !== model) { _sd.model = model; _chg = true; }
+        if (provider && _sd.provider !== provider) { _sd.provider = provider; _chg = true; }
+        if (_chg) saveSession(_sd);
+      }
+    } catch (e) {}
+    try {
+    appendFileSync(`${DATA_DIR}/trace.jsonl`, JSON.stringify({ ts: Date.now(), kind: "chat_request", session_id, model: model || "", provider: provider || "", message_len: (message || "").length, system_len: (system || "").length }) + String.fromCharCode(10));
+    } catch (e) {}
+    // v0.21.103: 新消息作废旧 done 缓存（与 ws-send 语义一致，防回放旧回复）
+    try {
+      const _pc = _streamResultCache.get(session_id);
+      if (_pc && _pc.status === "done") _streamResultCache.delete(session_id);
+    } catch (e) {}
     return new Response(createChatStream(session_id, message, req.signal, system, { model: model || "", provider: provider || "" }), {
       headers: {
         "Content-Type": "text/event-stream",
@@ -10452,6 +10890,11 @@ function startServer() {
   const tcpServer = http.createServer(async (req, res) => {
     try {
       const request = await toWebRequest(req);
+      const customResponse = await handleCustomRoute(request);
+      if (customResponse instanceof Response) {
+        await writeWebResponse(res, customResponse);
+        return;
+      }
       const response = await handleFetch(request);
       await writeWebResponse(res, response);
     } catch (err) {

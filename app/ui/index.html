@@ -117,7 +117,9 @@
     .agent-row .name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .agent-row .desc{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .session-list{padding-left:24px;overflow:hidden;max-height:0;transition:max-height .25s ease}
-    .session-list.open{max-height:400px}
+    /* v0.21.146：展开的会话分组不再截断（原 max-height:400px + overflow:hidden 导致会话多时
+       看不到也滚不动，只能删除）——全量展开，由 rail-scroll 统一滚动 */
+    .session-list.open{max-height:none;overflow:visible}
     .session-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 8px;border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--text2);transition:background .15s}
     .session-item:hover{background:var(--bg3)}
     .session-item.active{background:var(--accent-bg);color:var(--accent)}
@@ -520,6 +522,16 @@
       .chat-rail.open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.15)}
       .chat-rail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:199;display:none}
       .chat-rail-overlay.open{display:block}
+      /* v0.21.146：移动端会话抽屉滚动优化 + 操作按钮常显（触摸设备无 hover） */
+      .rail-scroll{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+      .session-item .del,.session-item .ren{opacity:1}
+      .agent-row .agent-del{opacity:1}
+      /* v0.21.147：移动端群聊默认隐藏房间列表（CSS 兜底，刷新/直达/导航任何进入方式都生效），
+         点「☰ 房间」以浮层展开；不再依赖 JS 折叠时序 */
+      .rooms-layout{position:relative}
+      .rooms-layout .rooms-side{display:none}
+      .rooms-layout .rooms-side.m-open{display:flex;position:absolute;left:0;top:0;bottom:0;width:230px;z-index:60;box-shadow:2px 0 14px rgba(0,0,0,.15);background:var(--bg1)}
+      .rooms-layout .rooms-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
       .chat-header{height:48px;padding:0 10px}
       .session-tabs{padding:4px 8px 0}
       .session-tab{max-width:150px;padding:5px 6px 5px 10px;font-size:11px}
@@ -1139,6 +1151,46 @@
 .ps-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;font-size:12px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;user-select:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ps-chip:hover{border-color:var(--accent)}
 .ps-chip.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+/* ─── 群聊房间（多 Agent 协作，v0.25 融合） ─── */
+.rooms-layout{display:flex;height:calc(100vh - 120px);min-height:420px;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--bg2)}
+.rooms-side{width:250px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg1);display:flex;flex-direction:column;min-height:0}
+.rooms-list{flex:1;overflow-y:auto;padding:8px}
+.room-item{padding:9px 11px;border-radius:var(--radius-md);cursor:pointer;margin-bottom:2px;border:1px solid transparent}
+.room-item:hover{background:var(--bg3)}
+.room-item.active{background:var(--accent-bg);border-color:var(--accent)}
+.room-item .t1{font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center;color:var(--text)}
+.room-item .t2{font-size:11px;color:var(--muted);margin-top:2px;display:flex;gap:4px;flex-wrap:wrap}
+.room-item .del{opacity:0;color:var(--muted);font-size:12px;padding:0 3px;cursor:pointer}
+.room-item:hover .del{opacity:1}
+.room-item .del:hover{color:var(--red)}
+.rooms-main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.rooms-chathead{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap}
+.rooms-title{font-weight:600;font-size:14px;color:var(--text)}
+.room-members{display:flex;gap:5px;flex-wrap:wrap}
+.room-member{display:inline-flex;align-items:center;gap:3px;background:var(--accent-bg);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:999px}
+.rooms-msgs{flex:1;overflow-y:auto;padding:16px;background:var(--bg1)}
+.rooms-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);text-align:center;font-size:15px;gap:8px}
+.rooms-msgs .rm{display:flex;gap:10px;margin-bottom:14px}
+.rooms-msgs .rm .av{width:30px;height:30px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;color:var(--text2)}
+.rooms-msgs .rm.me .av{background:var(--accent);color:#fff}
+.rooms-msgs .rm .bd{flex:1;min-width:0}
+.rooms-msgs .rm .meta{font-size:11px;color:var(--muted);margin-bottom:2px}
+.rooms-msgs .rm .meta b{color:var(--text2)}
+.rooms-msgs .rm .tx{font-size:13px;line-height:1.7;word-break:break-word;white-space:pre-wrap;color:var(--text)}
+.rooms-msgs .rm .tool-line{font-size:11px;color:var(--muted);background:var(--bg3);border-radius:6px;padding:3px 8px;margin-top:4px;display:inline-block;font-family:var(--font)}
+.rooms-msgs .rm .thinking{font-size:11.5px;color:var(--muted);border-left:3px solid var(--warning);padding:4px 10px;margin-top:4px;background:var(--bg2);border-radius:4px;white-space:pre-wrap;display:none}
+.rooms-msgs .rm .thinking.open{display:block}
+.rooms-msgs .rm .thinking .rt-ttl{cursor:pointer}
+.rooms-input{border-top:1px solid var(--border);background:var(--bg2);padding:10px 14px}
+.rooms-atbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;min-height:0}
+.rooms-atbar:empty{display:none}
+.rooms-atbar .at-chip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-bg);color:var(--accent);font-size:11.5px;padding:3px 9px;border-radius:999px;font-weight:500}
+.rooms-atbar .at-chip .x{cursor:pointer;opacity:.7;margin-left:3px}
+.rooms-inputrow{display:flex;gap:8px;align-items:flex-end}
+.rooms-inputrow textarea{flex:1;resize:none;min-height:38px;max-height:140px;background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 11px;color:var(--text);outline:none}
+.rooms-inputrow textarea:focus{border-color:var(--accent)}
+.room-ck{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:var(--radius-md);cursor:pointer;font-size:12.5px;color:var(--text)}
+.room-ck:hover{background:var(--bg1)}
 </style>
 <script src="scripts/marked.min.js"></script>
 <script src="scripts/purify.min.js"></script>
@@ -1150,6 +1202,7 @@
   <nav class="global-sidebar">
     <button class="nav-btn" title="概览" onclick="switchPage('overview')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>概览</button>
     <button class="nav-btn active" title="对话" onclick="switchPage('chat')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>对话</button>
+    <button class="nav-btn" title="群聊" onclick="switchPage('rooms')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M5 21v-2a4 4 0 0 1 4-4h2"/><path d="M13 21v-2a4 4 0 0 1 4-4h2"/><path d="M12 17v4"/></svg>群聊</button>
     <button class="nav-btn" title="专家" onclick="switchPage('experts')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/><path d="M18 3l.9 2.1L21 6l-2.1.9L18 9l-.9-2.1L15 6l2.1-.9L18 3z"/></svg>专家</button>
     <button class="nav-btn" title="模型" onclick="switchPage('models')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>模型</button>
     <button class="nav-btn" title="扩展" onclick="switchPage('extensions')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>扩展</button>
@@ -1335,6 +1388,41 @@
             </div>
           </aside>
         </main>
+
+        <!-- 群聊页（多 Agent 协作房间，Socket.IO 风格实时群聊；全部走 Hermes 会话） -->
+        <section class="page" id="page-rooms">
+          <div class="page-header"><h1>群聊</h1><button class="ov-actbtn mobile-only" id="roomListToggle" onclick="toggleRoomListMobile()" style="display:none">☰ 房间</button><button class="ov-actbtn" onclick="renderRoomsPage()" style="margin-left:auto">↻ 刷新</button><button class="ov-actbtn" onclick="roomCreateDialog()">＋ 新建房间</button></div>
+          <div class="page-body">
+            <div class="rooms-layout">
+              <div class="rooms-side">
+                <div class="rooms-list" id="roomList"></div>
+              </div>
+              <div class="rooms-main">
+                <div class="rooms-chathead">
+                  <div class="rooms-title" id="roomTitle">选择或创建群聊房间</div>
+                  <div class="room-members" id="roomMembers"></div>
+                </div>
+                <div class="rooms-msgs" id="roomMsgs"><div class="rooms-empty">👥 多 Agent 协作房间<br><span style="font-size:12px;color:var(--muted)">创建房间并邀请多位专家（268 专家 + 16 MBTI 人格）。发消息时 @ 成员（可多选），每位被 @ 的专家用独立的 Hermes 会话并行回复，实时汇入房间。底子全部是 Hermes。</span></div></div>
+                <div class="rooms-input">
+                  <div class="rooms-atbar" id="roomAtBar"></div>
+                  <div class="input-outer" style="background:transparent;border:none;padding:0">
+                    <div class="input-wrap">
+                      <textarea id="roomCompose" rows="1" placeholder="和群聊成员说点什么吧~（可 Ctrl+V 粘贴图片，@ 成员并行回复）"></textarea>
+                      <div class="input-btns">
+                        <button class="gen-send" id="roomSendBtn" onclick="roomSend()" title="发送"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg></button>
+                      </div>
+                    </div>
+                    <div class="toolbar" id="roomToolbar" style="display:flex">
+                      <button class="tool-btn" data-tip="@ 成员（并行回复）" onclick="roomAtDialog()" id="roomAtBtn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+                      <button class="tool-btn" data-tip="上传附件" onclick="roomAttachClick()" id="roomAttachBtn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                      <button class="tool-btn" data-tip="房间共享记忆" onclick="roomMemoryDialog()" id="roomMemBtn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4 7l-1 4H10l-1-4C7 14.5 5 12 5 9a7 7 0 0 1 7-7z"/></svg></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <!-- 专家页（v2 独立页：我的 / 内置 两页签，专家市场已并入内置） -->
         <section class="page" id="page-experts">
@@ -6852,7 +6940,7 @@ function renderRail(){
           return '<div class="session-item" onclick="openChannelSession(\''+esc(chId)+'\',\''+esc(s.id)+'\')">' +
             '<span class="dot"></span>'+
             '<span class="si-body"><span class="title">'+esc(title)+'</span>'+(meta?'<span class="meta">'+meta+'</span>':'')+'</span>'+
-            '</div>';
+            '<span class="del" title="删除该通道会话" onclick="delChannelSession(\''+esc(chId)+'\',\''+esc(s.id)+'\',event)">×</span></div>';
         }).join('');
       } else {
         html += '<div class="empty-sess">暂无会话</div>';
@@ -6974,6 +7062,26 @@ function delSession(aid, sid, e){
       else { var b = document.getElementById('chatBody'); if(b) b.innerHTML = '<div class="system-tip">没有打开的会话，点击右上角 + 新建</div>'; }
     })
     .catch(function(){ toast('删除会话失败'); });
+}
+/* 删除通道会话（cron/微信/QQ 等）：调 monitor 删除 API（gateway 优先，dashboard 兜底），成功后本地移除 */
+function delChannelSession(chId, sid, e){
+  if(e && e.stopPropagation) e.stopPropagation();
+  if(!confirm('确定删除该通道会话？将删除 Hermes 中的该会话记录。')) return;
+  var hd = monitorToken ? { 'X-Monitor-Token': monitorToken } : {};
+  fetch(apiUrl('/api/channel-sessions/'+encodeURIComponent(sid)), { method:'DELETE', headers:hd })
+    .then(function(r){ return r.json().catch(function(){ return {}; }); })
+    .then(function(j){
+      if(j && j.ok){
+        toast('已删除通道会话');
+        if(_channelSessions && _channelSessions[chId]){
+          _channelSessions[chId] = _channelSessions[chId].filter(function(s){ return String(s.id)!==String(sid); });
+          renderRail();
+        }
+      } else {
+        toast('删除失败: '+((j&&j.error)||'未知错误'),'error');
+      }
+    })
+    .catch(function(){ toast('删除失败','error'); });
 }
 /* 会话重命名：列表项 ✎ / 标签页 ✎ → prompt → POST /api/sessions/rename → 刷新列表与标签 */
 function renameSession(sid, e){
@@ -7113,7 +7221,7 @@ function msgHTML(m){
   var text = parts.text, imgs = parts.images;
   var imgHtml = imgStackHTML(imgs);
   if(m.role === 'user'){
-    return '<div class="msg user"><div class="msg-bubble">'+escapeHtml(text).replace(/\n/g,'<br>')+imgHtml+'</div><div class="msg-meta">你 · '+fmtDateTime(m.ts||m.created_at||Date.now())+'</div></div>';
+    return '<div class="msg user"><div class="chat-sender">你</div><div class="msg-bubble">'+escapeHtml(text).replace(/\n/g,'<br>')+imgHtml+'</div><div class="msg-meta">你 · '+fmtDateTime(m.ts||m.created_at||Date.now())+'</div></div>';
   }
   var toolsHtml = toolCallsHTML(m.tools);
   var msgText = esc(text).replace(/'/g,"\\'").replace(/\n/g,' ');
@@ -7122,7 +7230,7 @@ function msgHTML(m){
     '<button class="msg-act-btn" onclick="quoteMsg(this)" title="引用回复"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>引用</button>' +
     '<button class="msg-act-btn" onclick="forkMsg(this)" title="Fork 新话题"><svg viewBox="0 0 24 24"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9"/><path d="M12 12v3"/></svg>Fork</button>' +
     '</div>';
-  return '<div class="msg assistant" data-content="'+esc(text).replace(/"/g,'&quot;').replace(/\n/g,'&#10;')+'"><div class="msg-bubble">'+renderMarkdown(text)+imgHtml+toolsHtml+'</div>'+actionsHtml+'<div class="msg-meta">Hermes · '+fmtDateTime(m.ts||m.created_at||Date.now())+'</div></div>';
+  return '<div class="msg assistant" data-content="'+esc(text).replace(/"/g,'&quot;').replace(/\n/g,'&#10;')+'"><div class="chat-sender">'+(m.sender||m.persona_name||chatSenderName())+'</div><div class="msg-bubble">'+renderMarkdown(text)+imgHtml+toolsHtml+'</div>'+actionsHtml+'<div class="msg-meta">'+(m.sender||m.persona_name||chatSenderName())+' · '+fmtDateTime(m.ts||m.created_at||Date.now())+'</div></div>';
 }
 
 /* ── 聊天图片：卡片式堆叠 + 灯箱大图（点击任意卡片查看，←/→ 上下页切换，Esc 关闭）── */
@@ -8250,7 +8358,7 @@ function rtSend(userText){
   _rtState.stopped = false; _rtState.ended = false;
   // 显示用户消息
   var userDiv=document.createElement('div'); userDiv.className='msg user';
-  userDiv.innerHTML='<div class="msg-bubble">'+escapeHtml(userText).replace(/\n/g,'<br>')+'</div><div class="msg-meta">你 · '+fmtDateTime(Date.now())+'</div>';
+  userDiv.innerHTML='<div class="chat-sender">你</div><div class="msg-bubble">'+escapeHtml(userText).replace(/\n/g,'<br>')+'</div><div class="msg-meta">你 · '+fmtDateTime(Date.now())+'</div>';
   body.appendChild(userDiv); body.scrollTop=body.scrollHeight;
   condenseChatBody();
   _rtState.history.push({ role:'user', name:'用户', content:userText });
@@ -8627,10 +8735,13 @@ function closeRailDrawer(){
 /* 两级折叠：0=全部展开；1=会话树折叠；2=会话树+左侧菜单栏全折叠（类似 Octop） */
 var _railState = 0;
 function applyRailState(){
+  var mobile = (window.matchMedia && window.matchMedia('(max-width:768px)').matches) || window.innerWidth<=768;
   var rail=document.getElementById('chatRail');
   var sb=document.querySelector('.global-sidebar');
+  // 移动端：会话树强制折叠（抽屉模式，用户点「打开会话树」按钮才显示），忽略桌面持久化展开状态
+  var railState = mobile ? 1 : _railState;
   var collapsed = _railState===2;
-  if(rail) rail.classList.toggle('hidden', _railState>=1);
+  if(rail) rail.classList.toggle('hidden', railState>=1);
   if(sb) sb.classList.toggle('collapsed', collapsed);
   var siO=document.getElementById('sidebarIconOpen'), siC=document.getElementById('sidebarIconClose');
   if(siO) siO.style.display = collapsed?'block':'none';
@@ -8890,14 +9001,14 @@ function sendRaw(text){
   var userDiv = document.createElement('div'); userDiv.className='msg user';
   var chips = attachments.map(function(a){ return '<span class="attach-chip">📎 '+esc(a.name||'附件')+'</span>'; }).join(' ');
   var redirectTag = _pendingRedirect ? '<span style="display:inline-block;background:var(--accent);color:#fff;font-size:10px;border-radius:4px;padding:1px 6px;margin-right:6px">🎯 纠偏</span>' : '';
-  userDiv.innerHTML = '<div class="msg-bubble">'+quoteHtml+redirectTag+escapeHtml(text).replace(/\n/g,'<br>')+(chips?'<div style="margin-top:6px">'+chips+'</div>':'')+'</div><div class="msg-meta">你 · '+fmtDateTime(Date.now())+'</div>';
+  userDiv.innerHTML = '<div class="chat-sender">你</div><div class="msg-bubble">'+quoteHtml+redirectTag+escapeHtml(text).replace(/\n/g,'<br>')+(chips?'<div style="margin-top:6px">'+chips+'</div>':'')+'</div><div class="msg-meta">你 · '+fmtDateTime(Date.now())+'</div>';
   body.appendChild(userDiv); body.scrollTop=body.scrollHeight;
   condenseChatBody();
 
   var asst = document.createElement('div'); asst.className='msg assistant';
   var _tcHidden = (PV.Store.load().chat || {}).tools_hidden;
   var _tcStyle = _tcHidden ? ' style="display:none"' : '';
-  asst.innerHTML = '<div class="msg-bubble"><div class="md-text"><span class="cursor-blink">|</span></div><div class="chat-info"></div><div class="tool-calls" data-collapsed="true"'+_tcStyle+'><div class="tool-summary" onclick="toggleToolCalls(this.parentNode)"><span class="tc-ico">🛠</span><span class="tc-text">工具调用</span><span class="tc-toggle">展开 ▾</span></div><div class="tool-list"></div></div></div><div class="msg-meta">Hermes · '+fmtDateTime(Date.now())+'</div>';
+  asst.innerHTML = '<div class="chat-sender">'+chatSenderName()+'</div><div class="msg-bubble"><div class="md-text"><span class="cursor-blink">|</span></div><div class="chat-info"></div><div class="tool-calls" data-collapsed="true"'+_tcStyle+'><div class="tool-summary" onclick="toggleToolCalls(this.parentNode)"><span class="tc-ico">🛠</span><span class="tc-text">工具调用</span><span class="tc-toggle">展开 ▾</span></div><div class="tool-list"></div></div></div><div class="msg-meta">'+chatSenderName()+' · '+fmtDateTime(Date.now())+'</div>';
   body.appendChild(asst); body.scrollTop=body.scrollHeight;
   var mdEl = asst.querySelector('.md-text');
   var toolBox = asst.querySelector('.tool-calls');
@@ -9058,7 +9169,7 @@ function sendRaw(text){
         // 流式进行中（有运行中的工具）保持展开；全部完成后折叠
         // 尊重设置：tools_collapse 开启时始终折叠，tools_hidden 开启时保持隐藏
         var _chat = (PV.Store.load().chat) || {};
-        if(running && !_chat.tools_hidden) toolBox.setAttribute('data-collapsed', _chat.tools_collapse ? 'true' : 'false');
+        if(running && !_chat.tools_hidden) toolBox.setAttribute('data-collapsed','true'); // v0.21.103: 执行中保持折叠，点展开才看
         if(_chat.tools_hidden) toolBox.style.display='none';
         body.scrollTop=body.scrollHeight;
         _chatHTML[sid] = body.innerHTML;
@@ -9079,7 +9190,7 @@ function sendRaw(text){
         if(meta){
           var t = (u.total_tokens!=null) ? u.total_tokens
                 : ((u.prompt_tokens||0) + (u.completion_tokens||0));
-          meta.textContent = 'Hermes · '+fmtDateTime(Date.now())+' · ' + t + ' tokens';
+          meta.textContent = chatSenderName()+' · '+fmtDateTime(Date.now())+' · ' + t + ' tokens';
         }
       },
       onError: function(err){ var _raw = String(err||''); var _needCfg = /No inference provider configured/i.test(_raw); var _html = _needCfg ? '⚠ 尚未配置模型服务：请先到「模型」页添加模型供应商并填写 API Key。<br><span style="font-size:11px;opacity:.8">（网关返回：'+esc(_raw)+'）</span>' : '⚠ '+esc(_raw); mdEl.innerHTML = '<span class="error-text">'+_html+'</span>' + (_needCfg ? '<div style="margin-top:8px"><button onclick="switchPage(\'models\')" style="padding:5px 12px;border-radius:8px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer;font-size:12px">去配置模型 →</button></div>' : ''); if(_needCfg) renderConfigBanner(); genBarDone('error','回复出错'); _tabStreaming[sid]=false; renderSessionTabs(); _chatHTML[sid] = body.innerHTML; _voiceStreamStop(); },
@@ -9094,8 +9205,7 @@ function sendRaw(text){
         if(toolBox){
           var anyRunning = toolList.querySelector('.tool-call.running');
           var _ch2 = (PV.Store.load().chat) || {};
-          if(!anyRunning || _ch2.tools_collapse){ toolBox.setAttribute('data-collapsed','true'); updateToolSummary(); }
-          else { toolBox.setAttribute('data-collapsed','false'); updateToolSummary(); }
+          toolBox.setAttribute('data-collapsed','true'); updateToolSummary(); // v0.21.103: 完成后始终折叠
         }
         hideScrollBtn();
         _msgState.streaming=false; _msgState.abortCtrl=null;
@@ -9525,11 +9635,11 @@ function expertsList(){
    打包后的 app 中 js/personas_library.js 可能因浏览器缓存/加载时序失败，这里兜底注入并回调重渲染。
    采用版本号缓存键（替代 Date.now() 强制每次重下载）+ 多次重试，确保 268 位专家必然加载。 */
 function ensurePersonasLibrary(cb, attempt){
-  if(window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length){ if(cb) cb(); return; }
+  if(window.AGENCY_PERSONAS && window.AGENCY_PERSONAS.length){ mbtiInject(); if(cb) cb(); return; }
   attempt = attempt || 1;
   var s = document.createElement('script');
   s.src = 'js/personas_library.js?v=' + (window.__APP_VER__ || 'app') + '&t=' + attempt;
-  s.onload = function(){ if(cb) cb(); };
+  s.onload = function(){ mbtiInject(); if(cb) cb(); };
   s.onerror = function(){
     if(attempt < 4){ setTimeout(function(){ ensurePersonasLibrary(cb, attempt + 1); }, 400 * attempt); }
     else if(cb) cb();
@@ -10142,6 +10252,7 @@ function switchPage(name){
   if(name==='models') renderProviders();
   if(name==='extensions') renderExtensions();
   if(name==='experts') renderExpertsPage();
+  if(name==='rooms'){ ensurePersonasLibrary(mbtiInject); renderRoomsPage(); }
   if(name==='updates'){ checkHermesUpdate(); checkAppUpdate(); }
   if(name==='settings') renderSettings();
   if(name==='kb'){ kbLoadTree(); }
@@ -14214,7 +14325,7 @@ function openChannelModal(id){
   html += '</div>';
   // 二维码登录类渠道：不直接弹出二维码，改为「扫码 / 手动输入」选择视图
   if(def.qrLogin){
-    var qrFn = id==='telegram' ? 'chStartTelegramQr()' : (id==='whatsapp' ? 'chStartWhatsAppQr()' : (id==='weixin' ? 'chStartWeixinQr()' : (id==='wecom' ? 'chStartWecomQr()' : '')));
+    var qrFn = id==='telegram' ? 'chStartTelegramQr()' : (id==='whatsapp' ? 'chStartWhatsAppQr()' : (id==='weixin' ? 'chStartWeixinQr()' : (id==='wecom' ? 'chStartWecomQr()' : (id==='qqbot' ? 'chStartQqbotQr()' : ''))));
     var choice = '<div class="qr-choice">'+
       '<div class="conn-hint" style="margin-bottom:12px">该渠道支持扫码登录或手动填写 Token，请选择一种方式：</div>'+
       '<div class="qr-choice-row">'+
@@ -14719,7 +14830,269 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
+/* ───────────── v0.25 融合：群聊房间 + MBTI（Octop/CowAgent 理念，全部以 Hermes 为底子） ───────────── */
+
+/* ── MBTI 16 人格（Octop 亮点融合，注入专家库） ── */
+var MBTI_PERSONAS=[
+  {id:"mbti_intj",type:"INTJ",label:"建筑师",emoji:"🧠",desc:"独立自主的战略思想家，擅长长期规划与系统性架构",prompt:"你是 INTJ「建筑师」人格。特点：理性、独立、战略性强，擅长长期规划与复杂系统架构。沟通直接、注重效率，讨厌空谈，习惯用框架拆解问题。请以建筑师人格回应。"},
+  {id:"mbti_intp",type:"INTP",label:"逻辑学家",emoji:"🔬",desc:"求知欲旺盛的发明家，热衷分析、理论与创新",prompt:"你是 INTP「逻辑学家」人格。特点：求知欲强、思维发散、热爱理论与创新，善于发现系统中的矛盾与漏洞。表达偏冷静分析，喜欢探讨可能性。请以逻辑学家人格回应。"},
+  {id:"mbti_entj",type:"ENTJ",label:"指挥官",emoji:"👑",desc:"天生的领导者，果断高效，擅长组织与执行",prompt:"你是 ENTJ「指挥官」人格。特点：目标导向、果断自信、天然领袖气质，善于组织资源推动执行。沟通强势直接，关注结果与效率。请以指挥官人格回应。"},
+  {id:"mbti_entp",type:"ENTP",label:"辩论家",emoji:"⚡",desc:"机敏的思想者，热爱挑战常规与智力交锋",prompt:"你是 ENTP「辩论家」人格。特点：机智敏捷、热爱辩论与头脑风暴，善于提出反直觉的洞见，享受挑战常规。请以辩论家人格回应。"},
+  {id:"mbti_infj",type:"INFJ",label:"提倡者",emoji:"🕊️",desc:"安静而富有洞察力的理想主义者",prompt:"你是 INFJ「提倡者」人格。特点：安静深沉、富有洞察力与同理心，坚持原则与理想，善于倾听并给出富有远见的建议。请以提倡者人格回应。"},
+  {id:"mbti_infp",type:"INFP",label:"调停者",emoji:"🌱",desc:"理想主义诗人，重视价值观与内心真实",prompt:"你是 INFP「调停者」人格。特点：理想主义、敏感细腻，重视价值观与真实性，表达温和富有诗意。请以调停者人格回应。"},
+  {id:"mbti_enfj",type:"ENFJ",label:"主人公",emoji:"🌟",desc:"富有感召力的导师型领导者",prompt:"你是 ENFJ「主人公」人格。特点：热情、有号召力、善于激励他人，天生导师气质，关注他人成长。请以主人公人格回应。"},
+  {id:"mbti_enfp",type:"ENFP",label:"竞选者",emoji:"🎈",desc:"热情洋溢的探索者，充满创意与活力",prompt:"你是 ENFP「竞选者」人格。特点：热情开朗、创意无限、好奇心强，善于点燃他人热情，思维跳跃而富有感染力。请以竞选者人格回应。"},
+  {id:"mbti_istj",type:"ISTJ",label:"物流师",emoji:"📋",desc:"务实可靠的事实核查者，注重秩序与责任",prompt:"你是 ISTJ「物流师」人格。特点：务实、可靠、重秩序，讲求事实与流程，责任感强。表达严谨、按部就班。请以物流师人格回应。"},
+  {id:"mbti_isfj",type:"ISFJ",label:"守卫者",emoji:"🛡️",desc:"温暖尽责的守护者，默默付出",prompt:"你是 ISFJ「守卫者」人格。特点：温暖、尽责、注重细节，默默支持他人，重视稳定与和谐。请以守卫者人格回应。"},
+  {id:"mbti_estj",type:"ESTJ",label:"总经理",emoji:"🏢",desc:"高效务实的管理者，重视规则与秩序",prompt:"你是 ESTJ「总经理」人格。特点：高效务实、重视规则与秩序，天生的管理者，强调执行与纪律。请以总经理人格回应。"},
+  {id:"mbti_esfj",type:"ESFJ",label:"执政官",emoji:"🤝",desc:"热心友善的社区组织者",prompt:"你是 ESFJ「执政官」人格。特点：热心、友善、善于组织，重视人际关系与和谐氛围，乐于助人。请以执政官人格回应。"},
+  {id:"mbti_istp",type:"ISTP",label:"鉴赏家",emoji:"🔧",desc:"冷静机敏的实践者，动手能力极强",prompt:"你是 ISTP「鉴赏家」人格。特点：冷静、机敏、动手能力强，喜欢探索事物运作原理，独立务实。请以鉴赏家人格回应。"},
+  {id:"mbti_isfp",type:"ISFP",label:"探险家",emoji:"🎨",desc:"随性自由的艺术家，感受当下美好",prompt:"你是 ISFP「探险家」人格。特点：随性、自由、富有艺术气质，注重当下体验与美感，低调而真诚。请以探险家人格回应。"},
+  {id:"mbti_estp",type:"ESTP",label:"企业家",emoji:"🚀",desc:"精力充沛的行动派，临场应变大师",prompt:"你是 ESTP「企业家」人格。特点：精力充沛、行动力强、临场应变出色，喜欢冒险与实战。请以企业家人格回应。"},
+  {id:"mbti_esfp",type:"ESFP",label:"表演者",emoji:"🎭",desc:"热情外向的表演者，把快乐带给所有人",prompt:"你是 ESFP「表演者」人格。特点：热情外向、感染力强、享受当下，擅长营造轻松氛围。请以表演者人格回应。"}
+];
+function mbtiInject(){
+  try{
+    if(!window.AGENCY_PERSONAS || !window.AGENCY_PERSONAS.length) return;
+    if(window.AGENCY_PERSONAS.some(function(x){ return x.id==='mbti_intj'; })) return;
+    MBTI_PERSONAS.forEach(function(x){
+      AGENCY_PERSONAS.push({ id:x.id, dept:'mbti', dept_label:'MBTI 人格', emoji:x.emoji, label:x.type+' · '+x.label, desc:x.desc, prompt:x.prompt });
+    });
+    if(window.AGENCY_DEPTS && !AGENCY_DEPTS.some(function(d){ return d.id==='mbti'; })){
+      AGENCY_DEPTS.push({ id:'mbti', label:'MBTI 人格', count:16 });
+    }
+  }catch(e){}
+}
+
+/* ── 群聊房间（多 Agent 协作；成员回复 = 独立 Hermes 会话，SSE 实时广播） ── */
+var roomsStore=[]; var currentRoom=null; var roomAt=new Set(); var roomEventSrc=null; var roomLive={};
+function renderRoomsPage(){ loadRoomsList(); }
+function loadRoomsList(){
+  return api('/api/rooms','GET').then(function(r){
+    roomsStore=(r&&r.rooms)||[];
+    renderRoomList();
+    if(currentRoom && !roomsStore.find(function(x){ return String(x.id)===String(currentRoom); })){ currentRoom=null; roomResetView(); }
+    if(!currentRoom && roomsStore.length) selectRoom(roomsStore[0].id);
+    return roomsStore;
+  }).catch(function(){});
+}
+function renderRoomList(){
+  var box=document.getElementById('roomList'); if(!box) return;
+  box.innerHTML='';
+  if(!roomsStore.length){ box.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">暂无房间<br>点击「＋ 新建房间」创建</div>'; return; }
+  roomsStore.forEach(function(r){
+    var it=document.createElement('div'); it.className='room-item'+(String(r.id)===String(currentRoom)?' active':'');
+    var mems=(r.members||[]).map(function(m){ return (m.emoji||'')+m.label; }).join(' ');
+    it.innerHTML='<div class="t1"><span>'+escapeHtml(r.title||'群聊')+'</span><span class="del" onclick="event.stopPropagation();roomDelete(\''+r.id+'\')">✕</span></div>'+
+      '<div class="t2"><span>'+((r.members||[]).length+1)+' 成员</span><span>'+(r.message_count||0)+' 条</span>'+(mems?'<span style="color:var(--accent)">'+escapeHtml(mems)+'</span>':'')+'</div>';
+    it.onclick=function(){ selectRoom(r.id); };
+    box.appendChild(it);
+  });
+}
+function selectRoom(id){
+  currentRoom=id;
+  // v0.21.147：移动端选中房间后自动收起房间列表浮层（腾出聊天区域）
+  try{
+    var _sd=document.querySelector('.rooms-layout .rooms-side');
+    if(_sd&&_sd.classList.contains('m-open')){ _sd.classList.remove('m-open'); var _b=document.getElementById('roomListToggle'); if(_b) _b.textContent='☰ 房间'; }
+  }catch(e){}
+  renderRoomList();
+  api('/api/rooms/'+encodeURIComponent(id),'GET').then(function(r){
+    if(!r||!r.room) return;
+    var room=r.room;
+    var t=document.getElementById('roomTitle'); if(t) t.textContent=room.title||'群聊';
+    renderRoomMembers(room.members||[]);
+    renderRoomMessages(room.messages||[]);
+    connectRoomStream(id);
+  }).catch(function(){});
+}
+function roomResetView(){
+  var t=document.getElementById('roomTitle'); if(t) t.textContent='选择或创建群聊房间';
+  var mm=document.getElementById('roomMembers'); if(mm) mm.innerHTML='';
+  var ms=document.getElementById('roomMsgs'); if(ms) ms.innerHTML='<div class="rooms-empty">👥 多 Agent 协作房间</div>';
+  var ab=document.getElementById('roomAtBar'); if(ab) ab.innerHTML='';
+  roomAt.clear();
+}
+function renderRoomMembers(members){
+  var box=document.getElementById('roomMembers'); if(!box) return;
+  box.innerHTML='';
+  members.forEach(function(m){
+    var c=document.createElement('span'); c.className='room-member';
+    c.innerHTML=(m.emoji||'🧠')+' '+escapeHtml(m.label);
+    box.appendChild(c);
+  });
+}
+function renderRoomMessages(msgs){
+  var box=document.getElementById('roomMsgs'); if(!box) return;
+  box.innerHTML='';
+  if(!msgs.length){ roomResetView(); return; }
+  msgs.forEach(function(m){ roomMsgAppend(m.kind==='user'?'me':'member', m.label, m.text, m.from==='me'); });
+  box.scrollTop=box.scrollHeight;
+}
+function roomMsgAppend(kind,label,text,isMe,key){
+  var box=document.getElementById('roomMsgs'); if(!box) return;
+  var empty=box.querySelector('.rooms-empty'); if(empty) empty.remove();
+  var el=document.createElement('div'); el.className='rm'+(isMe?' me':'');
+  var av=isMe?'你':(label||'成员').slice(0,1);
+  el.innerHTML='<div class="av">'+escapeHtml(av)+'</div><div class="bd"><div class="meta"><b>'+escapeHtml(label||'成员')+'</b> <span>'+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</span></div><div class="tx">'+escapeHtml(text||'')+'</div></div>';
+  box.appendChild(el); box.scrollTop=box.scrollHeight;
+  return el;
+}
+function roomStreamEl(label){
+  var box=document.getElementById('roomMsgs'); if(!box) return null;
+  var empty=box.querySelector('.rooms-empty'); if(empty) empty.remove();
+  var el=document.createElement('div'); el.className='rm';
+  el.innerHTML='<div class="av">'+escapeHtml((label||'成员').slice(0,1))+'</div><div class="bd"><div class="meta"><b>'+escapeHtml(label)+'</b> <span>'+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</span></div><div class="tx"></div></div>';
+  box.appendChild(el); box.scrollTop=box.scrollHeight;
+  return el;
+}
+function connectRoomStream(id){
+  if(roomEventSrc){ try{ roomEventSrc.close(); }catch(e){} roomEventSrc=null; }
+  roomLive={};
+  var es=new EventSource(apiUrl('/api/rooms/'+encodeURIComponent(id)+'/events'));
+  roomEventSrc=es;
+  es.onmessage=function(ev){
+    var p; try{ p=JSON.parse(ev.data); }catch(e){ return; }
+    if(p.type==='user'){ roomMsgAppend('me','我',p.text,true); }
+    else if(p.type==='start'){
+      roomLive[p.key]={ el:roomStreamEl(p.label), text:'', reason:'' };
+    }else if(p.type==='delta'){
+      var l=roomLive[p.key]; if(!l||!l.el) return;
+      l.text+=p.delta;
+      var tx=l.el.querySelector('.tx'); if(tx) tx.textContent=l.text;
+      var box=document.getElementById('roomMsgs'); if(box) box.scrollTop=box.scrollHeight;
+    }else if(p.type==='reasoning'){
+      var l2=roomLive[p.key]; if(!l2||!l2.el) return;
+      l2.reason+=p.reasoning;
+      var th=l2.el.querySelector('.thinking');
+      if(!th){
+        var d=document.createElement('div'); d.className='thinking';
+        d.innerHTML='<span class="rt-ttl" onclick="this.parentElement.classList.toggle(\'open\')">🧠 思考过程</span><div style="display:none"></div>';
+        l2.el.querySelector('.tx').before(d);
+      }
+      var rcd=l2.el.querySelector('.thinking div'); if(rcd) rcd.textContent=l2.reason;
+    }else if(p.type==='tool'){
+      var l3=roomLive[p.key]; if(!l3||!l3.el) return;
+      var tl=document.createElement('div'); tl.className='tool-line'; tl.textContent='🛠 '+p.tool;
+      l3.el.querySelector('.bd').appendChild(tl);
+    }else if(p.type==='done'){
+      var l4=roomLive[p.key];
+      if(l4&&l4.el&&!l4.text){ var tx2=l4.el.querySelector('.tx'); if(tx2) tx2.textContent=p.text||'(空)'; }
+      delete roomLive[p.key];
+    }else if(p.type==='err'){
+      var l5=roomLive[p.key]; if(l5&&l5.el){ var tx3=l5.el.querySelector('.tx'); if(tx3) tx3.textContent='⚠️ '+p.error; }
+    }
+  };
+  es.onerror=function(){ /* EventSource 自动重连 */ };
+}
+function roomCreateDialog(){
+  var exps=(window.AGENCY_PERSONAS||[]);
+  if(!exps.length){ toast('专家库未加载，请稍后重试','error'); return; }
+  var opts=exps.slice(0,140).map(function(x){
+    return '<label class="room-ck"><input type="checkbox" value="'+x.id+'" data-label="'+escapeHtml(x.label)+'" data-emoji="'+escapeHtml(x.emoji||'🧠')+'" data-prompt="'+escapeHtml(x.prompt||'')+'" style="accent-color:var(--accent)"><span>'+escapeHtml(x.emoji||'🧠')+' '+escapeHtml(x.label)+' <span style="color:var(--muted);font-size:11px">'+escapeHtml(x.dept_label||'')+'</span></span></label>';
+  }).join('');
+  var html='<div class="modal-overlay" id="roomCreateOverlay" onclick="if(event.target===this)this.remove()">'+
+    '<div class="modal" style="max-width:560px">'+
+    '<div class="modal-head"><h3>＋ 创建群聊房间</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">×</button></div>'+
+    '<div class="modal-body" style="padding:16px;max-height:60vh;overflow-y:auto">'+
+    '<p style="font-size:12.5px;color:var(--text2);margin-bottom:12px;line-height:1.5">邀请专家成员（可多选，0 个则仅主 Hermes）。每位成员 = 独立 Hermes 会话 + 人格注入，发消息时 @ 成员并行回复。</p>'+
+    '<input type="text" id="roomCreateTitle" placeholder="房间名称（默认：群聊）" style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg1);color:var(--text);margin-bottom:12px">'+
+    '<div style="font-size:12.5px;font-weight:600;margin-bottom:8px;color:var(--text)">选择专家成员：</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;border:1px solid var(--border);border-radius:10px;padding:8px;max-height:300px;overflow-y:auto">'+opts+'</div>'+
+    '</div>'+
+    '<div class="modal-foot" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">'+
+    '<button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">取消</button>'+
+    '<button class="btn primary" onclick="roomCreateConfirm()">创建房间</button>'+
+    '</div></div></div>';
+  var div=document.createElement('div'); div.innerHTML=html; document.body.appendChild(div.firstChild);
+}
+function roomCreateConfirm(){
+  var title=(document.getElementById('roomCreateTitle').value||'').trim()||('群聊 '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
+  var members=[];
+  document.querySelectorAll('#roomCreateOverlay input:checked').forEach(function(cb){
+    members.push({ key:'exp_'+cb.value, label:cb.getAttribute('data-label'), emoji:cb.getAttribute('data-emoji'), persona_id:cb.value, system:cb.getAttribute('data-prompt') });
+  });
+  var ov=document.getElementById('roomCreateOverlay'); if(ov) ov.remove();
+  api('/api/rooms','POST',{title:title,members:members}).then(function(r){
+    if(r&&r.ok!==false){
+      roomsStore.unshift(r.room); renderRoomList(); selectRoom(r.room.id);
+      toast('房间已创建','success');
+    } else toast('创建失败: '+((r&&r.error)||''),'error');
+  }).catch(function(e){ toast('创建失败: '+e.message,'error'); });
+}
+function roomDelete(id){
+  if(!confirm('删除该群聊房间？')) return;
+  api('/api/rooms/'+encodeURIComponent(id),'DELETE').then(function(r){
+    if(r&&r.ok!==false){ roomsStore=roomsStore.filter(function(x){ return x.id!==id; }); renderRoomList(); roomResetView(); toast('已删除','success'); }
+  }).catch(function(){});
+}
+function roomAtDialog(){
+  if(!currentRoom) return;
+  var room=roomsStore.find(function(x){ return String(x.id)===String(currentRoom); });
+  if(!room||!(room.members||[]).length){ toast('该房间暂无成员，请先创建带专家的房间','error'); return; }
+  var html='<div class="modal-overlay" id="roomAtOverlay" onclick="if(event.target===this)this.remove()">'+
+    '<div class="modal" style="max-width:380px">'+
+    '<div class="modal-head"><h3>@ 成员（可多选，并行回复）</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">×</button></div>'+
+    '<div class="modal-body" style="padding:16px">'+
+    room.members.map(function(m){
+      var on=roomAt.has(m.key);
+      return '<label class="room-ck"><input type="checkbox" value="'+m.key+'"'+(on?' checked':'')+' style="accent-color:var(--accent)"><span>'+(m.emoji||'🧠')+' '+escapeHtml(m.label)+'</span></label>';
+    }).join('')+
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:8px">不选择任何成员 = 主 Hermes 回复</div>'+
+    '</div>'+
+    '<div class="modal-foot" style="padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">'+
+    '<button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">取消</button>'+
+    '<button class="btn primary" onclick="roomAtConfirm()">确定</button>'+
+    '</div></div></div>';
+  var div=document.createElement('div'); div.innerHTML=html; document.body.appendChild(div.firstChild);
+}
+function roomAtConfirm(){
+  roomAt.clear();
+  document.querySelectorAll('#roomAtOverlay input:checked').forEach(function(cb){ roomAt.add(cb.value); });
+  var ov=document.getElementById('roomAtOverlay'); if(ov) ov.remove();
+  roomRenderAtBar();
+}
+function roomRenderAtBar(){
+  var bar=document.getElementById('roomAtBar'); if(!bar) return;
+  bar.innerHTML='';
+  var room=roomsStore.find(function(x){ return String(x.id)===String(currentRoom); });
+  roomAt.forEach(function(k){
+    var m=(room&&room.members||[]).find(function(x){ return x.key===k; });
+    if(!m) return;
+    var c=document.createElement('span'); c.className='at-chip';
+    c.innerHTML=(m.emoji||'🧠')+' '+escapeHtml(m.label)+' <span class="x" onclick="roomAt.delete(\''+k+'\');roomRenderAtBar();">✕</span>';
+    bar.appendChild(c);
+  });
+}
+function roomSend(){
+  if(!currentRoom) return;
+  var ta=document.getElementById('roomCompose'); if(!ta) return;
+  var text=(ta.value||'').trim();
+  if(!text) return;
+  ta.value='';
+  var room=roomsStore.find(function(x){ return String(x.id)===String(currentRoom); });
+  var at=[];
+  if(roomAt.size){
+    roomAt.forEach(function(k){
+      var m=(room&&room.members||[]).find(function(x){ return x.key===k; });
+      if(m) at.push({ key:m.key, label:m.label, system:m.system||'', model:m.model||'', provider:'' });
+    });
+  }
+  api('/api/rooms/'+encodeURIComponent(currentRoom)+'/send','POST',{text:text,at:at}).then(function(r){
+    if(!r||r.ok===false) toast('发送失败: '+((r&&r.error)||''),'error');
+  }).catch(function(){});
+  if(!at.length) roomMsgAppend('member','Hermes','…',false);
+}
+var _roomComposeEl=document.getElementById('roomCompose');
+if(_roomComposeEl){
+  _roomComposeEl.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); roomSend(); }
+  });
+}
+
 </script>
+
+<script src="js/fusion-v030.js?v=0.21.142m"></script>
 
 <!-- BUILT v17 single-file UI | sources: preview_v17/{index.html,styles.css,data.js,app.js,js/ao_workflow_presets.js} | libs external: scripts/{marked,purify,qrcode}.min.js, js/personas_library.js -->
 </body>
